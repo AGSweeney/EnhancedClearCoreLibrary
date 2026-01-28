@@ -34,64 +34,12 @@ SOFTWARE.
   - Usage examples
   - Troubleshooting guide
 
-## Additional Documentation Files
-
-The following detailed documentation files provide in-depth information on specific topics:
-
-### Design and Architecture
-- **DESIGN_COORDINATED_ARCS.md** - Complete design guide
-  - Architecture overview
-  - Component design
-  - Integration details
-  - Performance considerations
-
-- **IMPLEMENTATION_SUMMARY.md** - Implementation overview
-  - Files created/modified
-  - Key features
-  - API usage
-  - Testing recommendations
-
-### Technical Details
-- **MOTION_SMOOTHNESS.md** - Motion smoothness analysis
-  - Smoothness characteristics
-  - Performance factors
-  - Quality examples
-  - Recommendations
-
-- **CONSTANT_PATH_VELOCITY.md** - Velocity control details
-  - Tangential velocity implementation
-  - Motor speed adaptation
-  - Mathematical foundation
-  - Verification methods
-
-- **ARC_PATH_DEVELOPMENT.md** - Path generation explanation
-  - How arc is developed
-  - Point-by-point calculation
-  - Comparison with chord-based methods
-
-- **ARC_POINT_COUNT.md** - Point count calculations
-  - Dynamic point generation
-  - Formula and examples
-  - Resolution analysis
-
-- **BRESENHAM_COMPARISON.md** - Algorithm comparison
-  - Parametric vs. Bresenham
-  - Trade-offs
-  - Why parametric was chosen
-
-- **UNIT_CONVERSION_DESIGN.md** - Unit conversion system design
-  - Architecture overview
-  - Supported units
-  - Conversion formulas
-  - Implementation details
-  - Usage examples
-
 ## Quick Start
 
-1. Read **[README.md](README.md)** for complete overview
-2. Review **DESIGN_COORDINATED_ARCS.md** for architecture details
-3. Check **CONSTANT_PATH_VELOCITY.md** for velocity control understanding
-4. See examples in README.md Usage Guide section
+1. Read **[README.md](README.md)** for complete overview and usage guide
+2. Review the Usage Guide section in README.md for code examples
+3. Check the API Reference section for detailed method documentation
+4. See example applications in the Examples section
 
 ## Code Examples
 
@@ -104,6 +52,12 @@ Example applications:
   - Demonstrates single motor moves with units
   - Shows coordinated linear and arc moves
   - Includes feed rate programming in physical units
+
+## Related Documentation
+
+Additional documentation files in the project root:
+- **[NEW_FILES.md](../../NEW_FILES.md)** - Complete listing of all new files added for coordinated motion and unit support
+- **[MODIFICATIONS.md](../../MODIFICATIONS.md)** - Detailed list of modifications made to Teknic files
 
 ## Support
 

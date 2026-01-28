@@ -93,7 +93,7 @@ int32_t arcCenterX = 0;     // Arc center X position
 int32_t arcCenterY = 0;     // Arc center Y position
 
 // Coordinated motion controller instance
-CoordinatedMotionController arcController;
+CoordinatedMotionController motionController;
 
 // Declares user-defined helper functions.
 bool ExecuteArcMove(double startAngle, double endAngle, bool clockwise);
@@ -169,7 +169,7 @@ int main() {
     }
 
     // Initialize coordinated motion controller
-    if (!arcController.Initialize(&motorX, &motorY)) {
+    if (!motionController.Initialize(&motorX, &motorY)) {
         SerialPort.SendLine("ERROR: Failed to initialize coordinated motion controller");
         while (true) {
             continue;
@@ -179,11 +179,11 @@ int main() {
     SerialPort.SendLine("Coordinated motion controller initialized");
     
     // Set arc motion parameters
-    arcController.ArcVelMax(arcVelocityLimit);
-    arcController.ArcAccelMax(arcAccelerationLimit);
+    motionController.ArcVelMax(arcVelocityLimit);
+    motionController.ArcAccelMax(arcAccelerationLimit);
     
     // Set initial position (assuming motors start at 0, 0)
-    arcController.SetPosition(0, 0);
+    motionController.SetPosition(0, 0);
     
     SerialPort.SendLine();
     SerialPort.SendLine("Starting arc moves...");
@@ -210,9 +210,9 @@ int main() {
         
         // Example 3: Return to start with arcs
         SerialPort.SendLine("Example 3: Return to start");
-        arcController.MoveArc(arcCenterX, arcCenterY, arcRadius,
+        motionController.MoveArc(arcCenterX, arcCenterY, arcRadius,
                               3 * M_PI / 2, 2 * M_PI, true);
-        while (!arcController.ArcComplete()) {
+        while (!motionController.ArcComplete()) {
             Delay_ms(10);
         }
         SerialPort.SendLine("Returned to start");
@@ -245,17 +245,17 @@ bool ExecuteArcMove(double startAngle, double endAngle, bool clockwise) {
     }
     
     // Command the arc move
-    arcController.MoveArc(arcCenterX, arcCenterY, arcRadius,
+    motionController.MoveArc(arcCenterX, arcCenterY, arcRadius,
                           startAngle, endAngle, clockwise);
     
     // Wait for arc to complete
     uint32_t lastStatusTime = Milliseconds();
-    while (!arcController.ArcComplete() &&
+    while (!motionController.ArcComplete() &&
            !motorX.StatusReg().bit.AlertsPresent && 
            !motorY.StatusReg().bit.AlertsPresent) {
         if (Milliseconds() - lastStatusTime > 1000) {
             SerialPort.Send("Arc in progress... Queued arcs: ");
-            SerialPort.SendLine(arcController.QueueCount());
+            SerialPort.SendLine(motionController.QueueCount());
             lastStatusTime = Milliseconds();
         }
         Delay_ms(10);
@@ -285,23 +285,23 @@ bool ExecuteArcMove(double startAngle, double endAngle, bool clockwise) {
 bool ExecuteContinuousArcs() {
     // Chain four 90-degree arcs to form a complete circle
     // Start from current position
-    arcController.MoveArcContinuous(arcCenterX, arcCenterY, arcRadius,
+    motionController.MoveArcContinuous(arcCenterX, arcCenterY, arcRadius,
                                     M_PI / 2, true);
-    arcController.MoveArcContinuous(arcCenterX, arcCenterY, arcRadius,
+    motionController.MoveArcContinuous(arcCenterX, arcCenterY, arcRadius,
                                     M_PI, true);
-    arcController.MoveArcContinuous(arcCenterX, arcCenterY, arcRadius,
+    motionController.MoveArcContinuous(arcCenterX, arcCenterY, arcRadius,
                                     3 * M_PI / 2, true);
-    arcController.MoveArcContinuous(arcCenterX, arcCenterY, arcRadius,
+    motionController.MoveArcContinuous(arcCenterX, arcCenterY, arcRadius,
                                     2 * M_PI, true);
     
     // Wait for all arcs to complete
     uint32_t lastStatusTime = Milliseconds();
-    while (!arcController.ArcComplete() &&
+    while (!motionController.ArcComplete() &&
            !motorX.StatusReg().bit.AlertsPresent && 
            !motorY.StatusReg().bit.AlertsPresent) {
         if (Milliseconds() - lastStatusTime > 1000) {
             SerialPort.Send("Arcs in progress... Queued arcs: ");
-            SerialPort.SendLine(arcController.QueueCount());
+            SerialPort.SendLine(motionController.QueueCount());
             lastStatusTime = Milliseconds();
         }
         Delay_ms(10);

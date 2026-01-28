@@ -584,10 +584,10 @@ ConnectorM1.EnableRequest(true);
 #### 3. Create Controller
 
 ```cpp
-CoordinatedMotionController arcController;
+CoordinatedMotionController motionController;
 
 // Initialize with two motors
-if (!arcController.Initialize(&ConnectorM0, &ConnectorM1)) {
+if (!motionController.Initialize(&ConnectorM0, &ConnectorM1)) {
     // Handle error
 }
 ```
@@ -596,13 +596,13 @@ if (!arcController.Initialize(&ConnectorM0, &ConnectorM1)) {
 
 ```cpp
 // Set velocity (tangential speed along path)
-arcController.ArcVelMax(5000);  // 5000 steps/sec
+motionController.ArcVelMax(5000);  // 5000 steps/sec
 
 // Set acceleration limit
-arcController.ArcAccelMax(50000);  // 50000 steps/sec²
+motionController.ArcAccelMax(50000);  // 50000 steps/sec²
 
 // Set initial position (if not starting at origin)
-arcController.SetPosition(0, 0);
+motionController.SetPosition(0, 0);
 ```
 
 #### 5. (Optional) Configure Unit Conversion
@@ -610,15 +610,15 @@ arcController.SetPosition(0, 0);
 ```cpp
 // Configure mechanical parameters for X-axis motor
 // Motor: 800 steps/rev, 5mm pitch ball screw
-arcController.SetMechanicalParamsX(800, 5.0, UNIT_MM);
+motionController.SetMechanicalParamsX(800, 5.0, UNIT_MM);
 
 // Configure mechanical parameters for Y-axis motor
-arcController.SetMechanicalParamsY(800, 5.0, UNIT_MM);
+motionController.SetMechanicalParamsY(800, 5.0, UNIT_MM);
 
 // Set feed rate in physical units
-arcController.ArcFeedRateInchesPerMin(100.0);
+motionController.ArcFeedRateInchesPerMin(100.0);
 // or
-arcController.ArcFeedRateMMPerMin(2540.0);
+motionController.ArcFeedRateMMPerMin(2540.0);
 ```
 
 ### Single Arc Move
@@ -628,7 +628,7 @@ arcController.ArcFeedRateMMPerMin(2540.0);
 ```cpp
 // Move in a 90° arc, radius 10000 steps, clockwise
 // Center at (0, 0), from 0° to 90°
-arcController.MoveArc(
+motionController.MoveArc(
     0,              // centerX
     0,              // centerY
     10000,          // radius (steps)
@@ -638,7 +638,7 @@ arcController.MoveArc(
 );
 
 // Wait for completion
-while (!arcController.ArcComplete()) {
+while (!motionController.ArcComplete()) {
     Delay_ms(10);
 }
 ```
@@ -647,7 +647,7 @@ while (!arcController.ArcComplete()) {
 
 ```cpp
 // Arc centered at (5000, 5000)
-arcController.MoveArc(
+motionController.MoveArc(
     5000,           // centerX
     5000,           // centerY
     10000,          // radius
@@ -663,13 +663,13 @@ arcController.MoveArc(
 
 ```cpp
 // Chain four 90° arcs to form a complete circle
-arcController.MoveArcContinuous(0, 0, 10000, M_PI / 2, true);
-arcController.MoveArcContinuous(0, 0, 10000, M_PI, true);
-arcController.MoveArcContinuous(0, 0, 10000, 3 * M_PI / 2, true);
-arcController.MoveArcContinuous(0, 0, 10000, 2 * M_PI, true);
+motionController.MoveArcContinuous(0, 0, 10000, M_PI / 2, true);
+motionController.MoveArcContinuous(0, 0, 10000, M_PI, true);
+motionController.MoveArcContinuous(0, 0, 10000, 3 * M_PI / 2, true);
+motionController.MoveArcContinuous(0, 0, 10000, 2 * M_PI, true);
 
 // Wait for all arcs to complete
-while (!arcController.ArcComplete()) {
+while (!motionController.ArcComplete()) {
     Delay_ms(10);
 }
 ```
@@ -678,10 +678,10 @@ while (!arcController.ArcComplete()) {
 
 ```cpp
 // Start with large radius arc
-arcController.MoveArc(0, 0, 20000, 0, M_PI / 2, true);
+motionController.MoveArc(0, 0, 20000, 0, M_PI / 2, true);
 
 // Chain smaller radius arc (tangent continuity maintained)
-arcController.MoveArcContinuous(0, 0, 10000, M_PI, true);
+motionController.MoveArcContinuous(0, 0, 10000, M_PI, true);
 ```
 
 ### Linear Coordinated Moves
@@ -690,10 +690,10 @@ arcController.MoveArcContinuous(0, 0, 10000, M_PI, true);
 
 ```cpp
 // Move in a straight line from current position to (10000, 5000)
-arcController.MoveLinear(10000, 5000);
+motionController.MoveLinear(10000, 5000);
 
 // Wait for completion
-while (!arcController.ArcComplete()) {
+while (!motionController.ArcComplete()) {
     Delay_ms(10);
 }
 ```
@@ -702,20 +702,20 @@ while (!arcController.ArcComplete()) {
 
 ```cpp
 // Move from (0, 0) to (10000, 5000)
-arcController.MoveLinearAbsolute(0, 0, 10000, 5000);
+motionController.MoveLinearAbsolute(0, 0, 10000, 5000);
 ```
 
 #### Continuous Linear Moves
 
 ```cpp
 // Chain multiple linear moves
-arcController.MoveLinear(10000, 0);
-arcController.MoveLinearContinuous(10000, 10000);
-arcController.MoveLinearContinuous(0, 10000);
-arcController.MoveLinearContinuous(0, 0);  // Return to start
+motionController.MoveLinear(10000, 0);
+motionController.MoveLinearContinuous(10000, 10000);
+motionController.MoveLinearContinuous(0, 10000);
+motionController.MoveLinearContinuous(0, 0);  // Return to start
 
 // Wait for all moves to complete
-while (!arcController.ArcComplete()) {
+while (!motionController.ArcComplete()) {
     Delay_ms(10);
 }
 ```
@@ -726,13 +726,13 @@ while (!arcController.ArcComplete()) {
 
 ```cpp
 // Start with a linear move
-arcController.MoveLinear(10000, 0);
+motionController.MoveLinear(10000, 0);
 
 // Queue an arc move (will chain after linear completes)
-arcController.QueueArc(0, 0, 10000, M_PI / 2, true);
+motionController.QueueArc(0, 0, 10000, M_PI / 2, true);
 
 // Queue another linear move (will chain after arc completes)
-arcController.QueueLinear(20000, 10000);
+motionController.QueueLinear(20000, 10000);
 
 // All motions execute continuously!
 ```
@@ -741,24 +741,24 @@ arcController.QueueLinear(20000, 10000);
 
 ```cpp
 // Start with an arc move
-arcController.MoveArc(0, 0, 10000, 0, M_PI / 2, true);
+motionController.MoveArc(0, 0, 10000, 0, M_PI / 2, true);
 
 // Queue a linear move (will chain after arc completes)
-arcController.QueueLinear(20000, 10000);
+motionController.QueueLinear(20000, 10000);
 
 // Queue another arc (will chain after linear completes)
-arcController.QueueArc(20000, 0, 10000, M_PI, false);
+motionController.QueueArc(20000, 0, 10000, M_PI, false);
 ```
 
 #### Complex Path Example
 
 ```cpp
 // Create a complex path: linear -> arc -> linear -> arc
-arcController.MoveLinear(10000, 0);                    // Move right
-arcController.QueueArc(10000, 0, 5000, M_PI / 2, true); // Arc up
-arcController.QueueLinear(10000, 10000);               // Move up
-arcController.QueueArc(0, 10000, 10000, M_PI, true);   // Arc left
-arcController.QueueLinear(0, 0);                       // Return to start
+motionController.MoveLinear(10000, 0);                    // Move right
+motionController.QueueArc(10000, 0, 5000, M_PI / 2, true); // Arc up
+motionController.QueueLinear(10000, 10000);               // Move up
+motionController.QueueArc(0, 10000, 10000, M_PI, true);   // Arc left
+motionController.QueueLinear(0, 0);                       // Return to start
 ```
 
 ### Unit Conversion Examples
@@ -768,20 +768,20 @@ arcController.QueueLinear(0, 0);                       // Return to start
 ```cpp
 // Configure mechanical parameters
 // Motor X: 800 steps/rev, 5mm pitch
-arcController.SetMechanicalParamsX(800, 5.0, UNIT_MM);
+motionController.SetMechanicalParamsX(800, 5.0, UNIT_MM);
 
 // Motor Y: 800 steps/rev, 5mm pitch
-arcController.SetMechanicalParamsY(800, 5.0, UNIT_MM);
+motionController.SetMechanicalParamsY(800, 5.0, UNIT_MM);
 
 // Set feed rate in inches per minute
-arcController.ArcFeedRateInchesPerMin(100.0);
+motionController.ArcFeedRateInchesPerMin(100.0);
 ```
 
 #### Arc Moves with Units
 
 ```cpp
 // Move arc in inches
-arcController.MoveArcInches(
+motionController.MoveArcInches(
     0.0,        // centerX (inches)
     0.0,        // centerY (inches)
     10.0,       // radius (inches)
@@ -791,7 +791,7 @@ arcController.MoveArcInches(
 );
 
 // Move arc in millimeters
-arcController.MoveArcMM(
+motionController.MoveArcMM(
     0.0,        // centerX (mm)
     0.0,        // centerY (mm)
     254.0,      // radius (mm) = 10 inches
@@ -805,22 +805,22 @@ arcController.MoveArcMM(
 
 ```cpp
 // Move linear in inches
-arcController.MoveLinearInches(11.25, 5.0);
+motionController.MoveLinearInches(11.25, 5.0);
 
 // Move linear in millimeters
-arcController.MoveLinearMM(285.75, 127.0);  // 11.25" = 285.75mm, 5" = 127mm
+motionController.MoveLinearMM(285.75, 127.0);  // 11.25" = 285.75mm, 5" = 127mm
 ```
 
 #### Get Position in Units
 
 ```cpp
 // Get current position in inches
-double xInches = arcController.CurrentXInches();
-double yInches = arcController.CurrentYInches();
+double xInches = motionController.CurrentXInches();
+double yInches = motionController.CurrentYInches();
 
 // Get current position in millimeters
-double xMM = arcController.CurrentXMM();
-double yMM = arcController.CurrentYMM();
+double xMM = motionController.CurrentXMM();
+double yMM = motionController.CurrentYMM();
 ```
 
 #### Single Motor Moves with Units
@@ -847,31 +847,31 @@ double posMM = ConnectorM0.PositionMM();
 
 ```cpp
 // Stop immediately (abrupt)
-arcController.Stop();
+motionController.Stop();
 
 // Stop with deceleration
-arcController.StopDecel();
+motionController.StopDecel();
 ```
 
 #### Check Status
 
 ```cpp
 // Check if motion is active
-if (arcController.IsActive()) {
+if (motionController.IsActive()) {
     // Motion in progress
 }
 
 // Check if all arcs complete
-if (arcController.ArcComplete()) {
+if (motionController.ArcComplete()) {
     // All motion finished
 }
 
 // Get current position
-int32_t x = arcController.CurrentX();
-int32_t y = arcController.CurrentY();
+int32_t x = motionController.CurrentX();
+int32_t y = motionController.CurrentY();
 
 // Get queue status
-uint8_t queued = arcController.QueueCount();
+uint8_t queued = motionController.QueueCount();
 ```
 
 ### Error Handling
@@ -891,7 +891,7 @@ if (ConnectorM0.StatusReg().bit.AlertsPresent ||
 }
 
 // Check queue not full
-if (arcController.QueueCount() >= 8) {
+if (motionController.QueueCount() >= 8) {
     // Wait for queue space
 }
 ```
@@ -899,13 +899,13 @@ if (arcController.QueueCount() >= 8) {
 #### Handle Errors During Motion
 
 ```cpp
-arcController.MoveArc(0, 0, 10000, 0, M_PI / 2, true);
+motionController.MoveArc(0, 0, 10000, 0, M_PI / 2, true);
 
-while (!arcController.ArcComplete()) {
+while (!motionController.ArcComplete()) {
     // Check for alerts
     if (ConnectorM0.StatusReg().bit.AlertsPresent ||
         ConnectorM1.StatusReg().bit.AlertsPresent) {
-        arcController.Stop();
+        motionController.Stop();
         // Handle error
         break;
     }
@@ -2101,13 +2101,9 @@ To extend to 3 axes (X, Y, Z):
 
 ### Related Documentation
 
-- `DESIGN_COORDINATED_ARCS.md`: Detailed design document
-- `IMPLEMENTATION_SUMMARY.md`: Implementation overview
-- `MOTION_SMOOTHNESS.md`: Smoothness analysis
-- `CONSTANT_PATH_VELOCITY.md`: Velocity control details
-- `ARC_PATH_DEVELOPMENT.md`: Path generation explanation
-- `ARC_POINT_COUNT.md`: Point count calculations
-- `BRESENHAM_COMPARISON.md`: Algorithm comparison
+- `INDEX.md`: Documentation index and quick start guide
+- `NEW_FILES.md`: List of all new files added to the codebase
+- `MODIFICATIONS.md`: Detailed list of modifications to Teknic files
 
 ### ClearCore Documentation
 
