@@ -171,11 +171,10 @@ bool ReadCommandEthernet(char* buffer, uint16_t maxLen);
 int main() {
     // SysManager is initialized in Reset_Handler before main() is called
     // Just add a simple delay to allow everything to stabilize
-    // Don't call Milliseconds() here as it might not be safe yet
-    Delay_ms(500);  // Longer delay to ensure full system initialization
+    Delay_ms(500);
     
-    // Initialize motors (safe even if motors aren't attached)
-    InitializeMotors();
+    // TEST VERSION: Disable motor initialization to isolate crash
+    // InitializeMotors();  // TEMPORARILY DISABLED FOR TESTING
     
     // Initialize communication (safe even if USB not connected)
     InitializeCommunication();
@@ -189,13 +188,8 @@ int main() {
     #elif COMM_MODE == ETHERNET_MODE
     if (ConnectorUsb) {
     #endif
-        SendResponseLine("Motion Streaming Example Ready");
-        if (motorsInitialized) {
-            SendResponseLine("Motors initialized - Send G-code commands (G01, G02, G03, etc.)");
-        } else {
-            SendResponseLine("WARNING: Motors not initialized (may not be attached)");
-            SendResponseLine("Communication active - Send G-code commands (G01, G02, G03, etc.)");
-        }
+        SendResponseLine("Motion Streaming Example Ready - TEST VERSION (Motors Disabled)");
+        SendResponseLine("If you see this, motors are NOT the crash cause");
     #if COMM_MODE == SERIAL_MODE || COMM_MODE == ETHERNET_MODE
     }
     #endif
