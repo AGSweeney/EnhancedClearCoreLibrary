@@ -1,0 +1,110 @@
+/* Normal hover behavior looks weird with a shadow, this makes it clear */
+.navpath li.navelem a:hover {
+	text-shadow: none !important;
+	text-decoration: underline;
+}
+
+/* Make navbar items stand out a bit more */
+#main-menu > li > a {
+	margin: var(--spacing-small);
+	background-color: var(--note-color);
+	color: var(--note-color-darker);
+	border: 1px solid var(--separator-color);
+}
+
+#main-menu > li > a:hover {
+	background-color: var(--note-color-darker);
+	color: var(--note-color-darker);
+	border-color: var(--note-color-darker);
+}
+
+/* show border to make it clear which element the description is associated with */
+table.memberdecls .mdescRight {
+	border-style: none solid solid none;
+	border-bottom-right-radius: var(--border-radius-small);
+}
+
+table.memberdecls .mdescLeft {
+	border-style: none none solid solid;
+	border-bottom-left-radius: var(--border-radius-small);
+}
+
+table.memberdecls .mdescLeft,
+table.memberdecls .mdescRight {
+	border-color: var(--separator-color);
+	border-width: 1px;
+	background-color: var(--fragment-background);
+	padding-top: 0;
+	transform: translate(0, -0.5rem);
+
+}
+
+/* ----------------------------------- */
+
+/* complex css selector to not show borders for descriptions on collapsed public types */
+table.memberdecls tr.inherit:not(tr.inherit[style="display: table-row;"])+tr>.mdescLeft,
+table.memberdecls tr.inherit:not(tr.inherit[style="display: table-row;"])+tr>.mdescRight {
+	border: 0;
+	background-color: var(--page-background-color);
+}
+
+/* styling the expandle details/summary elements */
+details>summary {
+	cursor: pointer;
+	background-color: var(--fragment-background);
+	padding: var(--spacing-medium);
+}
+
+details>summary::before {
+	content: "\25B6";
+}
+
+details {
+	border: 1px solid var(--separator-color);
+	border-radius: var(--border-radius-small);
+}
+
+/* make class blocks standout */
+html {
+	--memtitle-font-size: 24px;
+}
+
+h2.memtitle {
+	font-weight: bold;
+}
+
+div.memitem {
+	box-shadow: rgba(0, 113, 187, 0.12) 0px 2px 4px 0px, rgba(0, 113, 187, 0.32) 0px 2px 16px 0px !important;
+}
+
+/* step and direction disclaimer */
+.sd-disclaimer {
+	font-weight: bold;
+	background-color: #00338d;
+	padding: 0.5rem;
+	color: white;
+	border-radius: var(--border-radius-large);
+	margin-bottom: 1rem;
+	display: inline-block;
+}
+
+/* clearpath mc disclaimer */
+.mc-disclaimer {
+	font-weight: bold;
+	background-color: #049075;
+	padding: 0.5rem;
+	color: white;
+	border-radius: var(--border-radius-large);
+	margin-bottom: 1rem;
+	display: inline-block;
+}
+
+/* more spacing between list items */
+div.more-list-spacing li {
+	padding-top: 16px;
+}
+
+div.more-list-spacing img {
+	padding-bottom: 16px;
+	padding-top: 16px;
+}

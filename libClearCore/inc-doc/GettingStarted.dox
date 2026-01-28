@@ -1,0 +1,28 @@
+namespace ClearCore {
+/**
+\page GettingStarted Getting Started with ClearCore
+
+<h1>Hardware and Wiring</h1>
+We recommend referencing the [ClearCore Hardware and Wiring Manual](https://teknic.com/files/downloads/clearcore_user_manual.pdf)
+before proceeding.
+
+<h1>Selecting a Development Environment</h1>
+There are two supported development environments for %ClearCore: Arduino IDE and Microchip Studio
+<h2>Arduino IDE</h2>
+\note Easy to use development environment that is great for prototyping and beginner programmers.
+
+\ref ArduinoIDEInstall "Arduino IDE 2.X Installation/Setup Instructions" (recommended)
+
+\ref ArduinoLegacyInstall "Arduino IDE 1.8.X Installation/Setup Instructions" (legacy support)
+
+<h2>Microchip Studio (formerly Atmel Studio)</h2>
+\note Advanced development environment with debugging capabilities designed for experienced programmers
+
+\ref MicrochipInstall "Microchip Studio Installation/Setup Instructions"
+
+
+
+**/
+
+//********************************************************************************************
+}
