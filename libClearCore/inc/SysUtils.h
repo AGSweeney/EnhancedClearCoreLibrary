@@ -190,6 +190,32 @@ while (GCLK->SYNCBUSY.reg & GCLK_SYNCBUSY_GENCTRL((GCLK_INDEX))) {             \
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+    \brief System Clock Frequency variable
+
+    This variable holds the current system clock frequency in Hz.
+    It is initialized to 120 MHz and can be updated by SystemCoreClockUpdate().
+**/
+extern uint32_t SystemCoreClock;
+
+/**
+    \brief Initialize the system
+
+    Setup the microcontroller system. Initialize clocks and update the
+    SystemCoreClock variable. This function is called automatically during
+    system startup.
+**/
+void SystemInit(void);
+
+/**
+    \brief Update SystemCoreClock variable
+
+    Updates the SystemCoreClock with current core Clock retrieved from
+    cpu registers. Currently not implemented (always returns without change).
+**/
+void SystemCoreClockUpdate(void);
+
 /**
     \brief Update GCLK frequency
 

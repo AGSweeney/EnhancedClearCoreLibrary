@@ -149,6 +149,9 @@ bool feedRateSet = false;
 char commandBuffer[MAX_PACKET_LENGTH];
 uint16_t commandBufferIndex = 0;
 
+// Motor initialization status
+bool motorsInitialized = false;
+
 // ========== Function Prototypes ==========
 
 void InitializeMotors();
@@ -166,14 +169,36 @@ bool ReadCommandEthernet(char* buffer, uint16_t maxLen);
 // ========== Main Function ==========
 
 int main() {
-    // Initialize motors
+    // SysManager is initialized in Reset_Handler before main() is called
+    // Just add a simple delay to allow everything to stabilize
+    // Don't call Milliseconds() here as it might not be safe yet
+    Delay_ms(500);  // Longer delay to ensure full system initialization
+    
+    // Initialize motors (safe even if motors aren't attached)
     InitializeMotors();
     
-    // Initialize communication
+    // Initialize communication (safe even if USB not connected)
     InitializeCommunication();
     
-    SendResponseLine("Motion Streaming Example Ready");
-    SendResponseLine("Send G-code commands (G01, G02, G03, etc.)");
+    // Small delay before sending startup message
+    Delay_ms(200);
+    
+    // Only send startup messages if communication is ready
+    #if COMM_MODE == SERIAL_MODE
+    if (SerialPort) {
+    #elif COMM_MODE == ETHERNET_MODE
+    if (ConnectorUsb) {
+    #endif
+        SendResponseLine("Motion Streaming Example Ready");
+        if (motorsInitialized) {
+            SendResponseLine("Motors initialized - Send G-code commands (G01, G02, G03, etc.)");
+        } else {
+            SendResponseLine("WARNING: Motors not initialized (may not be attached)");
+            SendResponseLine("Communication active - Send G-code commands (G01, G02, G03, etc.)");
+        }
+    #if COMM_MODE == SERIAL_MODE || COMM_MODE == ETHERNET_MODE
+    }
+    #endif
     
     // Main loop
     while (true) {
@@ -204,23 +229,44 @@ int main() {
 // ========== Initialization Functions ==========
 
 void InitializeMotors() {
+    motorsInitialized = false;
+    
+    // Simple delay to ensure system is stable before accessing hardware
+    Delay_ms(50);
+    
+    // TEMPORARILY DISABLED FOR DEBUGGING - Comment out CoordinatedMotionController
+    // to see if that's causing the crash
+    /*
     // Set motors to Step and Direction mode
+    // This is safe even if motors aren't attached - it just configures the connectors
+    // Don't check SysManager.Ready() as it should already be ready from Reset_Handler
     MotorMgr.MotorModeSet(MotorManager::MOTOR_ALL, Connector::CPM_MODE_STEP_AND_DIR);
     
-    // Enable motors
+    // Small delay to allow mode change to propagate
+    Delay_ms(50);
+    
+    // Try to enable motors (non-blocking - motors may not be attached)
+    // These calls are safe even without motors - they just set the enable signal
     motorX.EnableRequest(true);
     motorY.EnableRequest(true);
     
-    // Wait for motors to enable
+    // Short delay to allow enable signal to propagate (non-blocking)
     Delay_ms(100);
     
     // Initialize coordinated motion controller
+    // This may fail if motors are not present or not properly configured
+    // Attempt initialization - this can fail safely if motors aren't attached
     if (!motionController.Initialize(&motorX, &motorY)) {
-        // Error - motors may not be properly configured
-        while (true) {
-            Delay_ms(1000);
-        }
+        // Motors not available - continue without motors
+        // Communication and other features will still work
+        // Don't try to configure motion controller if initialization failed
+        return;
     }
+    */
+    
+    // TEMPORARY: Skip all motor initialization to test if that's causing the crash
+    // If this version boots, we know the issue is in motor/CoordinatedMotionController init
+    return;
     
     // Configure mechanical parameters for unit conversion
     motionController.SetMechanicalParamsX(MOTOR_X_STEPS_PER_REV, MOTOR_X_PITCH_MM, ClearCore::UNIT_MM);
@@ -250,20 +296,25 @@ void InitializeMotors() {
     
     // Set initial position
     motionController.SetPosition(0, 0);
+    
+    // Mark motors as successfully initialized
+    motorsInitialized = true;
 }
 
 void InitializeCommunication() {
+    // Simple delay to ensure system is stable
+    Delay_ms(50);
+    
     #if COMM_MODE == SERIAL_MODE
     // Initialize serial port
     SerialPort.Mode(Connector::USB_CDC);
     SerialPort.Speed(SERIAL_BAUD_RATE);
     SerialPort.PortOpen();
     
-    uint32_t timeout = 5000;
-    uint32_t startTime = Milliseconds();
-    while (!SerialPort && Milliseconds() - startTime < timeout) {
-        continue;
-    }
+    // Simple delay - USB CDC requires host connection
+    // Don't wait indefinitely - just delay and continue
+    // Serial port will become available when USB connects
+    Delay_ms(100);
     
     #elif COMM_MODE == ETHERNET_MODE
     // Initialize serial port for status messages (USB CDC)
@@ -271,15 +322,15 @@ void InitializeCommunication() {
     ConnectorUsb.Speed(9600);
     ConnectorUsb.PortOpen();
     
-    uint32_t timeout = 5000;
-    uint32_t startTime = Milliseconds();
-    while (!ConnectorUsb && Milliseconds() - startTime < timeout) {
-        continue;
-    }
+    // Simple delay - USB CDC requires host connection
+    // Don't wait indefinitely - just delay and continue
+    Delay_ms(100);
     
     // Wait for Ethernet link
     while (!EthernetMgr.PhyLinkActive()) {
-        ConnectorUsb.SendLine("Waiting for Ethernet link...");
+        if (ConnectorUsb) {  // Only send if USB is ready
+            ConnectorUsb.SendLine("Waiting for Ethernet link...");
+        }
         Delay_ms(1000);
     }
     
@@ -288,34 +339,48 @@ void InitializeCommunication() {
     
     if (usingDhcp) {
         bool dhcpSuccess = EthernetMgr.DhcpBegin();
-        if (dhcpSuccess) {
-            ConnectorUsb.Send("DHCP IP: ");
-            ConnectorUsb.SendLine(EthernetMgr.LocalIp().StringValue());
+        if (ConnectorUsb) {  // Only send if USB is ready
+            if (dhcpSuccess) {
+                ConnectorUsb.Send("DHCP IP: ");
+                ConnectorUsb.SendLine(EthernetMgr.LocalIp().StringValue());
+            } else {
+                ConnectorUsb.SendLine("DHCP failed! Continuing with manual IP...");
+                EthernetMgr.LocalIp(manualIp);
+                ConnectorUsb.Send("Manual IP: ");
+                ConnectorUsb.SendLine(EthernetMgr.LocalIp().StringValue());
+            }
         } else {
-            ConnectorUsb.SendLine("DHCP failed!");
-            while (true) {
-                continue;
+            // USB not ready, but still configure IP
+            if (!dhcpSuccess) {
+                EthernetMgr.LocalIp(manualIp);
             }
         }
     } else {
         EthernetMgr.LocalIp(manualIp);
-        ConnectorUsb.Send("Manual IP: ");
-        ConnectorUsb.SendLine(EthernetMgr.LocalIp().StringValue());
+        if (ConnectorUsb) {  // Only send if USB is ready
+            ConnectorUsb.Send("Manual IP: ");
+            ConnectorUsb.SendLine(EthernetMgr.LocalIp().StringValue());
+        }
     }
     
     // Create TCP server
     tcpServer = new EthernetTcpServer(TCP_PORT);
-    if (!tcpServer->Begin()) {
-        ConnectorUsb.SendLine("Failed to start TCP server!");
-        while (true) {
-            continue;
+    if (!tcpServer) {
+        if (ConnectorUsb) {  // Only send if USB is ready
+            ConnectorUsb.SendLine("Failed to allocate TCP server!");
+        }
+    } else if (!tcpServer->Begin()) {
+        if (ConnectorUsb) {  // Only send if USB is ready
+            ConnectorUsb.SendLine("Failed to start TCP server! Will retry in main loop.");
         }
     }
     
-    ConnectorUsb.Send("TCP server listening on port ");
-    char portStr[10];
-    sprintf(portStr, "%d", TCP_PORT);
-    ConnectorUsb.SendLine(portStr);
+    if (ConnectorUsb) {  // Only send if USB is ready
+        ConnectorUsb.Send("TCP server listening on port ");
+        char portStr[10];
+        sprintf(portStr, "%d", TCP_PORT);
+        ConnectorUsb.SendLine(portStr);
+    }
     #endif
 }
 
@@ -355,11 +420,15 @@ bool ReadCommandEthernet(char* buffer, uint16_t maxLen) {
     
     // Check for new client connection
     if (!tcpClient.Connected() && tcpClient.BytesAvailable() == 0) {
-        tcpClient = tcpServer->Available();
-        if (tcpClient.Connected() || tcpClient.BytesAvailable() > 0) {
-            ConnectorUsb.SendLine("Client connected");
-            commandBufferIndex = 0;
-            memset(buffer, 0, maxLen);
+        if (tcpServer) {  // Double-check tcpServer is valid
+            tcpClient = tcpServer->Available();
+            if (tcpClient.Connected() || tcpClient.BytesAvailable() > 0) {
+                if (ConnectorUsb) {  // Only send if USB is ready
+                    ConnectorUsb.SendLine("Client connected");
+                }
+                commandBufferIndex = 0;
+                memset(buffer, 0, maxLen);
+            }
         }
         return false;
     }
@@ -497,6 +566,10 @@ void ParseGCode(const char* line) {
                 case 92:  // G92 - Set coordinate system offset (set origin)
                     // G92 X<value> Y<value> sets current position to specified values
                     // This effectively shifts the coordinate system origin
+                    if (!motorsInitialized) {
+                        SendResponseLine("error: Motors not initialized");
+                        break;
+                    }
                     if (hasX || hasY) {
                         // Convert specified coordinates to steps
                         int32_t newXSteps, newYSteps;
@@ -514,8 +587,12 @@ void ParseGCode(const char* line) {
                         SendResponseLine("Coordinate system offset set");
                     } else {
                         // G92 without parameters - reset offset (set current position to 0,0)
-                        motionController.SetPosition(0, 0);
-                        SendResponseLine("Coordinate system offset reset to origin");
+                        if (motorsInitialized) {
+                            motionController.SetPosition(0, 0);
+                            SendResponseLine("Coordinate system offset reset to origin");
+                        } else {
+                            SendResponseLine("error: Motors not initialized");
+                        }
                     }
                     break;
                     
@@ -529,30 +606,57 @@ void ParseGCode(const char* line) {
         } else if (line[0] == 'M') {
             switch (code) {
                 case 200:  // M200 - Emergency stop (immediate stop, clear queue)
-                    motionController.Stop();
-                    SendResponseLine("EMERGENCY STOP - queue cleared");
+                    if (motorsInitialized) {
+                        motionController.Stop();
+                        SendResponseLine("EMERGENCY STOP - queue cleared");
+                    } else {
+                        SendResponseLine("error: Motors not initialized");
+                    }
                     break;
                     
                 case 201:  // M201 - Stop with deceleration (smooth stop, clear queue)
-                    motionController.StopDecel();
-                    SendResponseLine("Stop with deceleration - queue cleared");
+                    if (motorsInitialized) {
+                        motionController.StopDecel();
+                        SendResponseLine("Stop with deceleration - queue cleared");
+                    } else {
+                        SendResponseLine("error: Motors not initialized");
+                    }
                     break;
                     
                 case 202:  // M202 - Enable motors
                     motorX.EnableRequest(true);
                     motorY.EnableRequest(true);
-                    SendResponseLine("Motors enabled");
+                    // Try to reinitialize if not already initialized
+                    if (!motorsInitialized) {
+                        Delay_ms(100);
+                        if (motionController.Initialize(&motorX, &motorY)) {
+                            motorsInitialized = true;
+                            motionController.SetMechanicalParamsX(MOTOR_X_STEPS_PER_REV, MOTOR_X_PITCH_MM, ClearCore::UNIT_MM);
+                            motionController.SetMechanicalParamsY(MOTOR_Y_STEPS_PER_REV, MOTOR_Y_PITCH_MM, ClearCore::UNIT_MM);
+                            motionController.FeedRateMMPerMin(currentFeedRate);
+                            motionController.ArcVelMax(DEFAULT_VELOCITY_STEPS_PER_SEC);
+                            motionController.ArcAccelMax(DEFAULT_ACCELERATION_STEPS_PER_SEC2);
+                            motionController.SetPosition(0, 0);
+                            SendResponseLine("Motors enabled and initialized");
+                        } else {
+                            SendResponseLine("Motors enabled but initialization failed (motors may not be attached)");
+                        }
+                    } else {
+                        SendResponseLine("Motors enabled");
+                    }
                     break;
                     
                 case 203:  // M203 - Disable motors (stops motion and disables)
-                    motionController.Stop();
+                    if (motorsInitialized) {
+                        motionController.Stop();
+                    }
                     motorX.EnableRequest(false);
                     motorY.EnableRequest(false);
                     SendResponseLine("Motors disabled");
                     break;
                     
                 case 114:  // M114 - Get current position
-                    {
+                    if (motorsInitialized) {
                         char response[100];
                         if (unitMode == UNIT_MODE_INCHES) {
                             double xInches = motionController.CurrentXInches();
@@ -564,17 +668,25 @@ void ParseGCode(const char* line) {
                             sprintf(response, "X:%.3f Y:%.3f", xMM, yMM);
                         }
                         SendResponseLine(response);
+                    } else {
+                        SendResponseLine("error: Motors not initialized");
                     }
                     break;
                     
                 case 115:  // M115 - Get status
                     {
                         char response[200];
-                        sprintf(response, "Status: Active=%d Queue=%d Units=%s Coords=%s",
-                                motionController.IsActive() ? 1 : 0,
-                                motionController.MotionQueueCount(),
-                                unitMode == UNIT_MODE_INCHES ? "inches" : "mm",
-                                coordinateMode == COORD_ABSOLUTE ? "abs" : "inc");
+                        if (motorsInitialized) {
+                            sprintf(response, "Status: Active=%d Queue=%d Units=%s Coords=%s Motors=OK",
+                                    motionController.IsActive() ? 1 : 0,
+                                    motionController.MotionQueueCount(),
+                                    unitMode == UNIT_MODE_INCHES ? "inches" : "mm",
+                                    coordinateMode == COORD_ABSOLUTE ? "abs" : "inc");
+                        } else {
+                            sprintf(response, "Status: Motors=NotInitialized Units=%s Coords=%s",
+                                    unitMode == UNIT_MODE_INCHES ? "inches" : "mm",
+                                    coordinateMode == COORD_ABSOLUTE ? "abs" : "inc");
+                        }
                         SendResponseLine(response);
                     }
                     break;
@@ -601,6 +713,12 @@ void ParseGCode(const char* line) {
 }
 
 void ExecuteG01(double x, double y, double f) {
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        SendResponseLine("error: Motors not initialized (motors may not be attached, use M202 to enable)");
+        return;
+    }
+    
     // Set feed rate if specified
     if (f >= 0.0) {
         if (unitMode == UNIT_MODE_INCHES) {
@@ -645,6 +763,12 @@ void ExecuteG01(double x, double y, double f) {
         endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_MM, mechanicalConfigY);
     }
     
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        SendResponseLine("error: Motors not initialized (motors may not be attached, use M202 to enable)");
+        return;
+    }
+    
     // Check if motors are enabled before queuing
     if (!motorX.EnableRequest() || !motorY.EnableRequest()) {
         SendResponseLine("error: Motors not enabled (use M202 to enable)");
@@ -664,6 +788,12 @@ void ExecuteG01(double x, double y, double f) {
 }
 
 void ExecuteG02(double x, double y, double i, double j, double f) {
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        SendResponseLine("error: Motors not initialized (motors may not be attached, use M202 to enable)");
+        return;
+    }
+    
     // Set feed rate if specified
     if (f >= 0.0) {
         if (unitMode == UNIT_MODE_INCHES) {
@@ -723,6 +853,12 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
         radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_MM, mechanicalConfigX);
     }
     
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        SendResponseLine("error: Motors not initialized (motors may not be attached, use M202 to enable)");
+        return;
+    }
+    
     // Check if motors are enabled before queuing
     if (!motorX.EnableRequest() || !motorY.EnableRequest()) {
         SendResponseLine("error: Motors not enabled (use M202 to enable)");
@@ -742,6 +878,12 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
 }
 
 void ExecuteG03(double x, double y, double i, double j, double f) {
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        SendResponseLine("error: Motors not initialized (motors may not be attached, use M202 to enable)");
+        return;
+    }
+    
     // Set feed rate if specified
     if (f >= 0.0) {
         if (unitMode == UNIT_MODE_INCHES) {
@@ -820,13 +962,23 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
 }
 
 void SendResponse(const char* message) {
+    if (!message) {
+        return;  // Safety check - don't send null pointers
+    }
+    
     #if COMM_MODE == SERIAL_MODE
-    SerialPort.Send(message);
+    // Only send if serial port is ready
+    if (SerialPort) {
+        SerialPort.Send(message);
+    }
     #elif COMM_MODE == ETHERNET_MODE
     if (tcpClient.Connected()) {
         tcpClient.Send(message);
     }
-    ConnectorUsb.Send(message);  // Also send to USB for debugging
+    // Only send to USB if it's ready
+    if (ConnectorUsb) {
+        ConnectorUsb.Send(message);  // Also send to USB for debugging
+    }
     #endif
 }
 

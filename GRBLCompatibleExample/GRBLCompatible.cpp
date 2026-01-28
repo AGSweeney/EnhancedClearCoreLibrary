@@ -77,22 +77,22 @@
 
 // Home switch configuration (optional - comment out to disable)
 // These switches are triggered when the axis reaches its home position
-#define HOME_X_PIN ConnectorIO0  // Comment out this line to disable X home switch
-#define HOME_Y_PIN ConnectorIO1  // Comment out this line to disable Y home switch
-#define HOME_Z_PIN ConnectorDI7  // Comment out this line to disable Z home switch
+//#define HOME_X_PIN ConnectorIO0  // Comment out this line to disable X home switch
+//#define HOME_Y_PIN ConnectorIO1  // Comment out this line to disable Y home switch
+//#define HOME_Z_PIN ConnectorDI7  // Comment out this line to disable Z home switch
 #define HOME_SWITCH_ACTIVE_LOW true  // true if switch is active low (closed = 0), false if active high
 
 // Probe input configuration (optional - comment out to disable)
 // Probe is triggered when probe touches workpiece
-#define PROBE_PIN ConnectorIO2    // Comment out this line to disable probe
+//#define PROBE_PIN ConnectorIO2    // Comment out this line to disable probe
 #define PROBE_ACTIVE_LOW true     // true if probe is active low (touching = 0), false if active high
 
 // Limit switch configuration (optional - comment out to disable)
 // Limit switches prevent motion beyond safe travel limits
-#define LIMIT_X_MIN_PIN ConnectorIO3  // Comment out this line to disable X min limit
-#define LIMIT_X_MAX_PIN ConnectorIO4  // Comment out this line to disable X max limit
-#define LIMIT_Y_MIN_PIN ConnectorIO5  // Comment out this line to disable Y min limit
-#define LIMIT_Y_MAX_PIN ConnectorDI6  // Comment out this line to disable Y max limit
+//#define LIMIT_X_MIN_PIN ConnectorIO3  // Comment out this line to disable X min limit
+//#define LIMIT_X_MAX_PIN ConnectorIO4  // Comment out this line to disable X max limit
+//#define LIMIT_Y_MIN_PIN ConnectorIO5  // Comment out this line to disable Y min limit
+//#define LIMIT_Y_MAX_PIN ConnectorDI6  // Comment out this line to disable Y max limit
 #define LIMIT_SWITCH_ACTIVE_LOW true  // true if switches are active low (triggered = 0), false if active high
 
 // Mechanical configuration
@@ -145,14 +145,15 @@ enum CoordinateMode {
 };
 
 enum UnitMode {
-    UNIT_INCHES,  // G20
-    UNIT_MM  // G21
+    UNIT_MODE_INCHES,  // G20
+    UNIT_MODE_MM  // G21
 };
 
 CoordinateMode coordinateMode = COORD_ABSOLUTE;
-UnitMode unitMode = UNIT_MM;
+UnitMode unitMode = UNIT_MODE_MM;
 double currentFeedRate = DEFAULT_FEED_RATE_MM_PER_MIN;
 bool feedRateSet = false;
+uint32_t savedVelocityMax = DEFAULT_VELOCITY_STEPS_PER_SEC;  // Store velocity for rapid moves
 
 // Command buffer
 #define MAX_LINE_LENGTH 256
@@ -162,6 +163,12 @@ uint16_t commandBufferIndex = 0;
 // Status reporting
 uint32_t lastStatusReportTime = 0;
 bool statusReportRequested = false;
+
+// Z-axis position tracking (in steps)
+int32_t currentZSteps = 0;
+
+// Motor initialization status
+bool motorsInitialized = false;
 
 // ========== Function Prototypes ==========
 
@@ -191,14 +198,26 @@ void ProcessRealtimeCommand(char cmd);
 // ========== Main Function ==========
 
 int main() {
+    // Small delay to ensure system is fully initialized
+    Delay_ms(100);
+    
+    // Initialize inputs (switches, probe)
+    InitializeInputs();
+    
     // Initialize motors
     InitializeMotors();
     
     // Initialize communication
     InitializeCommunication();
     
+    // Small delay before sending startup message
+    Delay_ms(100);
+    
     // Send GRBL startup message
     SendResponseLine("Grbl 1.1f ['$' for help]");
+    if (!motorsInitialized) {
+        SendResponseLine("ALARM: Motors not initialized (motors may not be attached)");
+    }
     
     // Main loop
     while (true) {
@@ -213,20 +232,22 @@ int main() {
         // Check limit switches - trigger alarm if activated
         if (CheckLimitSwitches()) {
             grblState = STATE_ALARM;
-            motionController.Stop();
-            motorZ.MoveStopAbrupt();
+            if (motorsInitialized) {
+                motionController.Stop();
+                motorZ.MoveStopAbrupt();
+            }
         }
         
         // Check probe state
         probeTriggered = CheckProbe();
         
-        // Update Z position from motor (if not moving)
-        if (!motorZ.StatusReg().bit.StepsActive) {
-            currentZSteps = motorZ.PositionTargeted();
+        // Update Z position from motor (if not moving and motors initialized)
+        if (motorsInitialized && !motorZ.StatusReg().bit.StepsActive) {
+            currentZSteps = motorZ.PositionRefCommanded();
         }
         
         // Update GRBL state based on motion controller
-        if (grblState != STATE_ALARM) {
+        if (grblState != STATE_ALARM && motorsInitialized) {
             if (motionController.IsActive() && !feedHoldActive) {
                 grblState = STATE_RUN;
             } else if (feedHoldActive && motionController.IsActive()) {
@@ -254,50 +275,52 @@ int main() {
 // ========== Initialization Functions ==========
 
 void InitializeMotors() {
+    motorsInitialized = false;
+    
     // Set motors to Step and Direction mode
     MotorMgr.MotorModeSet(MotorManager::MOTOR_ALL, Connector::CPM_MODE_STEP_AND_DIR);
     
-    // Enable motors (GRBL assumes motors are always enabled)
+    // Try to enable motors (non-blocking - motors may not be attached)
     motorX.EnableRequest(true);
     motorY.EnableRequest(true);
     motorZ.EnableRequest(true);
     motorsEnabled = true;
     
-    // Wait for motors to enable
+    // Short delay to allow enable signal to propagate (non-blocking)
     Delay_ms(100);
     
     // Initialize coordinated motion controller
+    // This may fail if motors are not present or not properly configured
     if (!motionController.Initialize(&motorX, &motorY)) {
-        // Error - motors may not be properly configured
+        // Motors not available - continue without motors
+        // Communication and other features will still work
         grblState = STATE_ALARM;
-        while (true) {
-            Delay_ms(1000);
-        }
+        return;
     }
     
     // Configure mechanical parameters for unit conversion
-    motionController.SetMechanicalParamsX(MOTOR_X_STEPS_PER_REV, MOTOR_X_PITCH_MM, UNIT_MM);
-    motionController.SetMechanicalParamsY(MOTOR_Y_STEPS_PER_REV, MOTOR_Y_PITCH_MM, UNIT_MM);
+    motionController.SetMechanicalParamsX(MOTOR_X_STEPS_PER_REV, MOTOR_X_PITCH_MM, ClearCore::UNIT_MM);
+    motionController.SetMechanicalParamsY(MOTOR_Y_STEPS_PER_REV, MOTOR_Y_PITCH_MM, ClearCore::UNIT_MM);
     
     // Configure Z-axis motor mechanical parameters
-    motorZ.SetMechanicalParams(MOTOR_Z_STEPS_PER_REV, MOTOR_Z_PITCH_MM, UNIT_MM, 1.0);
+    motorZ.SetMechanicalParams(MOTOR_Z_STEPS_PER_REV, MOTOR_Z_PITCH_MM, ClearCore::UNIT_MM, 1.0);
     
     // Store config locally for unit conversion
     mechanicalConfigX.stepsPerRevolution = MOTOR_X_STEPS_PER_REV;
     mechanicalConfigX.pitch = MOTOR_X_PITCH_MM;
-    mechanicalConfigX.pitchUnit = UNIT_MM;
+    mechanicalConfigX.pitchUnit = ClearCore::UNIT_MM;
     mechanicalConfigX.gearRatio = 1.0;
     UnitConverter::CalculateConversionFactors(mechanicalConfigX);
     
     mechanicalConfigY.stepsPerRevolution = MOTOR_Y_STEPS_PER_REV;
     mechanicalConfigY.pitch = MOTOR_Y_PITCH_MM;
-    mechanicalConfigY.pitchUnit = UNIT_MM;
+    mechanicalConfigY.pitchUnit = ClearCore::UNIT_MM;
     mechanicalConfigY.gearRatio = 1.0;
     UnitConverter::CalculateConversionFactors(mechanicalConfigY);
     
     mechanicalConfigZ.stepsPerRevolution = MOTOR_Z_STEPS_PER_REV;
     mechanicalConfigZ.pitch = MOTOR_Z_PITCH_MM;
-    mechanicalConfigZ.pitchUnit = UNIT_MM;
+    mechanicalConfigZ.pitchUnit = ClearCore::UNIT_MM;
     mechanicalConfigZ.gearRatio = 1.0;
     UnitConverter::CalculateConversionFactors(mechanicalConfigZ);
     
@@ -308,11 +331,16 @@ void InitializeMotors() {
     
     // Set motion parameters
     motionController.ArcVelMax(DEFAULT_VELOCITY_STEPS_PER_SEC);
+    savedVelocityMax = DEFAULT_VELOCITY_STEPS_PER_SEC;  // Store for rapid move restore
     motionController.ArcAccelMax(DEFAULT_ACCELERATION_STEPS_PER_SEC2);
     
     // Set initial position
     motionController.SetPosition(0, 0);
     currentZSteps = 0;
+    
+    // Mark motors as successfully initialized
+    motorsInitialized = true;
+    grblState = STATE_IDLE;  // Clear alarm state if initialization succeeded
 }
 
 void InitializeCommunication() {
@@ -321,11 +349,15 @@ void InitializeCommunication() {
     SerialPort.Speed(SERIAL_BAUD_RATE);
     SerialPort.PortOpen();
     
-    uint32_t timeout = 5000;
+    // Wait for serial port to be ready (non-blocking with timeout)
+    uint32_t timeout = 2000;  // Reduced timeout to 2 seconds
     uint32_t startTime = Milliseconds();
     while (!SerialPort && Milliseconds() - startTime < timeout) {
-        continue;
+        Delay_ms(10);  // Small delay to prevent tight loop
     }
+    
+    // Continue even if serial port isn't ready - device will still function
+    // Serial port will become available when USB is connected
 }
 
 // ========== Command Processing Functions ==========
@@ -371,7 +403,7 @@ void ProcessRealtimeCommand(char cmd) {
             break;
             
         case '!':  // Feed hold
-            if (grblState == STATE_RUN) {
+            if (grblState == STATE_RUN && motorsInitialized) {
                 feedHoldActive = true;
                 motionController.StopDecel();
                 motorZ.MoveStopDecel();
@@ -380,7 +412,7 @@ void ProcessRealtimeCommand(char cmd) {
             break;
             
         case '~':  // Resume
-            if (grblState == STATE_HOLD) {
+            if (grblState == STATE_HOLD && motorsInitialized) {
                 feedHoldActive = false;
                 grblState = STATE_RUN;
                 // Motion will resume automatically from queue
@@ -388,8 +420,10 @@ void ProcessRealtimeCommand(char cmd) {
             break;
             
         case 0x18:  // Ctrl-X (soft reset)
-            motionController.Stop();
-            motorZ.MoveStopAbrupt();
+            if (motorsInitialized) {
+                motionController.Stop();
+                motorZ.MoveStopAbrupt();
+            }
             feedHoldActive = false;
             grblState = STATE_IDLE;
             SendResponseLine("ok");
@@ -438,7 +472,7 @@ void ProcessCommand(const char* command) {
 void ParseGCode(const char* line) {
     // Parse command line (e.g., "G01 X10.5 Y20.3 Z5.0 F100")
     double x = 0, y = 0, z = 0, i = 0, j = 0, f = -1.0;
-    bool hasX = false, hasY = false, hasZ = false, hasI = false, hasJ = false, hasF = false;
+    bool hasX = false, hasY = false, hasZ = false, hasI = false, hasJ = false;
     
     // Find command code (G## or M##)
     if (line[0] == 'G' || line[0] == 'M') {
@@ -465,7 +499,6 @@ void ParseGCode(const char* line) {
                 hasJ = true;
             } else if (*ptr == 'F' || *ptr == 'f') {
                 sscanf(ptr, "F%lf", &f);
-                hasF = true;
             }
             ptr++;
         }
@@ -506,12 +539,12 @@ void ParseGCode(const char* line) {
                     break;
                     
                 case 20:  // G20 - Units in inches
-                    unitMode = UNIT_INCHES;
+                    unitMode = UNIT_MODE_INCHES;
                     SendResponseLine("ok");
                     break;
                     
                 case 21:  // G21 - Units in millimeters
-                    unitMode = UNIT_MM;
+                    unitMode = UNIT_MODE_MM;
                     SendResponseLine("ok");
                     break;
                     
@@ -540,14 +573,18 @@ void ParseGCode(const char* line) {
                     break;
                     
                 case 92:  // G92 - Set coordinate system offset
+                    if (!motorsInitialized) {
+                        SendError(9);  // Motors not initialized
+                        break;
+                    }
                     if (hasX || hasY) {
                         int32_t newXSteps, newYSteps;
-                        if (unitMode == UNIT_INCHES) {
-                            newXSteps = hasX ? UnitConverter::DistanceToSteps(x, UNIT_INCHES, mechanicalConfigX) : motionController.CurrentX();
-                            newYSteps = hasY ? UnitConverter::DistanceToSteps(y, UNIT_INCHES, mechanicalConfigY) : motionController.CurrentY();
+                        if (unitMode == UNIT_MODE_INCHES) {
+                            newXSteps = hasX ? UnitConverter::DistanceToSteps(x, ClearCore::UNIT_INCHES, mechanicalConfigX) : motionController.CurrentX();
+                            newYSteps = hasY ? UnitConverter::DistanceToSteps(y, ClearCore::UNIT_INCHES, mechanicalConfigY) : motionController.CurrentY();
                         } else {
-                            newXSteps = hasX ? UnitConverter::DistanceToSteps(x, UNIT_MM, mechanicalConfigX) : motionController.CurrentX();
-                            newYSteps = hasY ? UnitConverter::DistanceToSteps(y, UNIT_MM, mechanicalConfigY) : motionController.CurrentY();
+                            newXSteps = hasX ? UnitConverter::DistanceToSteps(x, ClearCore::UNIT_MM, mechanicalConfigX) : motionController.CurrentX();
+                            newYSteps = hasY ? UnitConverter::DistanceToSteps(y, ClearCore::UNIT_MM, mechanicalConfigY) : motionController.CurrentY();
                         }
                         motionController.SetPosition(newXSteps, newYSteps);
                         SendResponseLine("ok");
@@ -565,8 +602,10 @@ void ParseGCode(const char* line) {
             switch (code) {
                 case 0:  // M0 - Program stop
                 case 1:  // M1 - Optional stop
-                    motionController.StopDecel();
-                    motorZ.MoveStopDecel();
+                    if (motorsInitialized) {
+                        motionController.StopDecel();
+                        motorZ.MoveStopDecel();
+                    }
                     grblState = STATE_IDLE;
                     SendResponseLine("ok");
                     break;
@@ -578,8 +617,10 @@ void ParseGCode(const char* line) {
                     break;
                     
                 case 30:  // M30 - Program end
-                    motionController.Stop();
-                    motorZ.MoveStopAbrupt();
+                    if (motorsInitialized) {
+                        motionController.Stop();
+                        motorZ.MoveStopAbrupt();
+                    }
                     grblState = STATE_IDLE;
                     SendResponseLine("ok");
                     break;
@@ -595,6 +636,12 @@ void ParseGCode(const char* line) {
 }
 
 void ExecuteG00(double x, double y, double z) {
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        SendError(9);  // Homing cycle not started (or motors not initialized)
+        return;
+    }
+    
     // Rapid move - use maximum velocity
     if (!motorsEnabled) {
         SendError(9);  // Homing cycle not started
@@ -614,7 +661,7 @@ void ExecuteG00(double x, double y, double z) {
     double targetZ = z;
     
     if (coordinateMode == COORD_INCREMENTAL) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             targetX = motionController.CurrentXInches() + x;
             targetY = motionController.CurrentYInches() + y;
             targetZ = GetCurrentZPosition() + z;
@@ -627,25 +674,24 @@ void ExecuteG00(double x, double y, double z) {
     
     // Convert to steps
     int32_t endXSteps, endYSteps, endZSteps;
-    if (unitMode == UNIT_INCHES) {
-        endXSteps = UnitConverter::DistanceToSteps(targetX, UNIT_INCHES, mechanicalConfigX);
-        endYSteps = UnitConverter::DistanceToSteps(targetY, UNIT_INCHES, mechanicalConfigY);
-        endZSteps = UnitConverter::DistanceToSteps(targetZ, UNIT_INCHES, mechanicalConfigZ);
+    if (unitMode == UNIT_MODE_INCHES) {
+        endXSteps = UnitConverter::DistanceToSteps(targetX, ClearCore::UNIT_INCHES, mechanicalConfigX);
+        endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_INCHES, mechanicalConfigY);
+        endZSteps = UnitConverter::DistanceToSteps(targetZ, ClearCore::UNIT_INCHES, mechanicalConfigZ);
     } else {
-        endXSteps = UnitConverter::DistanceToSteps(targetX, UNIT_MM, mechanicalConfigX);
-        endYSteps = UnitConverter::DistanceToSteps(targetY, UNIT_MM, mechanicalConfigY);
-        endZSteps = UnitConverter::DistanceToSteps(targetZ, UNIT_MM, mechanicalConfigZ);
+        endXSteps = UnitConverter::DistanceToSteps(targetX, ClearCore::UNIT_MM, mechanicalConfigX);
+        endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_MM, mechanicalConfigY);
+        endZSteps = UnitConverter::DistanceToSteps(targetZ, ClearCore::UNIT_MM, mechanicalConfigZ);
     }
     
     // Use high velocity for rapid move
-    int32_t savedVel = motionController.ArcVelMax();
     motionController.ArcVelMax(DEFAULT_VELOCITY_STEPS_PER_SEC * 2);  // 2x normal speed
     
     // Queue X/Y coordinated move
     bool success = motionController.QueueLinear(endXSteps, endYSteps);
     
     // Restore velocity
-    motionController.ArcVelMax(savedVel);
+    motionController.ArcVelMax(savedVelocityMax);
     
     if (!success) {
         SendError(24);  // Line exceeds maximum line length
@@ -658,10 +704,16 @@ void ExecuteG00(double x, double y, double z) {
     SendResponseLine("ok");
 }
 
-void ExecuteG01(double x, double y, double f) {
+void ExecuteG01(double x, double y, double z, double f) {
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        SendError(9);  // Homing cycle not started (or motors not initialized)
+        return;
+    }
+    
     // Set feed rate if specified
     if (f >= 0.0) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(f);
             currentFeedRate = f;
         } else {
@@ -670,7 +722,7 @@ void ExecuteG01(double x, double y, double f) {
         }
         feedRateSet = true;
     } else if (feedRateSet) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(currentFeedRate);
         } else {
             motionController.FeedRateMMPerMin(currentFeedRate);
@@ -694,7 +746,7 @@ void ExecuteG01(double x, double y, double f) {
     double targetY = y;
     
     if (coordinateMode == COORD_INCREMENTAL) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             targetX = motionController.CurrentXInches() + x;
             targetY = motionController.CurrentYInches() + y;
         } else {
@@ -705,15 +757,32 @@ void ExecuteG01(double x, double y, double f) {
     
     // Convert to steps
     int32_t endXSteps, endYSteps;
-    if (unitMode == UNIT_INCHES) {
-        endXSteps = UnitConverter::DistanceToSteps(targetX, UNIT_INCHES, mechanicalConfigX);
-        endYSteps = UnitConverter::DistanceToSteps(targetY, UNIT_INCHES, mechanicalConfigY);
+    if (unitMode == UNIT_MODE_INCHES) {
+        endXSteps = UnitConverter::DistanceToSteps(targetX, ClearCore::UNIT_INCHES, mechanicalConfigX);
+        endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_INCHES, mechanicalConfigY);
     } else {
-        endXSteps = UnitConverter::DistanceToSteps(targetX, UNIT_MM, mechanicalConfigX);
-        endYSteps = UnitConverter::DistanceToSteps(targetY, UNIT_MM, mechanicalConfigY);
+        endXSteps = UnitConverter::DistanceToSteps(targetX, ClearCore::UNIT_MM, mechanicalConfigX);
+        endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_MM, mechanicalConfigY);
     }
     
     bool success = motionController.QueueLinear(endXSteps, endYSteps);
+    
+    // Handle Z-axis movement independently
+    if (z != 0.0 || coordinateMode == COORD_ABSOLUTE) {
+        double targetZ = z;
+        if (coordinateMode == COORD_INCREMENTAL) {
+            targetZ = GetCurrentZPosition() + z;
+        }
+        
+        int32_t targetZSteps;
+        if (unitMode == UNIT_MODE_INCHES) {
+            targetZSteps = UnitConverter::DistanceToSteps(targetZ, ClearCore::UNIT_INCHES, mechanicalConfigZ);
+        } else {
+            targetZSteps = UnitConverter::DistanceToSteps(targetZ, ClearCore::UNIT_MM, mechanicalConfigZ);
+        }
+        
+        MoveZAxis(targetZSteps, false);
+    }
     
     if (!success) {
         SendError(24);
@@ -724,9 +793,15 @@ void ExecuteG01(double x, double y, double f) {
 }
 
 void ExecuteG02(double x, double y, double z, double i, double j, double f) {
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        SendError(9);  // Homing cycle not started (or motors not initialized)
+        return;
+    }
+    
     // Set feed rate if specified
     if (f >= 0.0) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(f);
             currentFeedRate = f;
         } else {
@@ -735,7 +810,7 @@ void ExecuteG02(double x, double y, double z, double i, double j, double f) {
         }
         feedRateSet = true;
     } else if (feedRateSet) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(currentFeedRate);
         } else {
             motionController.FeedRateMMPerMin(currentFeedRate);
@@ -749,7 +824,7 @@ void ExecuteG02(double x, double y, double z, double i, double j, double f) {
     
     // Calculate arc center and parameters
     double startX, startY;
-    if (unitMode == UNIT_INCHES) {
+    if (unitMode == UNIT_MODE_INCHES) {
         startX = motionController.CurrentXInches();
         startY = motionController.CurrentYInches();
     } else {
@@ -778,14 +853,14 @@ void ExecuteG02(double x, double y, double z, double i, double j, double f) {
     
     // Convert to steps
     int32_t centerXSteps, centerYSteps, radiusSteps;
-    if (unitMode == UNIT_INCHES) {
-        centerXSteps = UnitConverter::DistanceToSteps(centerX, UNIT_INCHES, mechanicalConfigX);
-        centerYSteps = UnitConverter::DistanceToSteps(centerY, UNIT_INCHES, mechanicalConfigY);
-        radiusSteps = UnitConverter::DistanceToSteps(radius, UNIT_INCHES, mechanicalConfigX);
+    if (unitMode == UNIT_MODE_INCHES) {
+        centerXSteps = UnitConverter::DistanceToSteps(centerX, ClearCore::UNIT_INCHES, mechanicalConfigX);
+        centerYSteps = UnitConverter::DistanceToSteps(centerY, ClearCore::UNIT_INCHES, mechanicalConfigY);
+        radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_INCHES, mechanicalConfigX);
     } else {
-        centerXSteps = UnitConverter::DistanceToSteps(centerX, UNIT_MM, mechanicalConfigX);
-        centerYSteps = UnitConverter::DistanceToSteps(centerY, UNIT_MM, mechanicalConfigY);
-        radiusSteps = UnitConverter::DistanceToSteps(radius, UNIT_MM, mechanicalConfigX);
+        centerXSteps = UnitConverter::DistanceToSteps(centerX, ClearCore::UNIT_MM, mechanicalConfigX);
+        centerYSteps = UnitConverter::DistanceToSteps(centerY, ClearCore::UNIT_MM, mechanicalConfigY);
+        radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_MM, mechanicalConfigX);
     }
     
     bool success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, true);
@@ -798,10 +873,16 @@ void ExecuteG02(double x, double y, double z, double i, double j, double f) {
     SendResponseLine("ok");
 }
 
-void ExecuteG03(double x, double y, double i, double j, double f) {
+void ExecuteG03(double x, double y, double z, double i, double j, double f) {
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        SendError(9);  // Homing cycle not started (or motors not initialized)
+        return;
+    }
+    
     // Set feed rate if specified
     if (f >= 0.0) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(f);
             currentFeedRate = f;
         } else {
@@ -810,7 +891,7 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
         }
         feedRateSet = true;
     } else if (feedRateSet) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(currentFeedRate);
         } else {
             motionController.FeedRateMMPerMin(currentFeedRate);
@@ -824,7 +905,7 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
     
     // Calculate arc center and parameters
     double startX, startY;
-    if (unitMode == UNIT_INCHES) {
+    if (unitMode == UNIT_MODE_INCHES) {
         startX = motionController.CurrentXInches();
         startY = motionController.CurrentYInches();
     } else {
@@ -853,14 +934,14 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
     
     // Convert to steps
     int32_t centerXSteps, centerYSteps, radiusSteps;
-    if (unitMode == UNIT_INCHES) {
-        centerXSteps = UnitConverter::DistanceToSteps(centerX, UNIT_INCHES, mechanicalConfigX);
-        centerYSteps = UnitConverter::DistanceToSteps(centerY, UNIT_INCHES, mechanicalConfigY);
-        radiusSteps = UnitConverter::DistanceToSteps(radius, UNIT_INCHES, mechanicalConfigX);
+    if (unitMode == UNIT_MODE_INCHES) {
+        centerXSteps = UnitConverter::DistanceToSteps(centerX, ClearCore::UNIT_INCHES, mechanicalConfigX);
+        centerYSteps = UnitConverter::DistanceToSteps(centerY, ClearCore::UNIT_INCHES, mechanicalConfigY);
+        radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_INCHES, mechanicalConfigX);
     } else {
-        centerXSteps = UnitConverter::DistanceToSteps(centerX, UNIT_MM, mechanicalConfigX);
-        centerYSteps = UnitConverter::DistanceToSteps(centerY, UNIT_MM, mechanicalConfigY);
-        radiusSteps = UnitConverter::DistanceToSteps(radius, UNIT_MM, mechanicalConfigX);
+        centerXSteps = UnitConverter::DistanceToSteps(centerX, ClearCore::UNIT_MM, mechanicalConfigX);
+        centerYSteps = UnitConverter::DistanceToSteps(centerY, ClearCore::UNIT_MM, mechanicalConfigY);
+        radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_MM, mechanicalConfigX);
     }
     
     bool success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, false);
@@ -878,10 +959,10 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
         }
         
         int32_t endZSteps;
-        if (unitMode == UNIT_INCHES) {
-            endZSteps = UnitConverter::DistanceToSteps(targetZ, UNIT_INCHES, mechanicalConfigZ);
+        if (unitMode == UNIT_MODE_INCHES) {
+            endZSteps = UnitConverter::DistanceToSteps(targetZ, ClearCore::UNIT_INCHES, mechanicalConfigZ);
         } else {
-            endZSteps = UnitConverter::DistanceToSteps(targetZ, UNIT_MM, mechanicalConfigZ);
+            endZSteps = UnitConverter::DistanceToSteps(targetZ, ClearCore::UNIT_MM, mechanicalConfigZ);
         }
         
         MoveZAxis(endZSteps, false);
@@ -891,6 +972,12 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
 }
 
 void ExecuteG28() {
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        SendError(9);  // Homing cycle not started (or motors not initialized)
+        return;
+    }
+    
     // Home - move to home switches, then set origin
     if (!motorsEnabled) {
         SendError(9);
@@ -908,7 +995,7 @@ void ExecuteG28() {
     bool zHomed = false;
     
     // Use slow feed rate for homing
-    double homeFeedRate = unitMode == UNIT_INCHES ? 10.0 : 254.0;  // 10 in/min or 254 mm/min
+    double homeFeedRate = unitMode == UNIT_MODE_INCHES ? 10.0 : 254.0;  // 10 in/min or 254 mm/min
     motionController.FeedRateMMPerMin(homeFeedRate);
     
     #ifdef HOME_X_PIN
@@ -916,7 +1003,7 @@ void ExecuteG28() {
     while (!xHomed) {
         // Move small increment in negative X
         int32_t currentX = motionController.CurrentX();
-        int32_t targetX = currentX - UnitConverter::DistanceToSteps(1.0, unitMode == UNIT_INCHES ? UNIT_INCHES : UNIT_MM, mechanicalConfigX);
+        int32_t targetX = currentX - UnitConverter::DistanceToSteps(1.0, unitMode == UNIT_MODE_INCHES ? ClearCore::UNIT_INCHES : ClearCore::UNIT_MM, mechanicalConfigX);
         motionController.QueueLinear(targetX, motionController.CurrentY());
         
         // Wait for move to complete or home switch to trigger
@@ -940,7 +1027,7 @@ void ExecuteG28() {
     // Move Y axis negative until home switch is triggered
     while (!yHomed) {
         int32_t currentY = motionController.CurrentY();
-        int32_t targetY = currentY - UnitConverter::DistanceToSteps(1.0, unitMode == UNIT_INCHES ? UNIT_INCHES : UNIT_MM, mechanicalConfigY);
+        int32_t targetY = currentY - UnitConverter::DistanceToSteps(1.0, unitMode == UNIT_MODE_INCHES ? ClearCore::UNIT_INCHES : ClearCore::UNIT_MM, mechanicalConfigY);
         motionController.QueueLinear(motionController.CurrentX(), targetY);
         
         while (motionController.IsActive()) {
@@ -963,7 +1050,7 @@ void ExecuteG28() {
     // Move Z axis negative until home switch is triggered
     while (!zHomed) {
         int32_t currentZ = currentZSteps;
-        int32_t targetZ = currentZ - UnitConverter::DistanceToSteps(1.0, unitMode == UNIT_INCHES ? UNIT_INCHES : UNIT_MM, mechanicalConfigZ);
+        int32_t targetZ = currentZ - UnitConverter::DistanceToSteps(1.0, unitMode == UNIT_MODE_INCHES ? ClearCore::UNIT_INCHES : ClearCore::UNIT_MM, mechanicalConfigZ);
         motorZ.Move(targetZ, MotorDriver::MOVE_TARGET_ABSOLUTE);
         
         while (motorZ.StatusReg().bit.StepsActive) {
@@ -977,7 +1064,7 @@ void ExecuteG28() {
         }
         
         if (zHomed) break;
-        currentZSteps = motorZ.PositionTargeted();
+        currentZSteps = motorZ.PositionRefCommanded();
     }
     #else
     zHomed = true;
@@ -991,7 +1078,13 @@ void ExecuteG28() {
     SendResponseLine("ok");
 }
 
-void ExecuteG38(double x, double y, double f) {
+void ExecuteG38(double x, double y, double z, double f) {
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        SendError(9);  // Homing cycle not started (or motors not initialized)
+        return;
+    }
+    
     // Probe - move until probe triggers
     if (!motorsEnabled) {
         SendError(9);
@@ -1005,7 +1098,7 @@ void ExecuteG38(double x, double y, double f) {
     
     // Set feed rate if specified
     if (f >= 0.0) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(f);
         } else {
             motionController.FeedRateMMPerMin(f);
@@ -1017,7 +1110,7 @@ void ExecuteG38(double x, double y, double f) {
     double targetY = y;
     
     if (coordinateMode == COORD_INCREMENTAL) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             targetX = motionController.CurrentXInches() + x;
             targetY = motionController.CurrentYInches() + y;
         } else {
@@ -1028,12 +1121,12 @@ void ExecuteG38(double x, double y, double f) {
     
     // Convert to steps
     int32_t endXSteps, endYSteps;
-    if (unitMode == UNIT_INCHES) {
-        endXSteps = UnitConverter::DistanceToSteps(targetX, UNIT_INCHES, mechanicalConfigX);
-        endYSteps = UnitConverter::DistanceToSteps(targetY, UNIT_INCHES, mechanicalConfigY);
+    if (unitMode == UNIT_MODE_INCHES) {
+        endXSteps = UnitConverter::DistanceToSteps(targetX, ClearCore::UNIT_INCHES, mechanicalConfigX);
+        endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_INCHES, mechanicalConfigY);
     } else {
-        endXSteps = UnitConverter::DistanceToSteps(targetX, UNIT_MM, mechanicalConfigX);
-        endYSteps = UnitConverter::DistanceToSteps(targetY, UNIT_MM, mechanicalConfigY);
+        endXSteps = UnitConverter::DistanceToSteps(targetX, ClearCore::UNIT_MM, mechanicalConfigX);
+        endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_MM, mechanicalConfigY);
     }
     
     // Move toward target, checking probe
@@ -1070,7 +1163,7 @@ void ExecuteG38(double x, double y, double f) {
                 motionController.Stop();
                 // Report probe position
                 double probeX, probeY;
-                if (unitMode == UNIT_INCHES) {
+                if (unitMode == UNIT_MODE_INCHES) {
                     probeX = motionController.CurrentXInches();
                     probeY = motionController.CurrentYInches();
                 } else {
@@ -1120,14 +1213,21 @@ void SendStatusReport() {
     
     // Get current position
     double xPos, yPos, zPos;
-    if (unitMode == UNIT_INCHES) {
-        xPos = motionController.CurrentXInches();
-        yPos = motionController.CurrentYInches();
-        zPos = GetCurrentZPosition();
+    if (motorsInitialized) {
+        if (unitMode == UNIT_MODE_INCHES) {
+            xPos = motionController.CurrentXInches();
+            yPos = motionController.CurrentYInches();
+            zPos = GetCurrentZPosition();
+        } else {
+            xPos = motionController.CurrentXMM();
+            yPos = motionController.CurrentYMM();
+            zPos = GetCurrentZPosition();
+        }
     } else {
-        xPos = motionController.CurrentXMM();
-        yPos = motionController.CurrentYMM();
-        zPos = GetCurrentZPosition();
+        // Motors not initialized - report zero position
+        xPos = 0.0;
+        yPos = 0.0;
+        zPos = 0.0;
     }
     
     // Format status report (GRBL format: FS is feed rate, SS is spindle speed)
@@ -1166,12 +1266,15 @@ void SendResponseLine(const char* message) {
 // ========== Z-Axis Helper Functions ==========
 
 void MoveZAxis(int32_t targetZSteps, bool rapid) {
+    // Check if motors are initialized
+    if (!motorsInitialized) {
+        return;  // Cannot move without motors
+    }
+    
     // Move Z axis independently (not coordinated with X/Y)
     if (targetZSteps == currentZSteps) {
         return;  // Already at target
     }
-    
-    int32_t distance = targetZSteps - currentZSteps;
     
     if (rapid) {
         // Rapid move - use high velocity
@@ -1180,7 +1283,7 @@ void MoveZAxis(int32_t targetZSteps, bool rapid) {
         // Feed rate move - convert feed rate to velocity
         // Feed rate is in distance per minute, velocity is steps per second
         double feedRateStepsPerSec = currentFeedRate;
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             // Convert inches/min to steps/sec
             feedRateStepsPerSec = (currentFeedRate / 60.0) * (mechanicalConfigZ.stepsPerRevolution / mechanicalConfigZ.pitch);
         } else {
@@ -1197,14 +1300,114 @@ void MoveZAxis(int32_t targetZSteps, bool rapid) {
         Delay_ms(1);
     }
     
-    currentZSteps = motorZ.PositionTargeted();
+    currentZSteps = motorZ.PositionRefCommanded();
 }
 
 double GetCurrentZPosition() {
     // Get current Z position in current units
-    if (unitMode == UNIT_INCHES) {
-        return UnitConverter::StepsToDistance(currentZSteps, UNIT_INCHES, mechanicalConfigZ);
+    if (unitMode == UNIT_MODE_INCHES) {
+        return UnitConverter::StepsToDistance(currentZSteps, ClearCore::UNIT_INCHES, mechanicalConfigZ);
     } else {
-        return UnitConverter::StepsToDistance(currentZSteps, UNIT_MM, mechanicalConfigZ);
+        return UnitConverter::StepsToDistance(currentZSteps, ClearCore::UNIT_MM, mechanicalConfigZ);
     }
+}
+
+// ========== Input Checking Functions ==========
+
+void InitializeInputs() {
+    // Initialize home switches
+    #ifdef HOME_X_PIN
+    HOME_X_PIN.Mode(Connector::INPUT_DIGITAL);
+    #endif
+    
+    #ifdef HOME_Y_PIN
+    HOME_Y_PIN.Mode(Connector::INPUT_DIGITAL);
+    #endif
+    
+    #ifdef HOME_Z_PIN
+    HOME_Z_PIN.Mode(Connector::INPUT_DIGITAL);
+    #endif
+    
+    // Initialize probe input
+    #ifdef PROBE_PIN
+    PROBE_PIN.Mode(Connector::INPUT_DIGITAL);
+    #endif
+    
+    // Initialize limit switches
+    #ifdef LIMIT_X_MIN_PIN
+    LIMIT_X_MIN_PIN.Mode(Connector::INPUT_DIGITAL);
+    #endif
+    
+    #ifdef LIMIT_X_MAX_PIN
+    LIMIT_X_MAX_PIN.Mode(Connector::INPUT_DIGITAL);
+    #endif
+    
+    #ifdef LIMIT_Y_MIN_PIN
+    LIMIT_Y_MIN_PIN.Mode(Connector::INPUT_DIGITAL);
+    #endif
+    
+    #ifdef LIMIT_Y_MAX_PIN
+    LIMIT_Y_MAX_PIN.Mode(Connector::INPUT_DIGITAL);
+    #endif
+}
+
+bool CheckHomeSwitches() {
+    // Check if any home switch is triggered
+    #ifdef HOME_X_PIN
+    if (HOME_SWITCH_ACTIVE_LOW ? !HOME_X_PIN.State() : HOME_X_PIN.State()) {
+        return true;
+    }
+    #endif
+    
+    #ifdef HOME_Y_PIN
+    if (HOME_SWITCH_ACTIVE_LOW ? !HOME_Y_PIN.State() : HOME_Y_PIN.State()) {
+        return true;
+    }
+    #endif
+    
+    #ifdef HOME_Z_PIN
+    if (HOME_SWITCH_ACTIVE_LOW ? !HOME_Z_PIN.State() : HOME_Z_PIN.State()) {
+        return true;
+    }
+    #endif
+    
+    return false;
+}
+
+bool CheckLimitSwitches() {
+    // Check if any limit switch is triggered
+    #ifdef LIMIT_X_MIN_PIN
+    if (LIMIT_SWITCH_ACTIVE_LOW ? !LIMIT_X_MIN_PIN.State() : LIMIT_X_MIN_PIN.State()) {
+        return true;
+    }
+    #endif
+    
+    #ifdef LIMIT_X_MAX_PIN
+    if (LIMIT_SWITCH_ACTIVE_LOW ? !LIMIT_X_MAX_PIN.State() : LIMIT_X_MAX_PIN.State()) {
+        return true;
+    }
+    #endif
+    
+    #ifdef LIMIT_Y_MIN_PIN
+    if (LIMIT_SWITCH_ACTIVE_LOW ? !LIMIT_Y_MIN_PIN.State() : LIMIT_Y_MIN_PIN.State()) {
+        return true;
+    }
+    #endif
+    
+    #ifdef LIMIT_Y_MAX_PIN
+    if (LIMIT_SWITCH_ACTIVE_LOW ? !LIMIT_Y_MAX_PIN.State() : LIMIT_Y_MAX_PIN.State()) {
+        return true;
+    }
+    #endif
+    
+    return false;
+}
+
+bool CheckProbe() {
+    // Check if probe is triggered
+    #ifdef PROBE_PIN
+    return PROBE_ACTIVE_LOW ? !PROBE_PIN.State() : PROBE_PIN.State();
+    #else
+    return false;
+    #endif
 }
