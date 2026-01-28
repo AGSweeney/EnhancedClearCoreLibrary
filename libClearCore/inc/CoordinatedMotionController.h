@@ -408,6 +408,17 @@ public:
         \return Current Y position in millimeters
     **/
     double CurrentYMM() const;
+    
+    /**
+        \brief Get debug information about current motion
+        
+        \param[out] stepsRemaining Remaining steps in current move
+        \param[out] currentX Current X position in steps
+        \param[out] currentY Current Y position in steps
+        
+        \return true if motion is active, false otherwise
+    **/
+    bool GetDebugInfo(uint32_t& stepsRemaining, int32_t& currentX, int32_t& currentY) const;
 
 private:
     static const uint8_t ARC_QUEUE_SIZE = 8;

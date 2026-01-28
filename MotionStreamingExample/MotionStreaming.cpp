@@ -121,6 +121,7 @@ IpAddress manualIp = IpAddress(192, 168, 0, 109);  // Only used if usingDhcp = f
 
 // ========== Global Variables ==========
 
+// Global objects - constructors run before main()
 CoordinatedMotionController motionController;
 EthernetTcpServer* tcpServer = nullptr;
 EthernetTcpClient tcpClient;  // Store by value, not pointer
@@ -173,8 +174,8 @@ int main() {
     // Just add a simple delay to allow everything to stabilize
     Delay_ms(500);
     
-    // TEST VERSION: Disable motor initialization to isolate crash
-    // InitializeMotors();  // TEMPORARILY DISABLED FOR TESTING
+    // Initialize motors (may fail if motors not attached - that's OK)
+    InitializeMotors();
     
     // Initialize communication (safe even if USB not connected)
     InitializeCommunication();
@@ -188,8 +189,10 @@ int main() {
     #elif COMM_MODE == ETHERNET_MODE
     if (ConnectorUsb) {
     #endif
-        SendResponseLine("Motion Streaming Example Ready - TEST VERSION (Motors Disabled)");
-        SendResponseLine("If you see this, motors are NOT the crash cause");
+        SendResponseLine("Motion Streaming Example Ready");
+        if (!motorsInitialized) {
+            SendResponseLine("Note: Motors not initialized - continuing without motors");
+        }
     #if COMM_MODE == SERIAL_MODE || COMM_MODE == ETHERNET_MODE
     }
     #endif
@@ -228,9 +231,6 @@ void InitializeMotors() {
     // Simple delay to ensure system is stable before accessing hardware
     Delay_ms(50);
     
-    // TEMPORARILY DISABLED FOR DEBUGGING - Comment out CoordinatedMotionController
-    // to see if that's causing the crash
-    /*
     // Set motors to Step and Direction mode
     // This is safe even if motors aren't attached - it just configures the connectors
     // Don't check SysManager.Ready() as it should already be ready from Reset_Handler
@@ -239,13 +239,13 @@ void InitializeMotors() {
     // Small delay to allow mode change to propagate
     Delay_ms(50);
     
-    // Try to enable motors (non-blocking - motors may not be attached)
-    // These calls are safe even without motors - they just set the enable signal
-    motorX.EnableRequest(true);
-    motorY.EnableRequest(true);
+    // Motors start DISABLED for safety - user must explicitly enable with M202
+    // This prevents unexpected motion on boot
+    motorX.EnableRequest(false);
+    motorY.EnableRequest(false);
     
-    // Short delay to allow enable signal to propagate (non-blocking)
-    Delay_ms(100);
+    // Short delay to allow enable signal to propagate
+    Delay_ms(50);
     
     // Initialize coordinated motion controller
     // This may fail if motors are not present or not properly configured
@@ -256,11 +256,6 @@ void InitializeMotors() {
         // Don't try to configure motion controller if initialization failed
         return;
     }
-    */
-    
-    // TEMPORARY: Skip all motor initialization to test if that's causing the crash
-    // If this version boots, we know the issue is in motor/CoordinatedMotionController init
-    return;
     
     // Configure mechanical parameters for unit conversion
     motionController.SetMechanicalParamsX(MOTOR_X_STEPS_PER_REV, MOTOR_X_PITCH_MM, ClearCore::UNIT_MM);
@@ -685,6 +680,36 @@ void ParseGCode(const char* line) {
                     }
                     break;
                     
+                case 116:  // M116 - Debug: Get motion debug info
+                    if (motorsInitialized) {
+                        uint32_t stepsRemaining;
+                        int32_t currentXSteps, currentYSteps;
+                        bool isActive = motionController.GetDebugInfo(stepsRemaining, currentXSteps, currentYSteps);
+                        
+                        char response[200];
+                        if (unitMode == UNIT_MODE_INCHES) {
+                            double xInches = motionController.CurrentXInches();
+                            double yInches = motionController.CurrentYInches();
+                            sprintf(response, "Debug: Active=%d StepsRem=%lu X=%.3f(step:%ld) Y=%.3f(step:%ld)",
+                                    isActive ? 1 : 0,
+                                    (unsigned long)stepsRemaining,
+                                    xInches, (long)currentXSteps,
+                                    yInches, (long)currentYSteps);
+                        } else {
+                            double xMM = motionController.CurrentXMM();
+                            double yMM = motionController.CurrentYMM();
+                            sprintf(response, "Debug: Active=%d StepsRem=%lu X=%.3f(step:%ld) Y=%.3f(step:%ld)",
+                                    isActive ? 1 : 0,
+                                    (unsigned long)stepsRemaining,
+                                    xMM, (long)currentXSteps,
+                                    yMM, (long)currentYSteps);
+                        }
+                        SendResponseLine(response);
+                    } else {
+                        SendResponseLine("error: Motors not initialized");
+                    }
+                    break;
+                    
                 case 500:  // M500 - Save configuration (placeholder)
                     SendResponseLine("Configuration saved");
                     break;
@@ -978,5 +1003,5 @@ void SendResponse(const char* message) {
 
 void SendResponseLine(const char* message) {
     SendResponse(message);
-    SendResponse("\n");
+    SendResponse("\r\n");  // Use CRLF for proper terminal line endings (PuTTY, etc.)
 }

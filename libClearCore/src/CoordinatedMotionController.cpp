@@ -290,13 +290,77 @@ void CoordinatedMotionController::UpdateFast() {
     }
     
     if (stepsGenerated) {
+        // Safety check: if both steps are zero, motion is complete
+        if (stepsX == 0 && stepsY == 0) {
+            // Explicitly send zero steps to stop motors
+            if (m_motorX) {
+                m_motorX->SetCoordinatedSteps(0);
+            }
+            if (m_motorY) {
+                m_motorY->SetCoordinatedSteps(0);
+            }
+            
+            // No steps to apply - motion is complete
+            if (m_motionType == MOTION_TYPE_LINEAR && m_linearInterpolator.IsLinearComplete()) {
+                m_active = false;
+                m_motionType = MOTION_TYPE_NONE;
+                return;
+            } else if (m_motionType == MOTION_TYPE_ARC && m_arcInterpolator.IsArcComplete()) {
+                m_active = false;
+                m_motionType = MOTION_TYPE_NONE;
+                return;
+            }
+        }
+        
         // Apply steps to motors
         m_motorX->SetCoordinatedSteps(stepsX);
         m_motorY->SetCoordinatedSteps(stepsY);
         
-        // Update current position
-        m_currentX += stepsX;
-        m_currentY += stepsY;
+        // Update current position from interpolator (not by adding steps)
+        // This ensures position matches interpolator's internal state
+        if (m_motionType == MOTION_TYPE_ARC) {
+            int32_t tempX, tempY;
+            m_arcInterpolator.GetCurrentPosition(tempX, tempY);
+            m_currentX = tempX;
+            m_currentY = tempY;
+        } else if (m_motionType == MOTION_TYPE_LINEAR) {
+            int32_t tempX, tempY;
+            m_linearInterpolator.GetCurrentPosition(tempX, tempY);
+            m_currentX = tempX;
+            m_currentY = tempY;
+        }
+    } else {
+        // GenerateNextSteps returned false - motion should be complete
+        // Explicitly send zero steps to stop motors
+        if (m_motorX) {
+            m_motorX->SetCoordinatedSteps(0);
+        }
+        if (m_motorY) {
+            m_motorY->SetCoordinatedSteps(0);
+        }
+        
+        // Double-check completion status and stop if needed
+        if (m_motionType == MOTION_TYPE_ARC) {
+            if (m_arcInterpolator.IsArcComplete()) {
+                // Update position from interpolator one final time
+                int32_t tempX, tempY;
+                m_arcInterpolator.GetCurrentPosition(tempX, tempY);
+                m_currentX = tempX;
+                m_currentY = tempY;
+                m_active = false;
+                m_motionType = MOTION_TYPE_NONE;
+            }
+        } else if (m_motionType == MOTION_TYPE_LINEAR) {
+            if (m_linearInterpolator.IsLinearComplete()) {
+                // Update position from interpolator one final time
+                int32_t tempX, tempY;
+                m_linearInterpolator.GetCurrentPosition(tempX, tempY);
+                m_currentX = tempX;
+                m_currentY = tempY;
+                m_active = false;
+                m_motionType = MOTION_TYPE_NONE;
+            }
+        }
     }
 }
 
@@ -818,6 +882,23 @@ double CoordinatedMotionController::CurrentYMM() const {
         return 0.0;
     }
     return UnitConverter::StepsToDistance(m_currentY, UNIT_MM, m_mechanicalConfigY);
+}
+
+bool CoordinatedMotionController::GetDebugInfo(uint32_t& stepsRemaining, int32_t& currentX, int32_t& currentY) const {
+    currentX = m_currentX;
+    currentY = m_currentY;
+    
+    if (m_motionType == MOTION_TYPE_LINEAR) {
+        stepsRemaining = m_linearInterpolator.StepsRemaining();
+        return m_active;
+    } else if (m_motionType == MOTION_TYPE_ARC) {
+        // Arc interpolator doesn't have StepsRemaining, use 0
+        stepsRemaining = 0;
+        return m_active;
+    } else {
+        stepsRemaining = 0;
+        return false;
+    }
 }
 
 } // ClearCore namespace

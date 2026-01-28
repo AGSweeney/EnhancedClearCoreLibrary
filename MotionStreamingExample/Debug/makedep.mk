@@ -4,7 +4,5 @@
 
 Device_Startup\startup_same53.c
 
-Device_Startup\system_same53.c
-
 MotionStreaming.cpp
 

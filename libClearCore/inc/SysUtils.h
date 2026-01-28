@@ -192,31 +192,6 @@ extern "C" {
 #endif
 
 /**
-    \brief System Clock Frequency variable
-
-    This variable holds the current system clock frequency in Hz.
-    It is initialized to 120 MHz and can be updated by SystemCoreClockUpdate().
-**/
-extern uint32_t SystemCoreClock;
-
-/**
-    \brief Initialize the system
-
-    Setup the microcontroller system. Initialize clocks and update the
-    SystemCoreClock variable. This function is called automatically during
-    system startup.
-**/
-void SystemInit(void);
-
-/**
-    \brief Update SystemCoreClock variable
-
-    Updates the SystemCoreClock with current core Clock retrieved from
-    cpu registers. Currently not implemented (always returns without change).
-**/
-void SystemCoreClockUpdate(void);
-
-/**
     \brief Update GCLK frequency
 
     Updates the divisor on the specified GCLK to generate the requested
@@ -224,6 +199,9 @@ void SystemCoreClockUpdate(void);
 
     \param[in] gclkIndex The GCLK index.
     \param[in] freqReq The requested frequency, in Hz.
+    
+    \note GClkFreqUpdate, SystemInit, SystemCoreClock, and SystemCoreClockUpdate
+    are all provided by system_same53.c in the library.
 **/
 void GClkFreqUpdate(uint8_t gclkIndex, uint32_t freqReq);
 

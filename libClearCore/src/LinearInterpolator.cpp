@@ -115,6 +115,17 @@ bool LinearInterpolator::InitializeLinear(int32_t startX, int32_t startY,
 }
 
 bool LinearInterpolator::GenerateNextSteps(int32_t& stepsX, int32_t& stepsY) {
+    // If already at target position, stop generating steps
+    if (m_currentX == m_endX && m_currentY == m_endY) {
+        stepsX = 0;
+        stepsY = 0;
+        m_stepsRemaining = 0;
+        m_stepIncrementXQx = 0;
+        m_stepIncrementYQx = 0;
+        return false;
+    }
+    
+    // If no steps remaining, stop
     if (m_stepsRemaining == 0) {
         stepsX = 0;
         stepsY = 0;
@@ -142,11 +153,15 @@ bool LinearInterpolator::GenerateNextSteps(int32_t& stepsX, int32_t& stepsY) {
     m_currentY = newYSteps;
     
     // Check if we've reached or passed the end point
-    bool pastEndX = (m_stepIncrementXQx >= 0) ? (newXSteps >= m_endX) : (newXSteps <= m_endX);
-    bool pastEndY = (m_stepIncrementYQx >= 0) ? (newYSteps >= m_endY) : (newYSteps <= m_endY);
+    bool pastEndX = (m_stepIncrementXQx > 0) ? (newXSteps >= m_endX) : 
+                    (m_stepIncrementXQx < 0) ? (newXSteps <= m_endX) : 
+                    (newXSteps == m_endX);
+    bool pastEndY = (m_stepIncrementYQx > 0) ? (newYSteps >= m_endY) : 
+                    (m_stepIncrementYQx < 0) ? (newYSteps <= m_endY) : 
+                    (newYSteps == m_endY);
     
     if (pastEndX && pastEndY) {
-        // Snap to end position
+        // Reached target - snap to exact end position
         stepsX = m_endX - m_lastXSteps + stepsX;
         stepsY = m_endY - m_lastYSteps + stepsY;
         m_currentX = m_endX;
@@ -156,15 +171,25 @@ bool LinearInterpolator::GenerateNextSteps(int32_t& stepsX, int32_t& stepsY) {
         m_lastXSteps = m_endX;
         m_lastYSteps = m_endY;
         m_stepsRemaining = 0;
-    } else {
-        // Update remaining steps based on progress along path
-        // Approximate: reduce by the larger of |stepsX| or |stepsY|
-        uint32_t stepsThisSample = (abs(stepsX) > abs(stepsY)) ? abs(stepsX) : abs(stepsY);
-        if (stepsThisSample > m_stepsRemaining) {
-            m_stepsRemaining = 0;
-        } else {
-            m_stepsRemaining -= stepsThisSample;
+        m_stepIncrementXQx = 0;
+        m_stepIncrementYQx = 0;
+        
+        // If no correction needed, return false to stop
+        if (stepsX == 0 && stepsY == 0) {
+            return false;
         }
+        
+        // Return true to apply final correction steps
+        // Next call will return false because position == end
+        return true;
+    }
+    
+    // Update remaining steps based on progress
+    uint32_t stepsThisSample = (abs(stepsX) > abs(stepsY)) ? abs(stepsX) : abs(stepsY);
+    if (stepsThisSample > m_stepsRemaining) {
+        m_stepsRemaining = 0;
+    } else {
+        m_stepsRemaining -= stepsThisSample;
     }
     
     return true;

@@ -882,7 +882,12 @@
     <Compile Include="src\TrigLUT.cpp">
       <SubType>compile</SubType>
     </Compile>
+    <!-- SysUtils.cpp is kept for potential future utility functions, but currently empty -->
+    <!-- GClkFreqUpdate is provided by system_same53.c -->
     <Compile Include="src\SysUtils.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\system_same53.c">
       <SubType>compile</SubType>
     </Compile>
     <Folder Include="usb\class" />

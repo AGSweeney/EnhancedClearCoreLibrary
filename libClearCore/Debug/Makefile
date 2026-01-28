@@ -115,7 +115,8 @@ C_SRCS +=  \
 ../src/LinearInterpolator.cpp \
 ../src/ArcInterpolator.cpp \
 ../src/TrigLUT.cpp \
-../src/SysUtils.cpp
+../src/SysUtils.cpp \
+../src/system_same53.c
 
 
 PREPROCESSING_SRCS += 
@@ -182,7 +183,8 @@ src/UnitConverter.o \
 src/LinearInterpolator.o \
 src/ArcInterpolator.o \
 src/TrigLUT.o \
-src/SysUtils.o
+src/SysUtils.o \
+src/system_same53.o
 
 OBJS_AS_ARGS +=  \
 hpl/core/hpl_core_m4.o \
@@ -242,7 +244,8 @@ src/UnitConverter.o \
 src/LinearInterpolator.o \
 src/ArcInterpolator.o \
 src/TrigLUT.o \
-src/SysUtils.o
+src/SysUtils.o \
+src/system_same53.o
 
 C_DEPS +=  \
 hpl/core/hpl_core_m4.d \
@@ -302,7 +305,8 @@ src/UnitConverter.d \
 src/LinearInterpolator.d \
 src/ArcInterpolator.d \
 src/TrigLUT.d \
-src/SysUtils.d
+src/SysUtils.d \
+src/system_same53.d
 
 C_DEPS_AS_ARGS +=  \
 hpl/core/hpl_core_m4.d \
@@ -362,7 +366,8 @@ src/UnitConverter.d \
 src/LinearInterpolator.d \
 src/ArcInterpolator.d \
 src/TrigLUT.d \
-src/SysUtils.d
+src/SysUtils.d \
+src/system_same53.d
 
 OUTPUT_FILE_PATH +=libClearCore.a
 
@@ -781,6 +786,13 @@ src/SysUtils.o: ../src/SysUtils.cpp
 	@echo Building file: $<
 	@echo Invoking: ARM/GNU C Compiler : 6.3.1
 	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-g++.exe$(QUOTE) -mthumb -D__SAME53N19A__ -DARM_MATH_CM4 -DDEBUG  -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\4.5.0\CMSIS\Include" -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include" -I"../inc" -I"../../LwIP/LwIP/port/include" -I"../../LwIP/LwIP/src/include" -I"../config" -I"../hal/include" -I"../hal/utils/include" -I"../hpl/core" -I"../hpl/gclk" -I"../hpl/mclk" -I"../hpl/port" -I"../hpl/usb" -I"../hri" -I"../usb" -I"../usb/class/cdc" -I"../usb/class/cdc/device" -I"../usb/device" -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\5.4.0\CMSIS\Core\Include"  -O3 -ffunction-sections -fdata-sections -fno-rtti -fno-exceptions -g2 -Wall -Wextra -pedantic -mcpu=cortex-m4 -c -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -std=gnu++11 -fno-threadsafe-statics -nostdlib --param max-inline-insns-single=500 -MMD -v -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
+src/system_same53.o: ../src/system_same53.c
+	@echo Building file: $<
+	@echo Invoking: ARM/GNU C Compiler : 6.3.1
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-gcc.exe$(QUOTE)  -x c -mthumb -D__SAME53N19A__ -DARM_MATH_CM4 -DDEBUG  -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\4.5.0\CMSIS\Include" -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include" -I"../inc" -I"../../LwIP/LwIP/port/include" -I"../../LwIP/LwIP/src/include" -I"../usb" -I"../usb/device" -I"../usb/class/cdc" -I"../usb/class/cdc/device" -I"../hal/include" -I"../hal/utils/include" -I"../hri" -I"../hpl/core" -I"../hpl/port" -I"../hpl/usb" -I"../config" -I"../hpl/gclk" -I"../hpl/mclk" -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\5.4.0\CMSIS\Core\Include"  -O3 -ffunction-sections -fdata-sections -g2 -Wall -Wextra -pedantic -mcpu=cortex-m4 -c -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -std=gnu11 --param max-inline-insns-single=50 -MMD -v -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
 	@echo Finished building: $<
 	
 
