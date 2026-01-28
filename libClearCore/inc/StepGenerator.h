@@ -179,7 +179,7 @@ namespace ClearCore
 
             <div class="sd-disclaimer">For use with Step and Direction mode.</div>
         **/
-        volatile const int32_t &PositionRefCommanded()
+        volatile const int32_t &PositionRefCommanded() const
         {
             return m_posnAbsolute;
         }

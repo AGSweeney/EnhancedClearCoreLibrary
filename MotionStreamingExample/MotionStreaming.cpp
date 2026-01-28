@@ -81,6 +81,7 @@
  */
 
 #include "ClearCore.h"
+#include "EthernetTcpServer.h"
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
@@ -135,12 +136,12 @@ enum CoordinateMode {
 };
 
 enum UnitMode {
-    UNIT_INCHES,  // G20
-    UNIT_MM  // G21
+    UNIT_MODE_INCHES,  // G20
+    UNIT_MODE_MM  // G21
 };
 
 CoordinateMode coordinateMode = COORD_ABSOLUTE;
-UnitMode unitMode = UNIT_MM;
+UnitMode unitMode = UNIT_MODE_MM;
 double currentFeedRate = DEFAULT_FEED_RATE_MM_PER_MIN;
 bool feedRateSet = false;
 
@@ -222,19 +223,19 @@ void InitializeMotors() {
     }
     
     // Configure mechanical parameters for unit conversion
-    motionController.SetMechanicalParamsX(MOTOR_X_STEPS_PER_REV, MOTOR_X_PITCH_MM, UNIT_MM);
-    motionController.SetMechanicalParamsY(MOTOR_Y_STEPS_PER_REV, MOTOR_Y_PITCH_MM, UNIT_MM);
+    motionController.SetMechanicalParamsX(MOTOR_X_STEPS_PER_REV, MOTOR_X_PITCH_MM, ClearCore::UNIT_MM);
+    motionController.SetMechanicalParamsY(MOTOR_Y_STEPS_PER_REV, MOTOR_Y_PITCH_MM, ClearCore::UNIT_MM);
     
     // Store config locally for unit conversion in command processing
     mechanicalConfigX.stepsPerRevolution = MOTOR_X_STEPS_PER_REV;
     mechanicalConfigX.pitch = MOTOR_X_PITCH_MM;
-    mechanicalConfigX.pitchUnit = UNIT_MM;
+    mechanicalConfigX.pitchUnit = ClearCore::UNIT_MM;
     mechanicalConfigX.gearRatio = 1.0;
     UnitConverter::CalculateConversionFactors(mechanicalConfigX);
     
     mechanicalConfigY.stepsPerRevolution = MOTOR_Y_STEPS_PER_REV;
     mechanicalConfigY.pitch = MOTOR_Y_PITCH_MM;
-    mechanicalConfigY.pitchUnit = UNIT_MM;
+    mechanicalConfigY.pitchUnit = ClearCore::UNIT_MM;
     mechanicalConfigY.gearRatio = 1.0;
     UnitConverter::CalculateConversionFactors(mechanicalConfigY);
     
@@ -353,9 +354,9 @@ bool ReadCommandEthernet(char* buffer, uint16_t maxLen) {
     }
     
     // Check for new client connection
-    if (!tcpClient || !tcpClient->Connected()) {
+    if (!tcpClient.Connected() && tcpClient.BytesAvailable() == 0) {
         tcpClient = tcpServer->Available();
-        if (tcpClient) {
+        if (tcpClient.Connected() || tcpClient.BytesAvailable() > 0) {
             ConnectorUsb.SendLine("Client connected");
             commandBufferIndex = 0;
             memset(buffer, 0, maxLen);
@@ -364,7 +365,7 @@ bool ReadCommandEthernet(char* buffer, uint16_t maxLen) {
     }
     
     // Read data from client
-    int16_t ch = tcpClient->CharGet();
+    int16_t ch = tcpClient.Read();
     if (ch == -1) {
         return false;
     }
@@ -414,7 +415,7 @@ void ProcessCommand(const char* command) {
 void ParseGCode(const char* line) {
     // Parse command line (e.g., "G01 X10.5 Y20.3 F100")
     double x = 0, y = 0, i = 0, j = 0, f = -1.0;
-    bool hasX = false, hasY = false, hasI = false, hasJ = false, hasF = false;
+    bool hasX = false, hasY = false, hasI = false, hasJ = false;
     
     // Find command code (G## or M##)
     if (line[0] == 'G' || line[0] == 'M') {
@@ -438,7 +439,6 @@ void ParseGCode(const char* line) {
                 hasJ = true;
             } else if (*ptr == 'F' || *ptr == 'f') {
                 sscanf(ptr, "F%lf", &f);
-                hasF = true;
             }
             ptr++;
         }
@@ -475,12 +475,12 @@ void ParseGCode(const char* line) {
                     break;
                     
                 case 20:  // G20 - Units in inches
-                    unitMode = UNIT_INCHES;
+                    unitMode = UNIT_MODE_INCHES;
                     SendResponseLine("Units: inches");
                     break;
                     
                 case 21:  // G21 - Units in millimeters
-                    unitMode = UNIT_MM;
+                    unitMode = UNIT_MODE_MM;
                     SendResponseLine("Units: millimeters");
                     break;
                     
@@ -500,12 +500,12 @@ void ParseGCode(const char* line) {
                     if (hasX || hasY) {
                         // Convert specified coordinates to steps
                         int32_t newXSteps, newYSteps;
-                        if (unitMode == UNIT_INCHES) {
-                            newXSteps = hasX ? UnitConverter::DistanceToSteps(x, UNIT_INCHES, mechanicalConfigX) : motionController.CurrentX();
-                            newYSteps = hasY ? UnitConverter::DistanceToSteps(y, UNIT_INCHES, mechanicalConfigY) : motionController.CurrentY();
+                        if (unitMode == UNIT_MODE_INCHES) {
+                            newXSteps = hasX ? UnitConverter::DistanceToSteps(x, ClearCore::UNIT_INCHES, mechanicalConfigX) : motionController.CurrentX();
+                            newYSteps = hasY ? UnitConverter::DistanceToSteps(y, ClearCore::UNIT_INCHES, mechanicalConfigY) : motionController.CurrentY();
                         } else {
-                            newXSteps = hasX ? UnitConverter::DistanceToSteps(x, UNIT_MM, mechanicalConfigX) : motionController.CurrentX();
-                            newYSteps = hasY ? UnitConverter::DistanceToSteps(y, UNIT_MM, mechanicalConfigY) : motionController.CurrentY();
+                            newXSteps = hasX ? UnitConverter::DistanceToSteps(x, ClearCore::UNIT_MM, mechanicalConfigX) : motionController.CurrentX();
+                            newYSteps = hasY ? UnitConverter::DistanceToSteps(y, ClearCore::UNIT_MM, mechanicalConfigY) : motionController.CurrentY();
                         }
                         
                         // Set new position (this shifts the coordinate system)
@@ -554,7 +554,7 @@ void ParseGCode(const char* line) {
                 case 114:  // M114 - Get current position
                     {
                         char response[100];
-                        if (unitMode == UNIT_INCHES) {
+                        if (unitMode == UNIT_MODE_INCHES) {
                             double xInches = motionController.CurrentXInches();
                             double yInches = motionController.CurrentYInches();
                             sprintf(response, "X:%.3f Y:%.3f", xInches, yInches);
@@ -573,7 +573,7 @@ void ParseGCode(const char* line) {
                         sprintf(response, "Status: Active=%d Queue=%d Units=%s Coords=%s",
                                 motionController.IsActive() ? 1 : 0,
                                 motionController.MotionQueueCount(),
-                                unitMode == UNIT_INCHES ? "inches" : "mm",
+                                unitMode == UNIT_MODE_INCHES ? "inches" : "mm",
                                 coordinateMode == COORD_ABSOLUTE ? "abs" : "inc");
                         SendResponseLine(response);
                     }
@@ -603,7 +603,7 @@ void ParseGCode(const char* line) {
 void ExecuteG01(double x, double y, double f) {
     // Set feed rate if specified
     if (f >= 0.0) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(f);
             currentFeedRate = f;
         } else {
@@ -613,7 +613,7 @@ void ExecuteG01(double x, double y, double f) {
         feedRateSet = true;
     } else if (feedRateSet) {
         // Use current feed rate
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(currentFeedRate);
         } else {
             motionController.FeedRateMMPerMin(currentFeedRate);
@@ -626,7 +626,7 @@ void ExecuteG01(double x, double y, double f) {
     
     if (coordinateMode == COORD_INCREMENTAL) {
         // Incremental mode - add to current position
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             targetX = motionController.CurrentXInches() + x;
             targetY = motionController.CurrentYInches() + y;
         } else {
@@ -637,12 +637,12 @@ void ExecuteG01(double x, double y, double f) {
     
     // Convert to steps for queuing
     int32_t endXSteps, endYSteps;
-    if (unitMode == UNIT_INCHES) {
-        endXSteps = UnitConverter::DistanceToSteps(targetX, UNIT_INCHES, mechanicalConfigX);
-        endYSteps = UnitConverter::DistanceToSteps(targetY, UNIT_INCHES, mechanicalConfigY);
+    if (unitMode == UNIT_MODE_INCHES) {
+        endXSteps = UnitConverter::DistanceToSteps(targetX, ClearCore::UNIT_INCHES, mechanicalConfigX);
+        endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_INCHES, mechanicalConfigY);
     } else {
-        endXSteps = UnitConverter::DistanceToSteps(targetX, UNIT_MM, mechanicalConfigX);
-        endYSteps = UnitConverter::DistanceToSteps(targetY, UNIT_MM, mechanicalConfigY);
+        endXSteps = UnitConverter::DistanceToSteps(targetX, ClearCore::UNIT_MM, mechanicalConfigX);
+        endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_MM, mechanicalConfigY);
     }
     
     // Check if motors are enabled before queuing
@@ -666,7 +666,7 @@ void ExecuteG01(double x, double y, double f) {
 void ExecuteG02(double x, double y, double i, double j, double f) {
     // Set feed rate if specified
     if (f >= 0.0) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(f);
             currentFeedRate = f;
         } else {
@@ -675,7 +675,7 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
         }
         feedRateSet = true;
     } else if (feedRateSet) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(currentFeedRate);
         } else {
             motionController.FeedRateMMPerMin(currentFeedRate);
@@ -684,7 +684,7 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
     
     // Calculate arc center and parameters
     double startX, startY;
-    if (unitMode == UNIT_INCHES) {
+    if (unitMode == UNIT_MODE_INCHES) {
         startX = motionController.CurrentXInches();
         startY = motionController.CurrentYInches();
     } else {
@@ -713,14 +713,14 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
     
     // Convert to steps for queuing
     int32_t centerXSteps, centerYSteps, radiusSteps;
-    if (unitMode == UNIT_INCHES) {
-        centerXSteps = UnitConverter::DistanceToSteps(centerX, UNIT_INCHES, mechanicalConfigX);
-        centerYSteps = UnitConverter::DistanceToSteps(centerY, UNIT_INCHES, mechanicalConfigY);
-        radiusSteps = UnitConverter::DistanceToSteps(radius, UNIT_INCHES, mechanicalConfigX);
+    if (unitMode == UNIT_MODE_INCHES) {
+        centerXSteps = UnitConverter::DistanceToSteps(centerX, ClearCore::UNIT_INCHES, mechanicalConfigX);
+        centerYSteps = UnitConverter::DistanceToSteps(centerY, ClearCore::UNIT_INCHES, mechanicalConfigY);
+        radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_INCHES, mechanicalConfigX);
     } else {
-        centerXSteps = UnitConverter::DistanceToSteps(centerX, UNIT_MM, mechanicalConfigX);
-        centerYSteps = UnitConverter::DistanceToSteps(centerY, UNIT_MM, mechanicalConfigY);
-        radiusSteps = UnitConverter::DistanceToSteps(radius, UNIT_MM, mechanicalConfigX);
+        centerXSteps = UnitConverter::DistanceToSteps(centerX, ClearCore::UNIT_MM, mechanicalConfigX);
+        centerYSteps = UnitConverter::DistanceToSteps(centerY, ClearCore::UNIT_MM, mechanicalConfigY);
+        radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_MM, mechanicalConfigX);
     }
     
     // Check if motors are enabled before queuing
@@ -744,7 +744,7 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
 void ExecuteG03(double x, double y, double i, double j, double f) {
     // Set feed rate if specified
     if (f >= 0.0) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(f);
             currentFeedRate = f;
         } else {
@@ -753,7 +753,7 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
         }
         feedRateSet = true;
     } else if (feedRateSet) {
-        if (unitMode == UNIT_INCHES) {
+        if (unitMode == UNIT_MODE_INCHES) {
             motionController.FeedRateInchesPerMin(currentFeedRate);
         } else {
             motionController.FeedRateMMPerMin(currentFeedRate);
@@ -762,7 +762,7 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
     
     // Calculate arc center and parameters
     double startX, startY;
-    if (unitMode == UNIT_INCHES) {
+    if (unitMode == UNIT_MODE_INCHES) {
         startX = motionController.CurrentXInches();
         startY = motionController.CurrentYInches();
     } else {
@@ -791,14 +791,14 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
     
     // Convert to steps for queuing
     int32_t centerXSteps, centerYSteps, radiusSteps;
-    if (unitMode == UNIT_INCHES) {
-        centerXSteps = UnitConverter::DistanceToSteps(centerX, UNIT_INCHES, mechanicalConfigX);
-        centerYSteps = UnitConverter::DistanceToSteps(centerY, UNIT_INCHES, mechanicalConfigY);
-        radiusSteps = UnitConverter::DistanceToSteps(radius, UNIT_INCHES, mechanicalConfigX);
+    if (unitMode == UNIT_MODE_INCHES) {
+        centerXSteps = UnitConverter::DistanceToSteps(centerX, ClearCore::UNIT_INCHES, mechanicalConfigX);
+        centerYSteps = UnitConverter::DistanceToSteps(centerY, ClearCore::UNIT_INCHES, mechanicalConfigY);
+        radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_INCHES, mechanicalConfigX);
     } else {
-        centerXSteps = UnitConverter::DistanceToSteps(centerX, UNIT_MM, mechanicalConfigX);
-        centerYSteps = UnitConverter::DistanceToSteps(centerY, UNIT_MM, mechanicalConfigY);
-        radiusSteps = UnitConverter::DistanceToSteps(radius, UNIT_MM, mechanicalConfigX);
+        centerXSteps = UnitConverter::DistanceToSteps(centerX, ClearCore::UNIT_MM, mechanicalConfigX);
+        centerYSteps = UnitConverter::DistanceToSteps(centerY, ClearCore::UNIT_MM, mechanicalConfigY);
+        radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_MM, mechanicalConfigX);
     }
     
     // Check if motors are enabled before queuing

@@ -28,9 +28,6 @@
 
 namespace ClearCore {
 
-const int32_t ArcInterpolator::TWO_PI_QX = 32768;
-const int32_t ArcInterpolator::PI_QX = 16384;
-
 ArcInterpolator::ArcInterpolator()
     : m_currentAngleQx(0),
       m_currentXQx(0),

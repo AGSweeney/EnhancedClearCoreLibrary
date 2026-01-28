@@ -106,7 +106,10 @@ bool CoordinatedMotionController::MoveArc(int32_t centerX, int32_t centerY,
     }
     
     // Update current position
-    m_arcInterpolator.GetCurrentPosition(m_currentX, m_currentY);
+    int32_t tempX, tempY;
+    m_arcInterpolator.GetCurrentPosition(tempX, tempY);
+    m_currentX = tempX;
+    m_currentY = tempY;
     m_motionType = MOTION_TYPE_ARC;
     
     // Calculate current angle
@@ -240,7 +243,10 @@ void CoordinatedMotionController::UpdateFast() {
     if (m_motionType == MOTION_TYPE_ARC) {
         if (m_arcInterpolator.IsArcComplete()) {
             // Update position from interpolator
-            m_arcInterpolator.GetCurrentPosition(m_currentX, m_currentY);
+            int32_t tempX, tempY;
+            m_arcInterpolator.GetCurrentPosition(tempX, tempY);
+            m_currentX = tempX;
+            m_currentY = tempY;
             
             // Try unified queue first, then legacy queues
             if (!ProcessNextMotion()) {
@@ -252,7 +258,10 @@ void CoordinatedMotionController::UpdateFast() {
     } else if (m_motionType == MOTION_TYPE_LINEAR) {
         if (m_linearInterpolator.IsLinearComplete()) {
             // Update position from interpolator
-            m_linearInterpolator.GetCurrentPosition(m_currentX, m_currentY);
+            int32_t tempX, tempY;
+            m_linearInterpolator.GetCurrentPosition(tempX, tempY);
+            m_currentX = tempX;
+            m_currentY = tempY;
             
             // Try unified queue first, then legacy queues
             if (!ProcessNextMotion()) {
@@ -347,7 +356,7 @@ double CoordinatedMotionController::CalculateStartAngle(int32_t centerX, int32_t
     return angle;
 }
 
-bool CoordinatedMotionController::ValidateArc(int32_t centerX, int32_t centerY, int32_t radius) const {
+bool CoordinatedMotionController::ValidateArc(int32_t /*centerX*/, int32_t /*centerY*/, int32_t radius) const {
     // Check radius is positive
     if (radius <= 0) {
         return false;
@@ -507,7 +516,7 @@ bool CoordinatedMotionController::ProcessNextLinear() {
     return true;
 }
 
-bool CoordinatedMotionController::ValidateLinear(int32_t endX, int32_t endY) const {
+bool CoordinatedMotionController::ValidateLinear(int32_t /*endX*/, int32_t /*endY*/) const {
     // Check motors are enabled
     if (m_motorX && !m_motorX->EnableRequest()) {
         return false;
