@@ -188,10 +188,10 @@ The arc is **NOT** divided into chords. Instead:
 
 #### 2. CoordinatedMotionController Class
 
-**Purpose**: High-level coordinator managing arc queue
+**Purpose**: High-level coordinator managing coordinated motion (arcs and linear moves)
 
 **Responsibilities**:
-- Manage queue of arc segments (up to 8 arcs)
+- Manage queue of motion segments (up to 8 motions: arcs or linear moves)
 - Coordinate two motors (X and Y axes)
 - Integrate with existing MotorDriver infrastructure
 - Handle velocity/acceleration limits
@@ -595,10 +595,12 @@ if (!motionController.Initialize(&ConnectorM0, &ConnectorM1)) {
 #### 4. Configure Motion Parameters
 
 ```cpp
-// Set velocity (tangential speed along path)
+// Set velocity (applies to both arc and linear coordinated moves)
+// For arcs: tangential velocity along arc path
+// For linear: velocity along straight-line path
 motionController.ArcVelMax(5000);  // 5000 steps/sec
 
-// Set acceleration limit
+// Set acceleration limit (applies to all coordinated motion)
 motionController.ArcAccelMax(50000);  // 50000 steps/sec²
 
 // Set initial position (if not starting at origin)
@@ -616,9 +618,9 @@ motionController.SetMechanicalParamsX(800, 5.0, UNIT_MM);
 motionController.SetMechanicalParamsY(800, 5.0, UNIT_MM);
 
 // Set feed rate in physical units
-motionController.ArcFeedRateInchesPerMin(100.0);
+motionController.FeedRateInchesPerMin(100.0);
 // or
-motionController.ArcFeedRateMMPerMin(2540.0);
+motionController.FeedRateMMPerMin(2540.0);
 ```
 
 ### Single Arc Move
@@ -774,7 +776,7 @@ motionController.SetMechanicalParamsX(800, 5.0, UNIT_MM);
 motionController.SetMechanicalParamsY(800, 5.0, UNIT_MM);
 
 // Set feed rate in inches per minute
-motionController.ArcFeedRateInchesPerMin(100.0);
+motionController.FeedRateInchesPerMin(100.0);
 ```
 
 #### Arc Moves with Units
@@ -980,7 +982,7 @@ bool MoveArcContinuous(int32_t centerX, int32_t centerY,
 
 **Returns**: `true` if arc queued successfully
 
-**Description**: Queues an arc to be executed after the current arc completes. Start angle is automatically calculated for tangent continuity.
+**Description**: Queues an arc to be executed after the current motion (arc or linear) completes. Start angle is automatically calculated for tangent continuity.
 
 #### ArcVelMax
 
@@ -989,9 +991,13 @@ void ArcVelMax(uint32_t velMax);
 ```
 
 **Parameters**:
-- `velMax`: Maximum tangential velocity (steps/sec)
+- `velMax`: Maximum velocity along the path (steps/sec)
 
-**Description**: Sets the maximum velocity along the arc path. This is the speed the tool will travel along the arc circumference.
+**Description**: Sets the maximum velocity for coordinated motion. Applies to both arc and linear moves:
+- **For arcs**: Tangential velocity along the arc circumference
+- **For linear moves**: Velocity along the straight-line path
+
+This is the speed the tool will travel along the programmed path, regardless of motion type.
 
 #### ArcAccelMax
 
@@ -1002,7 +1008,7 @@ void ArcAccelMax(uint32_t accelMax);
 **Parameters**:
 - `accelMax`: Maximum acceleration (steps/sec²)
 
-**Description**: Sets the maximum acceleration limit (currently used for reference, full acceleration profiling may be added in future).
+**Description**: Sets the maximum acceleration limit for coordinated motion. Applies to both arc and linear moves. Currently used for reference; full acceleration profiling may be added in future.
 
 #### Stop
 
@@ -1010,7 +1016,7 @@ void ArcAccelMax(uint32_t accelMax);
 void Stop();
 ```
 
-**Description**: Stops motion immediately. Clears arc queue and stops motors abruptly.
+**Description**: Stops motion immediately. Clears all motion queues (arc and linear) and stops motors abruptly.
 
 #### MoveLinear
 
@@ -1097,7 +1103,7 @@ bool QueueLinear(int32_t endX, int32_t endY);
 void StopDecel();
 ```
 
-**Description**: Stops motion with deceleration. Clears arc queue and stops motors smoothly.
+**Description**: Stops motion with deceleration. Clears all motion queues (arc and linear) and stops motors smoothly.
 
 #### IsActive
 
@@ -1383,7 +1389,7 @@ int main() {
     controller.Initialize(&ConnectorM0, &ConnectorM1);
     controller.SetMechanicalParamsX(800, 5.0, UNIT_MM);  // 800 steps/rev, 5mm pitch
     controller.SetMechanicalParamsY(800, 5.0, UNIT_MM);
-    controller.ArcFeedRateInchesPerMin(100.0);
+    controller.FeedRateInchesPerMin(100.0);
     
     // Move in physical units
     controller.MoveLinearInches(11.25, 5.0);  // Move to (11.25", 5")
@@ -1657,7 +1663,7 @@ G01 X11.25 Y5.0 F100
 **Library Equivalent**:
 ```cpp
 // Set feed rate (F100 = 100 inches/min)
-controller.ArcFeedRateInchesPerMin(100.0);
+controller.FeedRateInchesPerMin(100.0);
 
 // Execute linear move
 controller.MoveLinearInches(11.25, 5.0);
@@ -1705,7 +1711,7 @@ if (startAngle < 0) startAngle += 2 * M_PI;
 if (endAngle < 0) endAngle += 2 * M_PI;
 
 // Set feed rate
-controller.ArcFeedRateInchesPerMin(100.0);
+controller.FeedRateInchesPerMin(100.0);
 
 // Execute arc move
 controller.MoveArcInches(centerX, centerY, radius, startAngle, endAngle, true);
@@ -1759,11 +1765,11 @@ void ExecuteG00(double x, double y) {
 // Parse and execute G01 (Linear)
 void ExecuteG01(double x, double y, double f = -1.0) {
     if (f >= 0.0) {
-        controller.ArcFeedRateInchesPerMin(f);
+        controller.FeedRateInchesPerMin(f);
         currentFeedRate = f;
         feedRateSet = true;
     } else if (feedRateSet) {
-        controller.ArcFeedRateInchesPerMin(currentFeedRate);
+        controller.FeedRateInchesPerMin(currentFeedRate);
     }
     
     if (coordinateMode == G90_ABSOLUTE) {
@@ -1809,11 +1815,11 @@ void ExecuteG02G03(double x, double y, double i, double j,
     
     // Set feed rate
     if (f >= 0.0) {
-        controller.ArcFeedRateInchesPerMin(f);
+        controller.FeedRateInchesPerMin(f);
         currentFeedRate = f;
         feedRateSet = true;
     } else if (feedRateSet) {
-        controller.ArcFeedRateInchesPerMin(currentFeedRate);
+        controller.FeedRateInchesPerMin(currentFeedRate);
     }
     
     // Execute arc
@@ -1932,9 +1938,9 @@ int main() {
 ```cpp
 // Set feed rate based on G-code units
 if (unitsInches) {
-    controller.ArcFeedRateInchesPerMin(feedRate);
+    controller.FeedRateInchesPerMin(feedRate);
 } else {
-    controller.ArcFeedRateMMPerMin(feedRate);
+    controller.FeedRateMMPerMin(feedRate);
 }
 
 // Feed rate persists until changed
@@ -1954,7 +1960,7 @@ G01 X0.0 Y0.0
 
 **Library Equivalent**:
 ```cpp
-controller.ArcFeedRateInchesPerMin(100.0);
+controller.FeedRateInchesPerMin(100.0);
 controller.MoveLinearInches(10.0, 0.0);
 controller.MoveLinearContinuous(10.0, 10.0);
 controller.MoveLinearContinuous(0.0, 10.0);
@@ -1969,7 +1975,7 @@ G02 X0.0 Y0.0 I5.0 J0.0  ; Complete circle (assumes start at 0,0)
 
 **Library Equivalent**:
 ```cpp
-controller.ArcFeedRateInchesPerMin(100.0);
+controller.FeedRateInchesPerMin(100.0);
 // Assuming start position is (0, 0)
 double startX = controller.CurrentXInches();  // Should be 0.0
 double startY = controller.CurrentYInches();  // Should be 0.0
@@ -1990,7 +1996,7 @@ G02 X0.0 Y0.0 I0.0 J-5.0
 
 **Library Equivalent**:
 ```cpp
-controller.ArcFeedRateInchesPerMin(100.0);
+controller.FeedRateInchesPerMin(100.0);
 controller.MoveLinearInches(10.0, 0.0);
 
 // G02 X10.0 Y10.0 I0.0 J5.0

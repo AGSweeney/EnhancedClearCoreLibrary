@@ -166,7 +166,10 @@ public:
     bool MoveLinearContinuous(int32_t endX, int32_t endY);
 
     /**
-        \brief Set maximum velocity for arc moves
+        \brief Set maximum velocity for coordinated motion
+        
+        Applies to both arc and linear coordinated moves. This sets the velocity
+        along the path (tangential velocity for arcs, linear velocity for straight moves).
         
         \param[in] velMax Maximum velocity in steps/sec
     **/
@@ -175,7 +178,9 @@ public:
     }
 
     /**
-        \brief Set maximum acceleration for arc moves
+        \brief Set maximum acceleration for coordinated motion
+        
+        Applies to both arc and linear coordinated moves.
         
         \param[in] accelMax Maximum acceleration in steps/sec²
     **/
@@ -197,36 +202,41 @@ public:
         \brief Check if coordinated motion is active
         
         \return true if motion is active
+        \note Reads volatile variable - safe to call from any context
     **/
     bool IsActive() const {
-        return m_active;
+        return m_active;  // Read volatile variable
     }
 
     /**
         \brief Check if all arcs are complete
         
-        \return true if no arcs remaining
+        \return true if no arcs remaining in legacy arc queue
+        \note This checks the legacy arc queue only. For unified queue,
+              use MotionQueueCount() == 0 && !IsActive() instead.
     **/
     bool ArcComplete() const {
-        return !m_active && m_arcQueueCount == 0;
+        return !m_active && m_arcQueueCount == 0;  // Read volatile variables
     }
 
     /**
         \brief Get current X position
         
         \return Current X position in steps
+        \note Reads volatile variable - safe to call from any context
     **/
     int32_t CurrentX() const {
-        return m_currentX;
+        return m_currentX;  // Read volatile variable
     }
 
     /**
         \brief Get current Y position
         
         \return Current Y position in steps
+        \note Reads volatile variable - safe to call from any context
     **/
     int32_t CurrentY() const {
-        return m_currentY;
+        return m_currentY;  // Read volatile variable
     }
 
     /**
@@ -234,11 +244,9 @@ public:
         
         \param[in] x X position in steps
         \param[in] y Y position in steps
+        \note Protected with critical section to prevent race with ISR
     **/
-    void SetPosition(int32_t x, int32_t y) {
-        m_currentX = x;
-        m_currentY = y;
-    }
+    void SetPosition(int32_t x, int32_t y);
 
     /**
         \brief ISR callback - called from MotorDriver::Refresh()
@@ -251,10 +259,12 @@ public:
     /**
         \brief Get number of arcs in queue
         
-        \return Number of arcs queued
+        \return Number of arcs queued in legacy arc queue
+        \note This returns the legacy arc queue count only. For unified queue,
+              use MotionQueueCount() instead.
     **/
     uint8_t QueueCount() const {
-        return m_arcQueueCount;
+        return m_arcQueueCount;  // Read volatile variable
     }
     
     /**
@@ -263,7 +273,7 @@ public:
         \return Total number of motions queued (arcs + linear)
     **/
     uint8_t MotionQueueCount() const {
-        return m_motionQueueCount;
+        return m_motionQueueCount;  // Read volatile variable
     }
 
     // ========== Unit Conversion Support ==========
@@ -345,25 +355,31 @@ public:
     bool MoveLinearMM(double endX, double endY);
     
     /**
-        \brief Set arc feed rate in inches per minute
+        \brief Set feed rate for coordinated motion in inches per minute
+        
+        Applies to both arc and linear coordinated moves.
         
         \param[in] feedRate Feed rate in inches per minute
     **/
-    void ArcFeedRateInchesPerMin(double feedRate);
+    void FeedRateInchesPerMin(double feedRate);
     
     /**
-        \brief Set arc feed rate in millimeters per minute
+        \brief Set feed rate for coordinated motion in millimeters per minute
+        
+        Applies to both arc and linear coordinated moves.
         
         \param[in] feedRate Feed rate in millimeters per minute
     **/
-    void ArcFeedRateMMPerMin(double feedRate);
+    void FeedRateMMPerMin(double feedRate);
     
     /**
-        \brief Set arc feed rate in millimeters per second
+        \brief Set feed rate for coordinated motion in millimeters per second
+        
+        Applies to both arc and linear coordinated moves.
         
         \param[in] feedRate Feed rate in millimeters per second
     **/
-    void ArcFeedRateMMPerSec(double feedRate);
+    void FeedRateMMPerSec(double feedRate);
     
     /**
         \brief Get current X position in inches
@@ -433,10 +449,12 @@ private:
     LinearInterpolator m_linearInterpolator;
     
     // Unified motion queue (can hold both arcs and linear moves)
+    // NOTE: Queue variables marked volatile because they're accessed from both
+    // ISR context (UpdateFast) and main thread context (QueueArc/QueueLinear)
     QueuedMotion m_motionQueue[ARC_QUEUE_SIZE];
-    uint8_t m_motionQueueHead;
-    uint8_t m_motionQueueTail;
-    uint8_t m_motionQueueCount;
+    volatile uint8_t m_motionQueueHead;
+    volatile uint8_t m_motionQueueTail;
+    volatile uint8_t m_motionQueueCount;
     
     // Legacy separate queues (for backward compatibility)
     struct QueuedArc {
@@ -445,30 +463,31 @@ private:
         int32_t radius;
         double endAngle;
         bool clockwise;
-        bool valid;
+        volatile bool valid;  // Valid flag accessed from ISR
     };
     
     struct QueuedLinear {
         int32_t endX;
         int32_t endY;
-        bool valid;
+        volatile bool valid;  // Valid flag accessed from ISR
     };
     
     QueuedArc m_arcQueue[ARC_QUEUE_SIZE];
     QueuedLinear m_linearQueue[ARC_QUEUE_SIZE];
-    uint8_t m_arcQueueHead;
-    uint8_t m_arcQueueTail;
-    uint8_t m_arcQueueCount;
-    uint8_t m_linearQueueHead;
-    uint8_t m_linearQueueTail;
-    uint8_t m_linearQueueCount;
+    volatile uint8_t m_arcQueueHead;
+    volatile uint8_t m_arcQueueTail;
+    volatile uint8_t m_arcQueueCount;
+    volatile uint8_t m_linearQueueHead;
+    volatile uint8_t m_linearQueueTail;
+    volatile uint8_t m_linearQueueCount;
     
     // State
-    bool m_active;
+    // NOTE: m_active and m_motionType accessed from both ISR and main thread
+    volatile bool m_active;
     bool m_initialized;
-    MotionType m_motionType;
-    int32_t m_currentX;
-    int32_t m_currentY;
+    volatile MotionType m_motionType;
+    volatile int32_t m_currentX;  // Position updated from ISR, read from main thread
+    volatile int32_t m_currentY;  // Position updated from ISR, read from main thread
     double m_currentAngle; // Current angle in radians
     
     // Motion parameters

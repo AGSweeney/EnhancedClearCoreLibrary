@@ -236,7 +236,7 @@ int main() {
     motionController.SetMechanicalParamsY(MOTOR_Y_STEPS_PER_REV, MOTOR_Y_PITCH_MM, UNIT_MM);
     
     // Set feed rate for coordinated motion
-    motionController.ArcFeedRateMMPerMin(FEED_RATE_MM_PER_MIN);
+    motionController.FeedRateMMPerMin(FEED_RATE_MM_PER_MIN);
     motionController.ArcAccelMax(ACCELERATION_LIMIT);
     
     // Set initial position
@@ -267,7 +267,7 @@ int main() {
     SerialPort.SendLine();
     
     // Set feed rate in inches per minute
-    motionController.ArcFeedRateInchesPerMin(FEED_RATE_INCHES_PER_MIN);
+    motionController.FeedRateInchesPerMin(FEED_RATE_INCHES_PER_MIN);
     
     // Move in a 10-inch radius arc from 0 to 90 degrees
     SerialPort.Send("Moving in a 10-inch radius arc (0 to 90 degrees)...");

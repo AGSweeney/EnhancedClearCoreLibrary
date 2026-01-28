@@ -133,19 +133,25 @@ bool CoordinatedMotionController::MoveArcContinuous(int32_t centerX, int32_t cen
         return false;
     }
     
+    // Critical section: protect queue operations from ISR
+    __disable_irq();
+    
     // Check if queue is full
     if (m_arcQueueCount >= ARC_QUEUE_SIZE) {
+        __enable_irq();
         return false;
     }
     
     // If no active arc, start immediately
     if (!m_active) {
+        __enable_irq();
         double startAngle = CalculateStartAngle(centerX, centerY);
         return MoveArc(centerX, centerY, radius, startAngle, endAngle, clockwise);
     }
     
     // Queue the arc
-    QueuedArc& arc = m_arcQueue[m_arcQueueTail];
+    uint8_t tail = m_arcQueueTail;
+    QueuedArc& arc = m_arcQueue[tail];
     arc.centerX = centerX;
     arc.centerY = centerY;
     arc.radius = radius;
@@ -153,8 +159,10 @@ bool CoordinatedMotionController::MoveArcContinuous(int32_t centerX, int32_t cen
     arc.clockwise = clockwise;
     arc.valid = true;
     
-    m_arcQueueTail = (m_arcQueueTail + 1) % ARC_QUEUE_SIZE;
+    m_arcQueueTail = (tail + 1) % ARC_QUEUE_SIZE;
     m_arcQueueCount++;
+    
+    __enable_irq();
     
     return true;
 }
@@ -284,12 +292,16 @@ void CoordinatedMotionController::UpdateFast() {
 }
 
 bool CoordinatedMotionController::ProcessNextArc() {
+    // This function is called from ISR context (UpdateFast), so interrupts are already disabled
+    // No need for additional critical section protection
+    
     if (m_arcQueueCount == 0) {
         return false;
     }
     
     // Get next arc from queue
-    QueuedArc& arc = m_arcQueue[m_arcQueueHead];
+    uint8_t head = m_arcQueueHead;
+    QueuedArc& arc = m_arcQueue[head];
     if (!arc.valid) {
         return false;
     }
@@ -303,7 +315,7 @@ bool CoordinatedMotionController::ProcessNextArc() {
                                          m_velocityMax, SampleRateHz)) {
         // Failed to initialize, remove from queue
         arc.valid = false;
-        m_arcQueueHead = (m_arcQueueHead + 1) % ARC_QUEUE_SIZE;
+        m_arcQueueHead = (head + 1) % ARC_QUEUE_SIZE;
         m_arcQueueCount--;
         return false;
     }
@@ -315,7 +327,7 @@ bool CoordinatedMotionController::ProcessNextArc() {
     
     // Remove from queue
     arc.valid = false;
-    m_arcQueueHead = (m_arcQueueHead + 1) % ARC_QUEUE_SIZE;
+    m_arcQueueHead = (head + 1) % ARC_QUEUE_SIZE;
     m_arcQueueCount--;
     
     return true;
@@ -399,9 +411,11 @@ bool CoordinatedMotionController::MoveLinearAbsolute(int32_t startX, int32_t sta
     // Stop any current motion
     Stop();
     
-    // Set current position
+    // Set current position (protected - called from main thread, but motion stopped)
+    __disable_irq();
     m_currentX = startX;
     m_currentY = startY;
+    __enable_irq();
     
     // Initialize linear interpolator
     if (!m_linearInterpolator.InitializeLinear(startX, startY,
@@ -424,46 +438,61 @@ bool CoordinatedMotionController::MoveLinearContinuous(int32_t endX, int32_t end
         return false;
     }
     
+    // Critical section: protect queue operations from ISR
+    __disable_irq();
+    
     // Check if queue is full
     if (m_linearQueueCount >= ARC_QUEUE_SIZE) {
+        __enable_irq();
         return false;
     }
     
     // If no active move, start immediately
     if (!m_active) {
+        __enable_irq();
         return MoveLinear(endX, endY);
     }
     
     // Queue the linear move
-    QueuedLinear& linear = m_linearQueue[m_linearQueueTail];
+    uint8_t tail = m_linearQueueTail;
+    QueuedLinear& linear = m_linearQueue[tail];
     linear.endX = endX;
     linear.endY = endY;
     linear.valid = true;
     
-    m_linearQueueTail = (m_linearQueueTail + 1) % ARC_QUEUE_SIZE;
+    m_linearQueueTail = (tail + 1) % ARC_QUEUE_SIZE;
     m_linearQueueCount++;
+    
+    __enable_irq();
     
     return true;
 }
 
 bool CoordinatedMotionController::ProcessNextLinear() {
+    // This function is called from ISR context (UpdateFast), so interrupts are already disabled
+    // No need for additional critical section protection
+    
     if (m_linearQueueCount == 0) {
         return false;
     }
     
     // Get next linear move from queue
-    QueuedLinear& linear = m_linearQueue[m_linearQueueHead];
+    uint8_t head = m_linearQueueHead;
+    QueuedLinear& linear = m_linearQueue[head];
     if (!linear.valid) {
         return false;
     }
     
     // Initialize interpolator with new linear move
-    if (!m_linearInterpolator.InitializeLinear(m_currentX, m_currentY,
+    // Read current position (volatile, but safe in ISR context)
+    int32_t currentX = m_currentX;
+    int32_t currentY = m_currentY;
+    if (!m_linearInterpolator.InitializeLinear(currentX, currentY,
                                                linear.endX, linear.endY,
                                                m_velocityMax, SampleRateHz)) {
         // Failed to initialize, remove from queue
         linear.valid = false;
-        m_linearQueueHead = (m_linearQueueHead + 1) % ARC_QUEUE_SIZE;
+        m_linearQueueHead = (head + 1) % ARC_QUEUE_SIZE;
         m_linearQueueCount--;
         return false;
     }
@@ -472,7 +501,7 @@ bool CoordinatedMotionController::ProcessNextLinear() {
     
     // Remove from queue
     linear.valid = false;
-    m_linearQueueHead = (m_linearQueueHead + 1) % ARC_QUEUE_SIZE;
+    m_linearQueueHead = (head + 1) % ARC_QUEUE_SIZE;
     m_linearQueueCount--;
     
     return true;
@@ -510,19 +539,25 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
         return false;
     }
     
+    // Critical section: protect queue operations from ISR
+    __disable_irq();
+    
     // Check if queue is full
     if (m_motionQueueCount >= ARC_QUEUE_SIZE) {
+        __enable_irq();
         return false;
     }
     
     // If no active motion, start immediately
     if (!m_active) {
+        __enable_irq();
         double startAngle = CalculateStartAngle(centerX, centerY);
         return MoveArc(centerX, centerY, radius, startAngle, endAngle, clockwise);
     }
     
     // Queue the arc motion
-    QueuedMotion& motion = m_motionQueue[m_motionQueueTail];
+    uint8_t tail = m_motionQueueTail;
+    QueuedMotion& motion = m_motionQueue[tail];
     motion.type = QUEUED_MOTION_ARC;
     motion.arc.centerX = centerX;
     motion.arc.centerY = centerY;
@@ -531,8 +566,10 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
     motion.arc.clockwise = clockwise;
     motion.valid = true;
     
-    m_motionQueueTail = (m_motionQueueTail + 1) % ARC_QUEUE_SIZE;
+    m_motionQueueTail = (tail + 1) % ARC_QUEUE_SIZE;
     m_motionQueueCount++;
+    
+    __enable_irq();
     
     return true;
 }
@@ -546,36 +583,48 @@ bool CoordinatedMotionController::QueueLinear(int32_t endX, int32_t endY) {
         return false;
     }
     
+    // Critical section: protect queue operations from ISR
+    __disable_irq();
+    
     // Check if queue is full
     if (m_motionQueueCount >= ARC_QUEUE_SIZE) {
+        __enable_irq();
         return false;
     }
     
     // If no active motion, start immediately
     if (!m_active) {
+        __enable_irq();
         return MoveLinear(endX, endY);
     }
     
     // Queue the linear motion
-    QueuedMotion& motion = m_motionQueue[m_motionQueueTail];
+    uint8_t tail = m_motionQueueTail;
+    QueuedMotion& motion = m_motionQueue[tail];
     motion.type = QUEUED_MOTION_LINEAR;
     motion.linear.endX = endX;
     motion.linear.endY = endY;
     motion.valid = true;
     
-    m_motionQueueTail = (m_motionQueueTail + 1) % ARC_QUEUE_SIZE;
+    m_motionQueueTail = (tail + 1) % ARC_QUEUE_SIZE;
     m_motionQueueCount++;
+    
+    __enable_irq();
     
     return true;
 }
 
 bool CoordinatedMotionController::ProcessNextMotion() {
+    // This function is called from ISR context (UpdateFast), so interrupts are already disabled
+    // No need for additional critical section protection
+    
     if (m_motionQueueCount == 0) {
         return false;
     }
     
     // Get next motion from unified queue
-    QueuedMotion& motion = m_motionQueue[m_motionQueueHead];
+    uint8_t head = m_motionQueueHead;
+    QueuedMotion& motion = m_motionQueue[head];
     if (!motion.valid) {
         return false;
     }
@@ -598,7 +647,10 @@ bool CoordinatedMotionController::ProcessNextMotion() {
         }
     } else if (motion.type == QUEUED_MOTION_LINEAR) {
         // Initialize linear interpolator
-        if (m_linearInterpolator.InitializeLinear(m_currentX, m_currentY,
+        // Read current position (volatile, but safe in ISR context)
+        int32_t currentX = m_currentX;
+        int32_t currentY = m_currentY;
+        if (m_linearInterpolator.InitializeLinear(currentX, currentY,
                                                  motion.linear.endX, motion.linear.endY,
                                                  m_velocityMax, SampleRateHz)) {
             m_motionType = MOTION_TYPE_LINEAR;
@@ -608,7 +660,7 @@ bool CoordinatedMotionController::ProcessNextMotion() {
     
     // Remove from queue
     motion.valid = false;
-    m_motionQueueHead = (m_motionQueueHead + 1) % ARC_QUEUE_SIZE;
+    m_motionQueueHead = (head + 1) % ARC_QUEUE_SIZE;
     m_motionQueueCount--;
     
     return success;
@@ -698,7 +750,15 @@ bool CoordinatedMotionController::MoveLinearMM(double endX, double endY) {
     return MoveLinear(endXSteps, endYSteps);
 }
 
-void CoordinatedMotionController::ArcFeedRateInchesPerMin(double feedRate) {
+void CoordinatedMotionController::SetPosition(int32_t x, int32_t y) {
+    // Critical section: protect position writes from ISR
+    __disable_irq();
+    m_currentX = x;
+    m_currentY = y;
+    __enable_irq();
+}
+
+void CoordinatedMotionController::FeedRateInchesPerMin(double feedRate) {
     if (!m_unitsConfiguredX || !m_unitsConfiguredY) {
         return;
     }
@@ -707,7 +767,7 @@ void CoordinatedMotionController::ArcFeedRateInchesPerMin(double feedRate) {
     ArcVelMax(stepsPerSec);
 }
 
-void CoordinatedMotionController::ArcFeedRateMMPerMin(double feedRate) {
+void CoordinatedMotionController::FeedRateMMPerMin(double feedRate) {
     if (!m_unitsConfiguredX || !m_unitsConfiguredY) {
         return;
     }
@@ -715,7 +775,7 @@ void CoordinatedMotionController::ArcFeedRateMMPerMin(double feedRate) {
     ArcVelMax(stepsPerSec);
 }
 
-void CoordinatedMotionController::ArcFeedRateMMPerSec(double feedRate) {
+void CoordinatedMotionController::FeedRateMMPerSec(double feedRate) {
     if (!m_unitsConfiguredX || !m_unitsConfiguredY) {
         return;
     }
