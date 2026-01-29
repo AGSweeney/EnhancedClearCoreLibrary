@@ -110,7 +110,7 @@
 // Default motion parameters
 #define DEFAULT_FEED_RATE_MM_PER_MIN 2540.0  // 100 inches/min
 #define DEFAULT_VELOCITY_STEPS_PER_SEC 5000
-#define DEFAULT_ACCELERATION_STEPS_PER_SEC2 50000
+#define DEFAULT_ACCELERATION_STEPS_PER_SEC2 85000
 
 // GRBL status reporting interval (ms)
 #define STATUS_REPORT_INTERVAL 250
@@ -474,10 +474,29 @@ static void TrimTrailingWhitespace(char* s) {
     }
 }
 
-// Wait for XY coordinated motion to finish and queue empty. Poll serial for 0x85 jog cancel; if seen, stop and return false.
-// Returns true if motion completed, false if cancelled.
+// Wait for XY coordinated motion to finish and queue empty.
+// Returns true when motion completes.
 static bool WaitForMotionComplete(void) {
     while (motionController.IsActive() || motionController.MotionQueueCount() != 0) {
+        uint32_t currentTime = Milliseconds();
+        if (currentTime - lastStatusReportTime >= STATUS_REPORT_INTERVAL) {
+            SendStatusReport();
+            lastStatusReportTime = currentTime;
+        }
+        Delay_ms(1);
+    }
+    return true;
+}
+
+// Jog wait: allow 0x85 cancel during jog (safe to consume input here).
+// Returns true if motion completed, false if cancelled.
+static bool WaitForJogComplete(void) {
+    while (motionController.IsActive() || motionController.MotionQueueCount() != 0) {
+        uint32_t currentTime = Milliseconds();
+        if (currentTime - lastStatusReportTime >= STATUS_REPORT_INTERVAL) {
+            SendStatusReport();
+            lastStatusReportTime = currentTime;
+        }
         int16_t ch = SerialPort.CharGet();
         if (ch >= 0 && ch == 0x85) {
             motionController.Stop();
@@ -508,11 +527,23 @@ void ProcessCommand(const char* command) {
         }
     }
     TrimTrailingWhitespace(upperCommand);
+
+    // Ignore sender metadata lines (gSender "feeder ..." or status echoes)
+    if (strncmp(upperCommand, "FEEDER ", 7) == 0 ||
+        strncmp(upperCommand, "SG=", 3) == 0 ||
+        strncmp(upperCommand, "$G=", 3) == 0) {
+        SendResponseLine("ok");
+        return;
+    }
     
     // Handle $ commands (GRBL configuration)
     if (upperCommand[0] == '$') {
         if (strcmp(upperCommand, "$") == 0 || strcmp(upperCommand, "$G") == 0) {
-            SendResponseLine("$G=G90 G21");
+            const char* coordStr = (coordinateMode == COORD_INCREMENTAL) ? "G91" : "G90";
+            const char* unitStr = (unitMode == UNIT_MODE_INCHES) ? "G20" : "G21";
+            char msg[32];
+            snprintf(msg, sizeof(msg), "$G=%s %s", coordStr, unitStr);
+            SendResponseLine(msg);
         } else if (strcmp(upperCommand, "$I") == 0) {
             SendResponseLine("ClearCore GRBL-Compatible v1.0");
         } else if (strcmp(upperCommand, "$N") == 0) {
@@ -557,7 +588,13 @@ void ProcessCommand(const char* command) {
         }
         return;
     }
-    
+
+    // Ignore non-command lines (sender metadata or empty noise)
+    if (upperCommand[0] != 'G' && upperCommand[0] != 'M') {
+        SendResponseLine("ok");
+        return;
+    }
+
     // Parse G-code command
     ParseGCode(upperCommand);
 }
@@ -570,7 +607,11 @@ void ParseGCode(const char* line) {
     // Find command code (G## or M##)
     if (line[0] == 'G' || line[0] == 'M') {
         int code = 0;
-        sscanf(line, "%*[GM]%d", &code);
+        if (sscanf(line, "%*[GM]%d", &code) != 1) {
+            // Ignore malformed command stubs like "G" or "M"
+            SendResponseLine("ok");
+            return;
+        }
         
         // Parse parameters
         const char* ptr = line;
@@ -609,7 +650,8 @@ void ParseGCode(const char* line) {
                     if (hasX || hasY || hasZ) {
                         ExecuteG00(x, y, z);
                     } else {
-                        SendError(1);  // G-code words consist of a letter and a value
+                        // No axis words; treat as a no-op modal update
+                        SendResponseLine("ok");
                     }
                     break;
                     
@@ -617,7 +659,8 @@ void ParseGCode(const char* line) {
                     if (hasX || hasY || hasZ) {
                         ExecuteG01(x, y, z, f);
                     } else {
-                        SendError(1);
+                        // No axis words; treat as a no-op modal update
+                        SendResponseLine("ok");
                     }
                     break;
                     
@@ -695,6 +738,15 @@ void ParseGCode(const char* line) {
                     unitMode = UNIT_MODE_MM;
                     SendResponseLine("ok");
                     break;
+
+                case 54:  // G54 - Work coordinate system (acknowledge)
+                case 55:  // G55
+                case 56:  // G56
+                case 57:  // G57
+                case 58:  // G58
+                case 59:  // G59
+                    SendResponseLine("ok");
+                    break;
                     
                 case 28:  // G28 - Home
                     ExecuteG28();
@@ -768,6 +820,8 @@ void ParseGCode(const char* line) {
                     
                 case 30:  // M30 - Program end
                     if (motorsInitialized) {
+                        // Wait for queued motion to finish before stopping
+                        WaitForMotionComplete();
                         motionController.Stop();
                         #if USE_Z_AXIS
                         motorZ.MoveStopAbrupt();
@@ -847,6 +901,17 @@ void ExecuteG00(double x, double y, double z) {
         #if USE_Z_AXIS
         endZSteps = UnitConverter::DistanceToSteps(targetZ, ClearCore::UNIT_MM, mechanicalConfigZ);
         #endif
+    }
+
+    // No XY move needed; handle Z-only or acknowledge.
+    if (endXSteps == motionController.CurrentX() && endYSteps == motionController.CurrentY()) {
+        #if USE_Z_AXIS
+        if (endZSteps != currentZSteps) {
+            MoveZAxis(endZSteps, true);
+        }
+        #endif
+        SendResponseLine("ok");
+        return;
     }
     
     // Use high velocity for rapid move
@@ -934,7 +999,28 @@ void ExecuteG01(double x, double y, double z, double f) {
         endXSteps = UnitConverter::DistanceToSteps(targetX, ClearCore::UNIT_MM, mechanicalConfigX);
         endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_MM, mechanicalConfigY);
     }
-    
+
+    // No XY move needed; handle Z-only or acknowledge.
+    if (endXSteps == motionController.CurrentX() && endYSteps == motionController.CurrentY()) {
+        #if USE_Z_AXIS
+        if (z != 0.0 || coordinateMode == COORD_ABSOLUTE) {
+            double targetZ = z;
+            if (coordinateMode == COORD_INCREMENTAL) {
+                targetZ = GetCurrentZPosition() + z;
+            }
+            int32_t targetZSteps;
+            if (unitMode == UNIT_MODE_INCHES) {
+                targetZSteps = UnitConverter::DistanceToSteps(targetZ, ClearCore::UNIT_INCHES, mechanicalConfigZ);
+            } else {
+                targetZSteps = UnitConverter::DistanceToSteps(targetZ, ClearCore::UNIT_MM, mechanicalConfigZ);
+            }
+            MoveZAxis(targetZSteps, false);
+        }
+        #endif
+        SendResponseLine("ok");
+        return;
+    }
+
     bool success = motionController.QueueLinear(endXSteps, endYSteps);
     if (!success) {
         Delay_ms(20);
@@ -1043,7 +1129,7 @@ static void ExecuteJog(const char* rest) {
         return;
     }
 
-    bool completed = WaitForMotionComplete();
+    bool completed = WaitForJogComplete();
 
     #if USE_Z_AXIS
     if (hasZ && completed) {
@@ -1056,6 +1142,7 @@ static void ExecuteJog(const char* rest) {
     (void)z;
     #endif
 
+    WaitForMotionComplete();
     SendResponseLine("ok");
 }
 
@@ -1244,7 +1331,6 @@ void ExecuteG03(double x, double y, double z, double i, double j, double f) {
     }
     #endif
     
-    WaitForMotionComplete();
     SendResponseLine("ok");
 }
 
