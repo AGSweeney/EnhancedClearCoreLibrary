@@ -43,6 +43,7 @@ CoordinatedMotionController::CoordinatedMotionController()
       m_active(false),
       m_initialized(false),
       m_motionType(MOTION_TYPE_NONE),
+      m_stopCounter(0),
       m_currentX(0),
       m_currentY(0),
       m_currentAngle(0.0),
@@ -120,6 +121,7 @@ bool CoordinatedMotionController::MoveArc(int32_t centerX, int32_t centerY,
         m_currentAngle += 2.0 * M_PI;
     }
     
+    m_stopCounter = 0;  // Reset stop counter when starting new motion
     m_active = true;
     return true;
 }
@@ -233,7 +235,23 @@ void CoordinatedMotionController::StopDecel() {
 }
 
 void CoordinatedMotionController::UpdateFast() {
-    if (!m_active || !m_initialized) {
+    if (!m_initialized) {
+        return;
+    }
+    
+    // If stop counter is active, continue sending zero steps to clear hardware buffer
+    if (m_stopCounter > 0) {
+        if (m_motorX) {
+            m_motorX->SetCoordinatedSteps(0);
+        }
+        if (m_motorY) {
+            m_motorY->SetCoordinatedSteps(0);
+        }
+        m_stopCounter--;
+        return;
+    }
+    
+    if (!m_active) {
         return;
     }
     
@@ -276,6 +294,7 @@ void CoordinatedMotionController::UpdateFast() {
         // No more moves, stop motion
         m_active = false;
         m_motionType = MOTION_TYPE_NONE;
+        m_stopCounter = 10;  // Send zero steps for 10 more cycles (2ms at 5kHz)
         return;
     }
     
@@ -304,10 +323,12 @@ void CoordinatedMotionController::UpdateFast() {
             if (m_motionType == MOTION_TYPE_LINEAR && m_linearInterpolator.IsLinearComplete()) {
                 m_active = false;
                 m_motionType = MOTION_TYPE_NONE;
+                m_stopCounter = 10;  // Send zero steps for 10 more cycles (2ms at 5kHz)
                 return;
             } else if (m_motionType == MOTION_TYPE_ARC && m_arcInterpolator.IsArcComplete()) {
                 m_active = false;
                 m_motionType = MOTION_TYPE_NONE;
+                m_stopCounter = 10;  // Send zero steps for 10 more cycles (2ms at 5kHz)
                 return;
             }
         }
@@ -349,6 +370,7 @@ void CoordinatedMotionController::UpdateFast() {
                 m_currentY = tempY;
                 m_active = false;
                 m_motionType = MOTION_TYPE_NONE;
+                m_stopCounter = 10;  // Send zero steps for 10 more cycles (2ms at 5kHz)
             }
         } else if (m_motionType == MOTION_TYPE_LINEAR) {
             if (m_linearInterpolator.IsLinearComplete()) {
@@ -359,6 +381,7 @@ void CoordinatedMotionController::UpdateFast() {
                 m_currentY = tempY;
                 m_active = false;
                 m_motionType = MOTION_TYPE_NONE;
+                m_stopCounter = 10;  // Send zero steps for 10 more cycles (2ms at 5kHz)
             }
         }
     }
@@ -467,6 +490,7 @@ bool CoordinatedMotionController::MoveLinear(int32_t endX, int32_t endY) {
     }
     
     m_motionType = MOTION_TYPE_LINEAR;
+    m_stopCounter = 0;  // Reset stop counter when starting new motion
     m_active = true;
     return true;
 }
@@ -498,6 +522,7 @@ bool CoordinatedMotionController::MoveLinearAbsolute(int32_t startX, int32_t sta
     }
     
     m_motionType = MOTION_TYPE_LINEAR;
+    m_stopCounter = 0;  // Reset stop counter when starting new motion
     m_active = true;
     return true;
 }

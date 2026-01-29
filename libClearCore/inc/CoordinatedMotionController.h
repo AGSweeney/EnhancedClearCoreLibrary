@@ -497,6 +497,7 @@ private:
     volatile bool m_active;
     bool m_initialized;
     volatile MotionType m_motionType;
+    volatile uint8_t m_stopCounter;  // Counter to continue sending zero steps after completion
     volatile int32_t m_currentX;  // Position updated from ISR, read from main thread
     volatile int32_t m_currentY;  // Position updated from ISR, read from main thread
     double m_currentAngle; // Current angle in radians

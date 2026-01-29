@@ -164,6 +164,7 @@ void ExecuteG02(double x, double y, double i, double j, double f = -1.0);
 void ExecuteG03(double x, double y, double i, double j, double f = -1.0);
 void SendResponse(const char* message);
 void SendResponseLine(const char* message);
+void PrintCurrentPosition();
 bool ReadCommandSerial(char* buffer, uint16_t maxLen);
 bool ReadCommandEthernet(char* buffer, uint16_t maxLen);
 
@@ -799,11 +800,15 @@ void ExecuteG01(double x, double y, double f) {
     bool success = motionController.QueueLinear(endXSteps, endYSteps);
     
     if (!success) {
-        SendResponseLine("error: Queue full or invalid");
+        char errorMsg[100];
+        uint8_t queueCount = motionController.MotionQueueCount();
+        sprintf(errorMsg, "error: Queue full (current: %d/8) or invalid - wait for moves to complete", queueCount);
+        SendResponseLine(errorMsg);
         return;
     }
     
     SendResponseLine("ok");
+    PrintCurrentPosition();
 }
 
 void ExecuteG02(double x, double y, double i, double j, double f) {
@@ -812,6 +817,11 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
         SendResponseLine("error: Motors not initialized (motors may not be attached, use M202 to enable)");
         return;
     }
+    
+    // Debug: Print parsed values
+    char debugMsg[200];
+    sprintf(debugMsg, "G02 parsed: X=%.3f Y=%.3f I=%.3f J=%.3f", x, y, i, j);
+    SendResponseLine(debugMsg);
     
     // Set feed rate if specified
     if (f >= 0.0) {
@@ -849,6 +859,11 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
         endY = startY + y;
     }
     
+    // Debug: Print calculated values
+    sprintf(debugMsg, "G02 calc: Start(%.3f,%.3f) End(%.3f,%.3f) Center(%.3f,%.3f) Radius=%.3f",
+            startX, startY, endX, endY, startX + i, startY + j, sqrt(i * i + j * j));
+    SendResponseLine(debugMsg);
+    
     // Calculate center (I and J are relative to start position)
     double centerX = startX + i;
     double centerY = startY + j;
@@ -859,6 +874,10 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
     // Calculate end angle (start angle calculated automatically by QueueArc)
     double endAngle = atan2(endY - centerY, endX - centerX);
     if (endAngle < 0) endAngle += 2 * M_PI;
+    
+    // Debug: Print end angle
+    sprintf(debugMsg, "G02 endAngle: %.6f rad (%.2f deg)", endAngle, endAngle * 180.0 / M_PI);
+    SendResponseLine(debugMsg);
     
     // Convert to steps for queuing
     int32_t centerXSteps, centerYSteps, radiusSteps;
@@ -871,6 +890,11 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
         centerYSteps = UnitConverter::DistanceToSteps(centerY, ClearCore::UNIT_MM, mechanicalConfigY);
         radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_MM, mechanicalConfigX);
     }
+    
+    // Debug: Print step values
+    sprintf(debugMsg, "G02 steps: Center(%ld,%ld) Radius=%ld EndAngle=%.6f",
+            (long)centerXSteps, (long)centerYSteps, (long)radiusSteps, endAngle);
+    SendResponseLine(debugMsg);
     
     // Check if motors are initialized
     if (!motorsInitialized) {
@@ -889,11 +913,15 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
     bool success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, true);
     
     if (!success) {
-        SendResponseLine("error: Queue full or invalid");
+        char errorMsg[100];
+        uint8_t queueCount = motionController.MotionQueueCount();
+        sprintf(errorMsg, "error: Queue full (current: %d/8) or invalid - wait for moves to complete", queueCount);
+        SendResponseLine(errorMsg);
         return;
     }
     
     SendResponseLine("ok");
+    PrintCurrentPosition();
 }
 
 void ExecuteG03(double x, double y, double i, double j, double f) {
@@ -973,11 +1001,33 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
     bool success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, false);
     
     if (!success) {
-        SendResponseLine("error: Queue full or invalid");
+        char errorMsg[100];
+        uint8_t queueCount = motionController.MotionQueueCount();
+        sprintf(errorMsg, "error: Queue full (current: %d/8) or invalid - wait for moves to complete", queueCount);
+        SendResponseLine(errorMsg);
         return;
     }
     
     SendResponseLine("ok");
+    PrintCurrentPosition();
+}
+
+void PrintCurrentPosition() {
+    if (!motorsInitialized) {
+        return;
+    }
+    
+    char response[100];
+    if (unitMode == UNIT_MODE_INCHES) {
+        double xInches = motionController.CurrentXInches();
+        double yInches = motionController.CurrentYInches();
+        sprintf(response, "X:%.3f Y:%.3f", xInches, yInches);
+    } else {
+        double xMM = motionController.CurrentXMM();
+        double yMM = motionController.CurrentYMM();
+        sprintf(response, "X:%.3f Y:%.3f", xMM, yMM);
+    }
+    SendResponseLine(response);
 }
 
 void SendResponse(const char* message) {
