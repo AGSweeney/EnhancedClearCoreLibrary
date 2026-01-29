@@ -63,7 +63,8 @@ public:
     **/
     bool InitializeLinear(int32_t startX, int32_t startY,
                          int32_t endX, int32_t endY,
-                         uint32_t velocityMax, uint16_t sampleRateHz);
+                         uint32_t velocityMax, uint32_t accelMax,
+                         uint16_t sampleRateHz);
     
     /**
         \brief Generate next step pair for the linear move
@@ -81,7 +82,13 @@ public:
         \return true if move is complete
     **/
     bool IsLinearComplete() const {
-        return m_stepsRemaining == 0;
+        // Position check is primary - only complete when actually at target
+        // Step count is just an estimate and can be inaccurate
+        if (m_currentX == m_endX && m_currentY == m_endY) {
+            return true;
+        }
+        // If not at target but stepsRemaining is 0, step count was wrong - not complete yet
+        return false;
     }
     
     /**
@@ -139,7 +146,12 @@ private:
     uint32_t m_totalSteps;
     uint32_t m_stepsRemaining;
     uint32_t m_velocityMax;
+    uint32_t m_accelMax;
     uint16_t m_sampleRateHz;
+    
+    // Cached normalized direction vector
+    double m_dirX;
+    double m_dirY;
     
     // Last step counts (for delta calculation)
     int32_t m_lastXSteps;

@@ -93,7 +93,7 @@ public:
                        int32_t radius,
                        double startAngle, double endAngle,
                        bool clockwise,
-                       uint32_t velocityMax,
+                       uint32_t velocityMax, uint32_t accelMax,
                        uint16_t sampleRateHz);
 
     /**
@@ -112,7 +112,25 @@ public:
         \return true if arc is complete
     **/
     bool IsArcComplete() const {
-        return m_currentArc.stepsRemaining == 0;
+        // Check if angle has reached end angle (with small threshold)
+        // Calculate remaining angle in the direction of travel (same logic as GenerateNextSteps)
+        int32_t angleRemainingQx;
+        if (m_currentArc.clockwise) {
+            if (m_currentArc.endAngleQx < m_currentAngleQx) {
+                angleRemainingQx = m_currentAngleQx - m_currentArc.endAngleQx;
+            } else {
+                angleRemainingQx = TWO_PI_QX - (m_currentArc.endAngleQx - m_currentAngleQx);
+            }
+        } else {
+            if (m_currentArc.endAngleQx > m_currentAngleQx) {
+                angleRemainingQx = m_currentArc.endAngleQx - m_currentAngleQx;
+            } else {
+                angleRemainingQx = TWO_PI_QX - (m_currentAngleQx - m_currentArc.endAngleQx);
+            }
+        }
+        
+        const int32_t ANGLE_THRESHOLD_QX = (TWO_PI_QX / 3600); // ~0.1 degree
+        return angleRemainingQx <= ANGLE_THRESHOLD_QX;
     }
 
     /**
@@ -150,6 +168,7 @@ private:
     // Velocity control
     int32_t m_angleIncrementQx; // Angle increment per step (Q15) - for reference
     uint32_t m_velocityMax;      // Tangential velocity along arc path (steps/sec)
+    uint32_t m_accelMax;         // Tangential acceleration along arc path (steps/sec^2)
     uint16_t m_sampleRateHz;    // Sample rate (Hz)
     
     // Constants

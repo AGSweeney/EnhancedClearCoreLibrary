@@ -82,9 +82,25 @@
 
 #include "ClearCore.h"
 #include "EthernetTcpServer.h"
+#include "SysTiming.h"
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
+
+// Simple PRNG for random moves
+static uint32_t randomSeed = 1;
+static uint32_t randomNext() {
+    randomSeed = randomSeed * 1103515245 + 12345;
+    return (randomSeed >> 16) & 0x7FFF;
+}
+static void randomSeedInit() {
+    // Seed from system time (milliseconds)
+    randomSeed = Milliseconds();
+    if (randomSeed == 0) randomSeed = 1;
+}
+static double randomDouble(double min, double max) {
+    return min + (randomNext() % 10000) * (max - min) / 10000.0;
+}
 
 // ========== Configuration ==========
 
@@ -114,10 +130,10 @@ IpAddress manualIp = IpAddress(192, 168, 0, 109);  // Only used if usingDhcp = f
 #define MOTOR_Y_PITCH_MM 5.0
 
 // Default motion parameters
-#define DEFAULT_FEED_RATE_MM_PER_MIN 2540.0  // 100 inches/min
-#define DEFAULT_FEED_RATE_INCHES_PER_MIN 100.0
+#define DEFAULT_FEED_RATE_MM_PER_MIN 254.0  // 10 inches/min
+#define DEFAULT_FEED_RATE_INCHES_PER_MIN 10.0
 #define DEFAULT_VELOCITY_STEPS_PER_SEC 5000
-#define DEFAULT_ACCELERATION_STEPS_PER_SEC2 50000
+#define DEFAULT_ACCELERATION_STEPS_PER_SEC2 10000
 
 // ========== Global Variables ==========
 
@@ -142,8 +158,8 @@ enum UnitMode {
 };
 
 CoordinateMode coordinateMode = COORD_ABSOLUTE;
-UnitMode unitMode = UNIT_MODE_MM;
-double currentFeedRate = DEFAULT_FEED_RATE_MM_PER_MIN;
+UnitMode unitMode = UNIT_MODE_INCHES;
+double currentFeedRate = DEFAULT_FEED_RATE_INCHES_PER_MIN;
 bool feedRateSet = false;
 
 // Command buffer
@@ -152,6 +168,7 @@ uint16_t commandBufferIndex = 0;
 
 // Motor initialization status
 bool motorsInitialized = false;
+static bool suppressAutoPosition = false;
 
 // ========== Function Prototypes ==========
 
@@ -167,6 +184,39 @@ void SendResponseLine(const char* message);
 void PrintCurrentPosition();
 bool ReadCommandSerial(char* buffer, uint16_t maxLen);
 bool ReadCommandEthernet(char* buffer, uint16_t maxLen);
+
+// Wait helpers for test sequences
+static uint32_t CalculateMoveTimeoutMs(double distance, double feedRate) {
+    double moveTimeMs = 0.0;
+    if (unitMode == UNIT_MODE_INCHES) {
+        // Distance in inches, feed rate in ipm
+        moveTimeMs = (distance / feedRate) * 60.0 * 1000.0;
+    } else {
+        // Distance in mm, feed rate in mm/min (feedRate * 25.4)
+        moveTimeMs = (distance / (feedRate * 25.4)) * 60.0 * 1000.0;
+    }
+    // Add 3 second safety margin and minimum 2 second timeout
+    uint32_t timeoutMs = (uint32_t)(moveTimeMs + 3000.0);
+    if (timeoutMs < 2000) {
+        timeoutMs = 2000;
+    }
+    return timeoutMs;
+}
+
+static void WaitForMotionComplete(uint32_t timeoutMs) {
+    uint32_t startTime = Milliseconds();
+    while (motionController.MotionQueueCount() > 0 || motionController.IsActive()) {
+        Delay_ms(50);
+        uint32_t currentTime = Milliseconds();
+        if (currentTime - startTime > timeoutMs) {
+            char timeoutMsg[100];
+            sprintf(timeoutMsg, "Warning: Move timeout after %lu ms",
+                    (unsigned long)(currentTime - startTime));
+            SendResponseLine(timeoutMsg);
+            break;
+        }
+    }
+}
 
 // ========== Main Function ==========
 
@@ -711,12 +761,187 @@ void ParseGCode(const char* line) {
                     }
                     break;
                     
-                case 500:  // M500 - Save configuration (placeholder)
-                    SendResponseLine("Configuration saved");
+                case 500:  // M500 - Run automated test sequence
+                    {
+                        if (!motorsInitialized) {
+                            SendResponseLine("error: Motors not initialized");
+                            break;
+                        }
+                        
+                        SendResponseLine("Starting automated test sequence...");
+                        
+                        // Enable motors
+                        motorX.EnableRequest(true);
+                        motorY.EnableRequest(true);
+                        SendResponseLine("Motors enabled");
+                        Delay_ms(100);
+                        
+                        // Set feed rate (use F parameter if provided, otherwise default to 10 ipm)
+                        double feedRate = (f >= 0.0) ? f : 10.0;
+                        if (unitMode == UNIT_MODE_INCHES) {
+                            motionController.FeedRateInchesPerMin(feedRate);
+                            currentFeedRate = feedRate;
+                        } else {
+                            motionController.FeedRateMMPerMin(feedRate * 25.4);  // Convert to mm/min
+                            currentFeedRate = feedRate * 25.4;
+                        }
+                        feedRateSet = true;
+                        char feedMsg[50];
+                        sprintf(feedMsg, "Feed rate set to %.1f ipm", feedRate);
+                        SendResponseLine(feedMsg);
+                        
+                        // Set current position to origin
+                        motionController.SetPosition(0, 0);
+                        SendResponseLine("Position set to origin");
+                        Delay_ms(50);
+                        
+                        // Suppress immediate position prints; we'll print after moves complete
+                        suppressAutoPosition = true;
+
+                        // Test 1: Simple linear move
+                        SendResponseLine("Test 1: G01 X0.5 Y0");
+                        ExecuteG01(0.5, 0.0);
+                        WaitForMotionComplete(CalculateMoveTimeoutMs(0.5, feedRate));
+                        SendResponseLine("Test 1 complete - Position:");
+                        PrintCurrentPosition();
+                        
+                        // Test 2: Return to origin
+                        SendResponseLine("Test 2: G01 X0 Y0");
+                        ExecuteG01(0.0, 0.0);
+                        double currentX = 0.0;
+                        double currentY = 0.0;
+                        if (unitMode == UNIT_MODE_INCHES) {
+                            currentX = motionController.CurrentXInches();
+                            currentY = motionController.CurrentYInches();
+                        } else {
+                            currentX = motionController.CurrentXMM();
+                            currentY = motionController.CurrentYMM();
+                        }
+                        double returnDistance = sqrt(currentX * currentX + currentY * currentY);
+                        WaitForMotionComplete(CalculateMoveTimeoutMs(returnDistance, feedRate));
+                        SendResponseLine("Test 2 complete - Position:");
+                        PrintCurrentPosition();
+                        
+                        // Test 3: Arc move (quarter circle, radius 2)
+                        SendResponseLine("Test 3: G02 X2 Y2 I0 J2");
+                        ExecuteG02(2.0, 2.0, 0.0, 2.0);
+                        const double arcLength = (M_PI / 2.0) * 2.0;
+                        WaitForMotionComplete(CalculateMoveTimeoutMs(arcLength, feedRate));
+                        SendResponseLine("Test 3 complete - Position:");
+                        PrintCurrentPosition();
+                        
+                        // Test 4: Return to origin
+                        SendResponseLine("Test 4: G01 X0 Y0");
+                        ExecuteG01(0.0, 0.0);
+                        if (unitMode == UNIT_MODE_INCHES) {
+                            currentX = motionController.CurrentXInches();
+                            currentY = motionController.CurrentYInches();
+                        } else {
+                            currentX = motionController.CurrentXMM();
+                            currentY = motionController.CurrentYMM();
+                        }
+                        returnDistance = sqrt(currentX * currentX + currentY * currentY);
+                        WaitForMotionComplete(CalculateMoveTimeoutMs(returnDistance, feedRate));
+                        SendResponseLine("Test 4 complete - Position:");
+                        PrintCurrentPosition();
+                        suppressAutoPosition = false;
+                        
+                        // Final position check
+                        SendResponseLine("Test complete - Final position:");
+                        PrintCurrentPosition();
+                    }
                     break;
                     
-                case 501:  // M501 - Load configuration (placeholder)
-                    SendResponseLine("Configuration loaded");
+                case 501:  // M501 - Random move test sequence
+                    {
+                        if (!motorsInitialized) {
+                            SendResponseLine("error: Motors not initialized");
+                            break;
+                        }
+                        
+                        SendResponseLine("Starting random move test sequence...");
+                        
+                        // Enable motors
+                        motorX.EnableRequest(true);
+                        motorY.EnableRequest(true);
+                        SendResponseLine("Motors enabled");
+                        Delay_ms(100);
+                        
+                        randomSeedInit();
+                        
+                        // Set feed rate (use F parameter if provided, otherwise default to 10 ipm)
+                        double feedRate = (f >= 0.0) ? f : 10.0;
+                        if (unitMode == UNIT_MODE_INCHES) {
+                            motionController.FeedRateInchesPerMin(feedRate);
+                            currentFeedRate = feedRate;
+                        } else {
+                            motionController.FeedRateMMPerMin(feedRate * 25.4);  // Convert to mm/min
+                            currentFeedRate = feedRate * 25.4;
+                        }
+                        feedRateSet = true;
+                        char feedMsg[50];
+                        sprintf(feedMsg, "Feed rate set to %.1f ipm", feedRate);
+                        SendResponseLine(feedMsg);
+                        
+                        // Suppress immediate position prints; we'll print after moves complete
+                        suppressAutoPosition = true;
+
+                        // Generate 10 random moves
+                        const int numMoves = 10;
+                        const double maxRange = 10.0;  // Max 10mm or 10 inches
+                        
+                        for (int i = 0; i < numMoves; i++) {
+                            // Random move type: 0=X only, 1=Y only, 2=XY
+                            int moveType = randomNext() % 3;
+                            double x = 0.0, y = 0.0;
+                            
+                            switch (moveType) {
+                                case 0:  // X only
+                                    x = randomDouble(-maxRange, maxRange);
+                                    y = 0.0;
+                                    break;
+                                case 1:  // Y only
+                                    x = 0.0;
+                                    y = randomDouble(-maxRange, maxRange);
+                                    break;
+                                case 2:  // XY
+                                    x = randomDouble(-maxRange, maxRange);
+                                    y = randomDouble(-maxRange, maxRange);
+                                    break;
+                            }
+                            
+                            char moveMsg[100];
+                            sprintf(moveMsg, "Move %d/%d: G01 X%.3f Y%.3f", i+1, numMoves, x, y);
+                            SendResponseLine(moveMsg);
+                            
+                            ExecuteG01(x, y);
+                            
+                            // Wait for move to complete with timeout based on move distance
+                            double distance = sqrt(x*x + y*y);
+                            uint32_t timeoutMs = CalculateMoveTimeoutMs(distance, feedRate);
+                            WaitForMotionComplete(timeoutMs);
+                            Delay_ms(100);  // Small delay between moves
+                        }
+                        
+                        // Return to origin at end of test
+                        SendResponseLine("Returning to origin: G01 X0 Y0");
+                        double currentX = 0.0;
+                        double currentY = 0.0;
+                        if (unitMode == UNIT_MODE_INCHES) {
+                            currentX = motionController.CurrentXInches();
+                            currentY = motionController.CurrentYInches();
+                        } else {
+                            currentX = motionController.CurrentXMM();
+                            currentY = motionController.CurrentYMM();
+                        }
+                        double returnDistance = sqrt(currentX * currentX + currentY * currentY);
+                        ExecuteG01(0.0, 0.0);
+                        WaitForMotionComplete(CalculateMoveTimeoutMs(returnDistance, feedRate));
+                        suppressAutoPosition = false;
+                        
+                        SendResponseLine("Random move test complete - Final position:");
+                        PrintCurrentPosition();
+                    }
                     break;
                     
                 default:
@@ -802,13 +1027,19 @@ void ExecuteG01(double x, double y, double f) {
     if (!success) {
         char errorMsg[100];
         uint8_t queueCount = motionController.MotionQueueCount();
-        sprintf(errorMsg, "error: Queue full (current: %d/8) or invalid - wait for moves to complete", queueCount);
+        if (queueCount >= 8) {
+            sprintf(errorMsg, "error: Queue full (current: %d/8) - wait for moves to complete", queueCount);
+        } else {
+            sprintf(errorMsg, "error: Invalid move (queue: %d/8) - check motors enabled and parameters", queueCount);
+        }
         SendResponseLine(errorMsg);
         return;
     }
     
     SendResponseLine("ok");
-    PrintCurrentPosition();
+    if (!suppressAutoPosition) {
+        PrintCurrentPosition();
+    }
 }
 
 void ExecuteG02(double x, double y, double i, double j, double f) {
@@ -891,9 +1122,15 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
         radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_MM, mechanicalConfigX);
     }
     
+    // Debug: Calculate and print start angle
+    double startAngle = atan2(startY - centerY, startX - centerX);
+    if (startAngle < 0) startAngle += 2 * M_PI;
+    sprintf(debugMsg, "G02 startAngle: %.6f rad (%.2f deg)", startAngle, startAngle * 180.0 / M_PI);
+    SendResponseLine(debugMsg);
+    
     // Debug: Print step values
-    sprintf(debugMsg, "G02 steps: Center(%ld,%ld) Radius=%ld EndAngle=%.6f",
-            (long)centerXSteps, (long)centerYSteps, (long)radiusSteps, endAngle);
+    sprintf(debugMsg, "G02 steps: Center(%ld,%ld) Radius=%ld StartAngle=%.6f EndAngle=%.6f",
+            (long)centerXSteps, (long)centerYSteps, (long)radiusSteps, startAngle, endAngle);
     SendResponseLine(debugMsg);
     
     // Check if motors are initialized
@@ -915,13 +1152,19 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
     if (!success) {
         char errorMsg[100];
         uint8_t queueCount = motionController.MotionQueueCount();
-        sprintf(errorMsg, "error: Queue full (current: %d/8) or invalid - wait for moves to complete", queueCount);
+        if (queueCount >= 8) {
+            sprintf(errorMsg, "error: Queue full (current: %d/8) - wait for moves to complete", queueCount);
+        } else {
+            sprintf(errorMsg, "error: Invalid arc (queue: %d/8) - check motors enabled and parameters", queueCount);
+        }
         SendResponseLine(errorMsg);
         return;
     }
     
     SendResponseLine("ok");
-    PrintCurrentPosition();
+    if (!suppressAutoPosition) {
+        PrintCurrentPosition();
+    }
 }
 
 void ExecuteG03(double x, double y, double i, double j, double f) {
@@ -1003,13 +1246,19 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
     if (!success) {
         char errorMsg[100];
         uint8_t queueCount = motionController.MotionQueueCount();
-        sprintf(errorMsg, "error: Queue full (current: %d/8) or invalid - wait for moves to complete", queueCount);
+        if (queueCount >= 8) {
+            sprintf(errorMsg, "error: Queue full (current: %d/8) - wait for moves to complete", queueCount);
+        } else {
+            sprintf(errorMsg, "error: Invalid arc (queue: %d/8) - check motors enabled and parameters", queueCount);
+        }
         SendResponseLine(errorMsg);
         return;
     }
     
     SendResponseLine("ok");
-    PrintCurrentPosition();
+    if (!suppressAutoPosition) {
+        PrintCurrentPosition();
+    }
 }
 
 void PrintCurrentPosition() {

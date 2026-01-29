@@ -46,19 +46,24 @@ LinearInterpolator::LinearInterpolator()
       m_totalSteps(0),
       m_stepsRemaining(0),
       m_velocityMax(5000),
+      m_accelMax(0),
       m_sampleRateHz(5000),
+      m_dirX(0.0),
+      m_dirY(0.0),
       m_lastXSteps(0),
       m_lastYSteps(0) {
 }
 
 bool LinearInterpolator::InitializeLinear(int32_t startX, int32_t startY,
                                          int32_t endX, int32_t endY,
-                                         uint32_t velocityMax, uint16_t sampleRateHz) {
+                                         uint32_t velocityMax, uint32_t accelMax,
+                                         uint16_t sampleRateHz) {
     m_startX = startX;
     m_startY = startY;
     m_endX = endX;
     m_endY = endY;
     m_velocityMax = velocityMax;
+    m_accelMax = accelMax;
     m_sampleRateHz = sampleRateHz;
     
     // Calculate total distance
@@ -85,16 +90,16 @@ bool LinearInterpolator::InitializeLinear(int32_t startX, int32_t startY,
     int32_t deltaX = endX - startX;
     int32_t deltaY = endY - startY;
     
-    // Calculate steps per sample along the path
+    // Calculate unit direction vector components
+    m_dirX = (double)deltaX / (double)m_totalSteps;
+    m_dirY = (double)deltaY / (double)m_totalSteps;
+    
+    // Calculate steps per sample along the path (start at max speed)
     double stepsPerSample = (double)velocityMax / (double)sampleRateHz;
     
-    // Calculate unit direction vector components
-    double dirX = (double)deltaX / (double)m_totalSteps;
-    double dirY = (double)deltaY / (double)m_totalSteps;
-    
     // Calculate step increments per sample for each axis
-    double incrementX = dirX * stepsPerSample;
-    double incrementY = dirY * stepsPerSample;
+    double incrementX = m_dirX * stepsPerSample;
+    double incrementY = m_dirY * stepsPerSample;
     
     // Convert to Q15 fixed-point
     m_stepIncrementXQx = Q15_FROM_DOUBLE(incrementX);
@@ -125,12 +130,57 @@ bool LinearInterpolator::GenerateNextSteps(int32_t& stepsX, int32_t& stepsY) {
         return false;
     }
     
-    // If no steps remaining, stop
+    // Position-based completion is primary - step count is just an estimate
+    // If step count reaches 0 but we're not at target, recalculate and continue
     if (m_stepsRemaining == 0) {
-        stepsX = 0;
-        stepsY = 0;
-        return false;
+        // Check if we're actually at the target position
+        if (m_currentX == m_endX && m_currentY == m_endY) {
+            stepsX = 0;
+            stepsY = 0;
+            return false;
+        }
+        // Step count was wrong - recalculate remaining distance and continue
+        // This handles cases where step counting is inaccurate
+        uint32_t remainingDist = CalculateDistance(m_currentX, m_currentY, m_endX, m_endY);
+        if (remainingDist == 0) {
+            // Already at target (within rounding)
+            stepsX = 0;
+            stepsY = 0;
+            m_currentX = m_endX;
+            m_currentY = m_endY;
+            return false;
+        }
+        // Reset stepsRemaining to allow continuation
+        m_stepsRemaining = remainingDist;
+        // Recalculate increments if needed (they should still be valid)
     }
+    
+    // Compute accel/decel-limited speed for this sample
+    uint32_t remainingDist = CalculateDistance(m_currentX, m_currentY, m_endX, m_endY);
+    uint32_t distFromStart = (m_totalSteps > remainingDist) ? (m_totalSteps - remainingDist) : 0;
+    
+    double targetSpeed = (double)m_velocityMax;
+    if (m_accelMax > 0) {
+        double maxSpeedFromStart = sqrt(2.0 * (double)m_accelMax * (double)distFromStart);
+        double maxSpeedFromEnd = sqrt(2.0 * (double)m_accelMax * (double)remainingDist);
+        if (maxSpeedFromStart < targetSpeed) {
+            targetSpeed = maxSpeedFromStart;
+        }
+        if (maxSpeedFromEnd < targetSpeed) {
+            targetSpeed = maxSpeedFromEnd;
+        }
+    }
+    
+    // Minimum speed: 1 step/sec to avoid stalling
+    double minSpeed = 1.0;
+    if (targetSpeed < minSpeed) {
+        targetSpeed = minSpeed;
+    }
+    
+    // Update step increments for this sample
+    double stepsPerSample = targetSpeed / (double)m_sampleRateHz;
+    m_stepIncrementXQx = Q15_FROM_DOUBLE(m_dirX * stepsPerSample);
+    m_stepIncrementYQx = Q15_FROM_DOUBLE(m_dirY * stepsPerSample);
     
     // Update position by adding increments
     m_currentXQx += m_stepIncrementXQx;
@@ -153,6 +203,7 @@ bool LinearInterpolator::GenerateNextSteps(int32_t& stepsX, int32_t& stepsY) {
     m_currentY = newYSteps;
     
     // Check if we've reached or passed the end point
+    // Only mark as complete when BOTH axes have reached their targets
     bool pastEndX = (m_stepIncrementXQx > 0) ? (newXSteps >= m_endX) : 
                     (m_stepIncrementXQx < 0) ? (newXSteps <= m_endX) : 
                     (newXSteps == m_endX);
@@ -160,6 +211,8 @@ bool LinearInterpolator::GenerateNextSteps(int32_t& stepsX, int32_t& stepsY) {
                     (m_stepIncrementYQx < 0) ? (newYSteps <= m_endY) : 
                     (newYSteps == m_endY);
     
+    // Only complete when both axes have reached their targets
+    // For moves with no Y movement, pastEndY will be true immediately, but we still need to reach X target
     if (pastEndX && pastEndY) {
         // Reached target - snap to exact end position
         stepsX = m_endX - m_lastXSteps + stepsX;
@@ -184,8 +237,17 @@ bool LinearInterpolator::GenerateNextSteps(int32_t& stepsX, int32_t& stepsY) {
         return true;
     }
     
-    // Update remaining steps based on progress
-    uint32_t stepsThisSample = (abs(stepsX) > abs(stepsY)) ? abs(stepsX) : abs(stepsY);
+    // Update remaining steps based on actual distance traveled
+    // Use the same approximation as CalculateDistance for consistency
+    int64_t absStepsX = (stepsX < 0) ? -stepsX : stepsX;
+    int64_t absStepsY = (stepsY < 0) ? -stepsY : stepsY;
+    uint32_t stepsThisSample;
+    if (absStepsX > absStepsY) {
+        stepsThisSample = (uint32_t)(absStepsX + (absStepsY >> 1));
+    } else {
+        stepsThisSample = (uint32_t)(absStepsY + (absStepsX >> 1));
+    }
+    
     if (stepsThisSample > m_stepsRemaining) {
         m_stepsRemaining = 0;
     } else {
@@ -208,6 +270,11 @@ void LinearInterpolator::Reset() {
     m_stepIncrementYQx = 0;
     m_totalSteps = 0;
     m_stepsRemaining = 0;
+    m_velocityMax = 0;
+    m_accelMax = 0;
+    m_sampleRateHz = 0;
+    m_dirX = 0.0;
+    m_dirY = 0.0;
     m_lastXSteps = 0;
     m_lastYSteps = 0;
 }

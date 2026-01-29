@@ -36,6 +36,7 @@ ArcInterpolator::ArcInterpolator()
       m_lastYSteps(0),
       m_angleIncrementQx(0),
       m_velocityMax(0),
+      m_accelMax(0),
       m_sampleRateHz(0) {
     Reset();
 }
@@ -44,7 +45,7 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
                                      int32_t radius,
                                      double startAngle, double endAngle,
                                      bool clockwise,
-                                     uint32_t velocityMax,
+                                     uint32_t velocityMax, uint32_t accelMax,
                                      uint16_t sampleRateHz) {
     // Validate parameters
     if (radius <= 0) {
@@ -60,17 +61,27 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
     endAngleQx = NormalizeAngleQx(endAngleQx);
     
     // Calculate arc angle span
+    // For clockwise: angle decreases (270° → 0° wraps around, so 270° → 360° → 0° = 90°)
+    // For counterclockwise: angle increases (0° → 270° = 270°)
     int32_t angleSpanQx;
     if (clockwise) {
-        if (endAngleQx > startAngleQx) {
-            angleSpanQx = TWO_PI_QX - (endAngleQx - startAngleQx);
+        // Clockwise: decreasing angle
+        if (endAngleQx < startAngleQx) {
+            // Wraps around: going from larger angle to smaller (e.g., 270° → 0°)
+            // Span = (2π - start) + end = 2π - (start - end)
+            angleSpanQx = TWO_PI_QX - (startAngleQx - endAngleQx);
         } else {
-            angleSpanQx = startAngleQx - endAngleQx;
+            // Clockwise with end > start means we wrap through 2π
+            angleSpanQx = TWO_PI_QX - (endAngleQx - startAngleQx);
         }
     } else {
+        // Counterclockwise: increasing angle
         if (endAngleQx > startAngleQx) {
+            // Normal case: end > start, span = end - start
             angleSpanQx = endAngleQx - startAngleQx;
         } else {
+            // Wraps around: end < start (e.g., 0° → 270°)
+            // Span = (2π - start) + end = 2π - (start - end)
             angleSpanQx = TWO_PI_QX - (startAngleQx - endAngleQx);
         }
     }
@@ -108,6 +119,7 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
     // This is the speed the tool will travel along the arc circumference
     // Individual motor speeds will adapt automatically based on their position
     m_velocityMax = velocityMax;
+    m_accelMax = accelMax;
     m_sampleRateHz = sampleRateHz;
     
     // Initialize current state
@@ -121,17 +133,77 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
     m_currentYQx = m_currentArc.centerYQx + 
                    (((int64_t)m_currentArc.radiusQx * sinVal) >> 15);
     
-    m_lastXSteps = centerX + radius; // Initial X position in steps
-    m_lastYSteps = centerY;         // Initial Y position in steps
+    // Set initial step positions from calculated fixed-point values
+    m_lastXSteps = (int32_t)(m_currentXQx >> FRACT_BITS);
+    m_lastYSteps = (int32_t)(m_currentYQx >> FRACT_BITS);
     
     return true;
 }
 
 bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
-    if (m_currentArc.stepsRemaining == 0) {
-        stepsX = 0;
-        stepsY = 0;
-        return false;
+    // Check if arc is complete by angle (more reliable than step count)
+    // Calculate remaining angle in the direction of travel
+    // Use the same logic as angle span calculation to ensure consistency
+    int32_t angleRemainingQx;
+    if (m_currentArc.clockwise) {
+        // Clockwise: angle decreases
+        if (m_currentArc.endAngleQx < m_currentAngleQx) {
+            // Normal clockwise case
+            angleRemainingQx = m_currentAngleQx - m_currentArc.endAngleQx;
+        } else {
+            // Wrap around through 2π
+            angleRemainingQx = TWO_PI_QX - (m_currentArc.endAngleQx - m_currentAngleQx);
+        }
+    } else {
+        // Counterclockwise: angle increases
+        if (m_currentArc.endAngleQx > m_currentAngleQx) {
+            // Normal case: end > current
+            angleRemainingQx = m_currentArc.endAngleQx - m_currentAngleQx;
+        } else {
+            // Wraps around: end < current
+            angleRemainingQx = TWO_PI_QX - (m_currentAngleQx - m_currentArc.endAngleQx);
+        }
+    }
+    
+    // Update remaining steps estimate from angle remaining (more reliable than step deltas)
+    int64_t radiusSteps = m_currentArc.radiusQx >> FRACT_BITS;
+    if (radiusSteps == 0) {
+        radiusSteps = 1; // Prevent divide by zero
+    }
+    uint32_t stepsRemainingEstimate = (uint32_t)(((int64_t)radiusSteps * angleRemainingQx) >> 15);
+    m_currentArc.stepsRemaining = stepsRemainingEstimate;
+
+    // Arc is complete if no angle remaining
+    // Use a small threshold (about 0.1 degrees) to account for rounding
+    const int32_t ANGLE_THRESHOLD_QX = (TWO_PI_QX / 3600); // ~0.1 degree
+    if (angleRemainingQx <= ANGLE_THRESHOLD_QX) {
+        // Snap to exact end position
+        int32_t cosEnd = CosQx(m_currentArc.endAngleQx);
+        int32_t sinEnd = SinQx(m_currentArc.endAngleQx);
+        int64_t endXQx = m_currentArc.centerXQx + (((int64_t)m_currentArc.radiusQx * cosEnd) >> 15);
+        int64_t endYQx = m_currentArc.centerYQx + (((int64_t)m_currentArc.radiusQx * sinEnd) >> 15);
+        int32_t endXSteps = (int32_t)(endXQx >> FRACT_BITS);
+        int32_t endYSteps = (int32_t)(endYQx >> FRACT_BITS);
+        
+        // Calculate final correction steps
+        stepsX = endXSteps - m_lastXSteps;
+        stepsY = endYSteps - m_lastYSteps;
+        
+        // Update to exact end position
+        m_lastXSteps = endXSteps;
+        m_lastYSteps = endYSteps;
+        m_currentXQx = endXQx;
+        m_currentYQx = endYQx;
+        m_currentAngleQx = m_currentArc.endAngleQx;
+        m_currentArc.stepsRemaining = 0;
+        
+        // If no correction needed, return false to stop
+        if (stepsX == 0 && stepsY == 0) {
+            return false;
+        }
+        
+        // Return true to apply final correction steps
+        return true;
     }
     
     // CRITICAL: Maintain constant TANGENTIAL velocity along the arc path
@@ -143,15 +215,28 @@ bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
     // Angular velocity: ω = v / r    (rad/sec)
     // Angle increment per sample: dθ = ω * dt = (v / r) * (1 / sampleRateHz)
     
-    int64_t radiusSteps = m_currentArc.radiusQx >> FRACT_BITS;
-    if (radiusSteps == 0) {
-        radiusSteps = 1; // Prevent divide by zero
+    // Calculate accel/decel-limited tangential speed
+    uint32_t distFromStart = (m_currentArc.totalSteps > m_currentArc.stepsRemaining) ?
+                              (m_currentArc.totalSteps - m_currentArc.stepsRemaining) : 0;
+    uint32_t remainingDist = m_currentArc.stepsRemaining;
+    double targetSpeed = (double)m_velocityMax;
+    if (m_accelMax > 0) {
+        double maxSpeedFromStart = sqrt(2.0 * (double)m_accelMax * (double)distFromStart);
+        double maxSpeedFromEnd = sqrt(2.0 * (double)m_accelMax * (double)remainingDist);
+        if (maxSpeedFromStart < targetSpeed) {
+            targetSpeed = maxSpeedFromStart;
+        }
+        if (maxSpeedFromEnd < targetSpeed) {
+            targetSpeed = maxSpeedFromEnd;
+        }
+    }
+    if (targetSpeed < 1.0) {
+        targetSpeed = 1.0; // Minimum 1 step/sec to avoid stalling
     }
     
-    // Calculate angle increment per sample period to maintain constant path speed
-    // Formula: dθ_Q15 = (velocityMax * TWO_PI_QX) / (radiusSteps * sampleRateHz)
-    // This ensures: tangential speed = radius * angular_speed = constant
-    int64_t angleIncrementPerSampleQx = ((int64_t)m_velocityMax * TWO_PI_QX) / 
+    // Calculate angle increment per sample period to maintain target path speed
+    // Formula: dθ_Q15 = (speed * TWO_PI_QX) / (radiusSteps * sampleRateHz)
+    int64_t angleIncrementPerSampleQx = ((int64_t)targetSpeed * TWO_PI_QX) /
                                        (radiusSteps * (int64_t)m_sampleRateHz);
     
     // Ensure minimum increment
@@ -159,20 +244,20 @@ bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
         angleIncrementPerSampleQx = 1; // Minimum 1 Q15 unit
     }
     
-    // Limit increment to not exceed remaining arc angle
-    int32_t angleRemainingQx;
+    // Recalculate remaining angle (may have changed since start of function)
+    // Use same logic as completion check above
     if (m_currentArc.clockwise) {
-        int32_t currentToEndQx = m_currentAngleQx - m_currentArc.endAngleQx;
-        if (currentToEndQx < 0) {
-            currentToEndQx += TWO_PI_QX;
+        if (m_currentArc.endAngleQx < m_currentAngleQx) {
+            angleRemainingQx = m_currentAngleQx - m_currentArc.endAngleQx;
+        } else {
+            angleRemainingQx = TWO_PI_QX - (m_currentArc.endAngleQx - m_currentAngleQx);
         }
-        angleRemainingQx = currentToEndQx;
     } else {
-        int32_t currentToEndQx = m_currentArc.endAngleQx - m_currentAngleQx;
-        if (currentToEndQx < 0) {
-            currentToEndQx += TWO_PI_QX;
+        if (m_currentArc.endAngleQx > m_currentAngleQx) {
+            angleRemainingQx = m_currentArc.endAngleQx - m_currentAngleQx;
+        } else {
+            angleRemainingQx = TWO_PI_QX - (m_currentAngleQx - m_currentArc.endAngleQx);
         }
-        angleRemainingQx = currentToEndQx;
     }
     
     // Clamp increment to remaining angle
@@ -220,16 +305,22 @@ bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
     m_currentXQx = newXQx;
     m_currentYQx = newYQx;
     
-    // Update remaining steps estimate
-    // Use the larger of X or Y step magnitude to estimate arc progress
-    uint32_t stepsTaken = (uint32_t)(abs(stepsX) > abs(stepsY) ? abs(stepsX) : abs(stepsY));
-    if (stepsTaken > m_currentArc.stepsRemaining) {
-        stepsTaken = m_currentArc.stepsRemaining;
+    // Update remaining steps estimate from updated angle
+    int32_t angleRemainingQxPost;
+    if (m_currentArc.clockwise) {
+        if (m_currentArc.endAngleQx < m_currentAngleQx) {
+            angleRemainingQxPost = m_currentAngleQx - m_currentArc.endAngleQx;
+        } else {
+            angleRemainingQxPost = TWO_PI_QX - (m_currentArc.endAngleQx - m_currentAngleQx);
+        }
+    } else {
+        if (m_currentArc.endAngleQx > m_currentAngleQx) {
+            angleRemainingQxPost = m_currentArc.endAngleQx - m_currentAngleQx;
+        } else {
+            angleRemainingQxPost = TWO_PI_QX - (m_currentAngleQx - m_currentArc.endAngleQx);
+        }
     }
-    m_currentArc.stepsRemaining -= stepsTaken;
-    if (m_currentArc.stepsRemaining > m_currentArc.totalSteps) {
-        m_currentArc.stepsRemaining = 0; // Prevent underflow
-    }
+    m_currentArc.stepsRemaining = (uint32_t)(((int64_t)radiusSteps * angleRemainingQxPost) >> 15);
     
     return true;
 }
@@ -248,6 +339,7 @@ void ArcInterpolator::Reset() {
     m_lastYSteps = 0;
     m_angleIncrementQx = 0;
     m_velocityMax = 0;
+    m_accelMax = 0;
     m_sampleRateHz = 0;
 }
 

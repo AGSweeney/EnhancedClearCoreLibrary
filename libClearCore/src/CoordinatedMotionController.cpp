@@ -102,7 +102,7 @@ bool CoordinatedMotionController::MoveArc(int32_t centerX, int32_t centerY,
     // Initialize arc interpolator
     if (!m_arcInterpolator.InitializeArc(centerX, centerY, radius,
                                          startAngle, endAngle, clockwise,
-                                         m_velocityMax, SampleRateHz)) {
+                                         m_velocityMax, m_accelMax, SampleRateHz)) {
         return false;
     }
     
@@ -408,7 +408,7 @@ bool CoordinatedMotionController::ProcessNextArc() {
     // Initialize interpolator with new arc
     if (!m_arcInterpolator.InitializeArc(arc.centerX, arc.centerY, arc.radius,
                                          startAngle, arc.endAngle, arc.clockwise,
-                                         m_velocityMax, SampleRateHz)) {
+                                         m_velocityMax, m_accelMax, SampleRateHz)) {
         // Failed to initialize, remove from queue
         arc.valid = false;
         m_arcQueueHead = (head + 1) % ARC_QUEUE_SIZE;
@@ -485,7 +485,7 @@ bool CoordinatedMotionController::MoveLinear(int32_t endX, int32_t endY) {
     // Initialize linear interpolator
     if (!m_linearInterpolator.InitializeLinear(m_currentX, m_currentY,
                                               endX, endY,
-                                              m_velocityMax, SampleRateHz)) {
+                                              m_velocityMax, m_accelMax, SampleRateHz)) {
         return false;
     }
     
@@ -517,7 +517,7 @@ bool CoordinatedMotionController::MoveLinearAbsolute(int32_t startX, int32_t sta
     // Initialize linear interpolator
     if (!m_linearInterpolator.InitializeLinear(startX, startY,
                                               endX, endY,
-                                              m_velocityMax, SampleRateHz)) {
+                                              m_velocityMax, m_accelMax, SampleRateHz)) {
         return false;
     }
     
@@ -587,7 +587,7 @@ bool CoordinatedMotionController::ProcessNextLinear() {
     int32_t currentY = m_currentY;
     if (!m_linearInterpolator.InitializeLinear(currentX, currentY,
                                                linear.endX, linear.endY,
-                                               m_velocityMax, SampleRateHz)) {
+                                               m_velocityMax, m_accelMax, SampleRateHz)) {
         // Failed to initialize, remove from queue
         linear.valid = false;
         m_linearQueueHead = (head + 1) % ARC_QUEUE_SIZE;
@@ -738,7 +738,7 @@ bool CoordinatedMotionController::ProcessNextMotion() {
                                             motion.arc.radius,
                                             startAngle, motion.arc.endAngle,
                                             motion.arc.clockwise,
-                                            m_velocityMax, SampleRateHz)) {
+                                            m_velocityMax, m_accelMax, SampleRateHz)) {
             m_motionType = MOTION_TYPE_ARC;
             m_currentAngle = motion.arc.endAngle;
             success = true;
@@ -750,7 +750,7 @@ bool CoordinatedMotionController::ProcessNextMotion() {
         int32_t currentY = m_currentY;
         if (m_linearInterpolator.InitializeLinear(currentX, currentY,
                                                  motion.linear.endX, motion.linear.endY,
-                                                 m_velocityMax, SampleRateHz)) {
+                                                 m_velocityMax, m_accelMax, SampleRateHz)) {
             m_motionType = MOTION_TYPE_LINEAR;
             success = true;
         }

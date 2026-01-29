@@ -224,7 +224,8 @@ MotionStreaming.d MotionStreaming.o: .././MotionStreaming.cpp \
  ../../LwIP/LwIP/src/include/lwip/tcpbase.h \
  ../../LwIP/LwIP/src/include/lwip/icmp.h \
  ../../LwIP/LwIP/src/include/lwip/prot/icmp.h \
- ../../libClearCore/inc/EthernetTcpClient.h
+ ../../libClearCore/inc/EthernetTcpClient.h \
+ ../../libClearCore/inc/SysTiming.h
 
 ../../libClearCore/inc/ClearCore.h:
 
@@ -693,3 +694,5 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../../LwIP/LwIP/src/include/lwip/prot/icmp.h:
 
 ../../libClearCore/inc/EthernetTcpClient.h:
+
+../../libClearCore/inc/SysTiming.h:
