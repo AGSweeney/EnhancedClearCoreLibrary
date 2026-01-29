@@ -38,6 +38,8 @@ ArcInterpolator::ArcInterpolator()
       m_velocityMax(0),
       m_accelMax(0),
       m_sampleRateHz(0),
+      m_entrySpeed(0),
+      m_exitSpeed(0),
       m_angleFracRad(0.0),
       m_currentAngleRad(0.0),
       m_lastXExact(0.0),
@@ -52,7 +54,9 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
                                      double startAngle, double endAngle,
                                      bool clockwise,
                                      uint32_t velocityMax, uint32_t accelMax,
-                                     uint16_t sampleRateHz) {
+                                     uint16_t sampleRateHz,
+                                     uint32_t entrySpeed,
+                                     uint32_t exitSpeed) {
     // Validate parameters
     if (radius <= 0) {
         return false;
@@ -127,6 +131,8 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
     m_velocityMax = velocityMax;
     m_accelMax = accelMax;
     m_sampleRateHz = sampleRateHz;
+    m_entrySpeed = entrySpeed;
+    m_exitSpeed = exitSpeed;
     m_angleFracRad = 0.0;
     m_remainX = 0.0;
     m_remainY = 0.0;
@@ -207,8 +213,10 @@ bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
     uint32_t remainingDist = m_currentArc.stepsRemaining;
     double targetSpeed = (double)m_velocityMax;
     if (m_accelMax > 0) {
-        double maxSpeedFromStart = sqrt(2.0 * (double)m_accelMax * (double)distFromStart);
-        double maxSpeedFromEnd = sqrt(2.0 * (double)m_accelMax * (double)remainingDist);
+        double maxSpeedFromStart = sqrt((double)m_entrySpeed * (double)m_entrySpeed +
+                                        2.0 * (double)m_accelMax * (double)distFromStart);
+        double maxSpeedFromEnd = sqrt((double)m_exitSpeed * (double)m_exitSpeed +
+                                      2.0 * (double)m_accelMax * (double)remainingDist);
         if (maxSpeedFromStart < targetSpeed) {
             targetSpeed = maxSpeedFromStart;
         }
@@ -339,6 +347,8 @@ void ArcInterpolator::Reset() {
     m_velocityMax = 0;
     m_accelMax = 0;
     m_sampleRateHz = 0;
+    m_entrySpeed = 0;
+    m_exitSpeed = 0;
     m_angleFracRad = 0.0;
     m_currentAngleRad = 0.0;
     m_lastXExact = 0.0;

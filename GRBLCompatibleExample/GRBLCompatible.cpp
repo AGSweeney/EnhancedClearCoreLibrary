@@ -111,6 +111,8 @@
 #define DEFAULT_FEED_RATE_MM_PER_MIN 2540.0  // 100 inches/min
 #define DEFAULT_VELOCITY_STEPS_PER_SEC 5000
 #define DEFAULT_ACCELERATION_STEPS_PER_SEC2 85000
+// Junction deviation in steps (cornering tolerance)
+#define DEFAULT_JUNCTION_DEVIATION_STEPS 40
 
 // GRBL status reporting interval (ms)
 #define STATUS_REPORT_INTERVAL 250
@@ -351,6 +353,7 @@ void InitializeMotors() {
     motionController.ArcVelMax(DEFAULT_VELOCITY_STEPS_PER_SEC);
     savedVelocityMax = DEFAULT_VELOCITY_STEPS_PER_SEC;  // Store for rapid move restore
     motionController.ArcAccelMax(DEFAULT_ACCELERATION_STEPS_PER_SEC2);
+    motionController.JunctionDeviationSteps(DEFAULT_JUNCTION_DEVIATION_STEPS);
     
     // Set initial position
     motionController.SetPosition(0, 0);
@@ -917,11 +920,18 @@ void ExecuteG00(double x, double y, double z) {
     // Use high velocity for rapid move
     motionController.ArcVelMax(DEFAULT_VELOCITY_STEPS_PER_SEC * 2);  // 2x normal speed
     
-    // Queue X/Y coordinated move (retry once after brief delay if queue was busy)
-    bool success = motionController.QueueLinear(endXSteps, endYSteps);
-    if (!success) {
-        Delay_ms(20);
+    // Queue X/Y coordinated move (wait for planner space)
+    bool success = false;
+    uint32_t startWait = Milliseconds();
+    while (!success) {
         success = motionController.QueueLinear(endXSteps, endYSteps);
+        if (success) {
+            break;
+        }
+        if (Milliseconds() - startWait > 5000) {
+            break;
+        }
+        Delay_ms(1);
     }
     if (!success) {
         motionController.ArcVelMax(savedVelocityMax);
@@ -1021,10 +1031,17 @@ void ExecuteG01(double x, double y, double z, double f) {
         return;
     }
 
-    bool success = motionController.QueueLinear(endXSteps, endYSteps);
-    if (!success) {
-        Delay_ms(20);
+    bool success = false;
+    uint32_t startWait = Milliseconds();
+    while (!success) {
         success = motionController.QueueLinear(endXSteps, endYSteps);
+        if (success) {
+            break;
+        }
+        if (Milliseconds() - startWait > 5000) {
+            break;
+        }
+        Delay_ms(1);
     }
     if (!success) {
         SendError(24);
@@ -1119,10 +1136,17 @@ static void ExecuteJog(const char* rest) {
         motionController.FeedRateMMPerMin(f);
     }
 
-    bool success = motionController.QueueLinear(endXSteps, endYSteps);
-    if (!success) {
-        Delay_ms(20);
+    bool success = false;
+    uint32_t startWait = Milliseconds();
+    while (!success) {
         success = motionController.QueueLinear(endXSteps, endYSteps);
+        if (success) {
+            break;
+        }
+        if (Milliseconds() - startWait > 5000) {
+            break;
+        }
+        Delay_ms(1);
     }
     if (!success) {
         SendError(24);
@@ -1217,10 +1241,17 @@ void ExecuteG02(double x, double y, double z, double i, double j, double f) {
         radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_MM, mechanicalConfigX);
     }
     
-    bool success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, true);
-    if (!success) {
-        Delay_ms(20);
+    bool success = false;
+    uint32_t startWait = Milliseconds();
+    while (!success) {
         success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, true);
+        if (success) {
+            break;
+        }
+        if (Milliseconds() - startWait > 5000) {
+            break;
+        }
+        Delay_ms(1);
     }
     if (!success) {
         SendError(24);
@@ -1302,10 +1333,17 @@ void ExecuteG03(double x, double y, double z, double i, double j, double f) {
         radiusSteps = UnitConverter::DistanceToSteps(radius, ClearCore::UNIT_MM, mechanicalConfigX);
     }
     
-    bool success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, false);
-    if (!success) {
-        Delay_ms(20);
+    bool success = false;
+    uint32_t startWait = Milliseconds();
+    while (!success) {
         success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, false);
+        if (success) {
+            break;
+        }
+        if (Milliseconds() - startWait > 5000) {
+            break;
+        }
+        Delay_ms(1);
     }
     if (!success) {
         SendError(24);

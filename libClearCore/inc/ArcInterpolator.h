@@ -94,7 +94,9 @@ public:
                        double startAngle, double endAngle,
                        bool clockwise,
                        uint32_t velocityMax, uint32_t accelMax,
-                       uint16_t sampleRateHz);
+                       uint16_t sampleRateHz,
+                       uint32_t entrySpeed = 0,
+                       uint32_t exitSpeed = 0);
 
     /**
         \brief Generate next step pair for current arc
@@ -170,6 +172,8 @@ private:
     uint32_t m_velocityMax;      // Tangential velocity along arc path (steps/sec)
     uint32_t m_accelMax;         // Tangential acceleration along arc path (steps/sec^2)
     uint16_t m_sampleRateHz;    // Sample rate (Hz)
+    uint32_t m_entrySpeed;      // Entry speed (steps/sec)
+    uint32_t m_exitSpeed;       // Exit speed (steps/sec)
     double m_angleFracRad;       // Fractional angle accumulator (rad) for sub-Q15 increments
     double m_currentAngleRad;    // Current angle (rad) for continuous advance
     double m_lastXExact;         // Last X position (steps, double) for delta

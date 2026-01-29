@@ -64,7 +64,9 @@ public:
     bool InitializeLinear(int32_t startX, int32_t startY,
                          int32_t endX, int32_t endY,
                          uint32_t velocityMax, uint32_t accelMax,
-                         uint16_t sampleRateHz);
+                         uint16_t sampleRateHz,
+                         uint32_t entrySpeed = 0,
+                         uint32_t exitSpeed = 0);
     
     /**
         \brief Generate next step pair for the linear move
@@ -148,6 +150,8 @@ private:
     uint32_t m_velocityMax;
     uint32_t m_accelMax;
     uint16_t m_sampleRateHz;
+    uint32_t m_entrySpeed;
+    uint32_t m_exitSpeed;
     
     // Cached normalized direction vector
     double m_dirX;

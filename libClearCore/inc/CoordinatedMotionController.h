@@ -380,6 +380,13 @@ public:
         \param[in] feedRate Feed rate in millimeters per second
     **/
     void FeedRateMMPerSec(double feedRate);
+
+    /**
+        \brief Set junction deviation in steps for cornering speed
+    **/
+    void JunctionDeviationSteps(double deviationSteps) {
+        m_junctionDeviationSteps = deviationSteps;
+    }
     
     /**
         \brief Get current X position in inches
@@ -437,11 +444,25 @@ private:
     
     struct QueuedMotion {
         QueuedMotionType type;
+        // Planner data (steps/sec and steps)
+        uint32_t nominalSpeed;
+        uint32_t entrySpeed;
+        uint32_t exitSpeed;
+        uint32_t lengthSteps;
+        float entryDirX;
+        float entryDirY;
+        float exitDirX;
+        float exitDirY;
+        int32_t startX;
+        int32_t startY;
+        int32_t endX;
+        int32_t endY;
         union {
             struct {
                 int32_t centerX;
                 int32_t centerY;
                 int32_t radius;
+                double startAngle;
                 double endAngle;
                 bool clockwise;
             } arc;
@@ -497,6 +518,11 @@ private:
     volatile bool m_active;
     bool m_initialized;
     volatile MotionType m_motionType;
+    double m_junctionDeviationSteps;
+    int32_t m_activeTargetX;
+    int32_t m_activeTargetY;
+
+    void RecalculatePlanner();
     volatile uint8_t m_stopCounter;  // Counter to continue sending zero steps after completion
     volatile int32_t m_currentX;  // Position updated from ISR, read from main thread
     volatile int32_t m_currentY;  // Position updated from ISR, read from main thread

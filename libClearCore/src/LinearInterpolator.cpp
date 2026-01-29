@@ -48,6 +48,8 @@ LinearInterpolator::LinearInterpolator()
       m_velocityMax(5000),
       m_accelMax(0),
       m_sampleRateHz(5000),
+      m_entrySpeed(0),
+      m_exitSpeed(0),
       m_dirX(0.0),
       m_dirY(0.0),
       m_lastXSteps(0),
@@ -57,7 +59,9 @@ LinearInterpolator::LinearInterpolator()
 bool LinearInterpolator::InitializeLinear(int32_t startX, int32_t startY,
                                          int32_t endX, int32_t endY,
                                          uint32_t velocityMax, uint32_t accelMax,
-                                         uint16_t sampleRateHz) {
+                                         uint16_t sampleRateHz,
+                                         uint32_t entrySpeed,
+                                         uint32_t exitSpeed) {
     m_startX = startX;
     m_startY = startY;
     m_endX = endX;
@@ -65,6 +69,8 @@ bool LinearInterpolator::InitializeLinear(int32_t startX, int32_t startY,
     m_velocityMax = velocityMax;
     m_accelMax = accelMax;
     m_sampleRateHz = sampleRateHz;
+    m_entrySpeed = entrySpeed;
+    m_exitSpeed = exitSpeed;
     
     // Calculate total distance
     m_totalSteps = CalculateDistance(startX, startY, endX, endY);
@@ -161,8 +167,10 @@ bool LinearInterpolator::GenerateNextSteps(int32_t& stepsX, int32_t& stepsY) {
     
     double targetSpeed = (double)m_velocityMax;
     if (m_accelMax > 0) {
-        double maxSpeedFromStart = sqrt(2.0 * (double)m_accelMax * (double)distFromStart);
-        double maxSpeedFromEnd = sqrt(2.0 * (double)m_accelMax * (double)remainingDist);
+        double maxSpeedFromStart = sqrt((double)m_entrySpeed * (double)m_entrySpeed +
+                                        2.0 * (double)m_accelMax * (double)distFromStart);
+        double maxSpeedFromEnd = sqrt((double)m_exitSpeed * (double)m_exitSpeed +
+                                      2.0 * (double)m_accelMax * (double)remainingDist);
         if (maxSpeedFromStart < targetSpeed) {
             targetSpeed = maxSpeedFromStart;
         }
@@ -265,6 +273,8 @@ void LinearInterpolator::Reset() {
     m_velocityMax = 0;
     m_accelMax = 0;
     m_sampleRateHz = 0;
+    m_entrySpeed = 0;
+    m_exitSpeed = 0;
     m_dirX = 0.0;
     m_dirY = 0.0;
     m_lastXSteps = 0;
