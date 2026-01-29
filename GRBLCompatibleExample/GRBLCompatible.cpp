@@ -13,6 +13,7 @@
  *    2. Real-time commands (? for status, ! for feed hold, ~ for resume)
  *    3. GRBL error codes
  *    4. Standard GRBL G-codes (G00, G01, G02, G03, G20, G21, G28, G38, G90, G91, G92)
+ *       G02/G03: I,J (center offset) or R (radius). Use one, not both. Negative R = arc > 180 deg.
  *    5. GRBL startup message and help commands
  *    6. Home switches, probe input, and limit switches (all optional)
  *
@@ -74,6 +75,9 @@
 #define motorX ConnectorM0
 #define motorY ConnectorM1
 #define motorZ ConnectorM2  // Z-axis motor (3rd axis)
+
+// Set to 1 to enable Z-axis (3-axis), 0 to run XY-only (2-axis). When 0, Z is reported as 0 and ignored in moves.
+#define USE_Z_AXIS 0
 
 // Home switch configuration (optional - comment out to disable)
 // These switches are triggered when the axis reaches its home position
@@ -188,6 +192,9 @@ bool CheckProbe();
 void InitializeInputs();
 void MoveZAxis(int32_t targetZSteps, bool rapid = false);  // Move Z axis independently
 double GetCurrentZPosition();  // Get current Z position in current units
+static void ExecuteJog(const char* rest);  // $J= jog (GRBL v1.1)
+bool ArcRToIJ(double startX, double startY, double endX, double endY, double r,
+              bool clockwise, double& outI, double& outJ);  // GRBL-style R-to-IJ for G2/G3
 void SendResponse(const char* message);
 void SendResponseLine(const char* message);
 void SendError(uint8_t errorCode);
@@ -234,17 +241,21 @@ int main() {
             grblState = STATE_ALARM;
             if (motorsInitialized) {
                 motionController.Stop();
+                #if USE_Z_AXIS
                 motorZ.MoveStopAbrupt();
+                #endif
             }
         }
         
         // Check probe state
         probeTriggered = CheckProbe();
         
+        #if USE_Z_AXIS
         // Update Z position from motor (if not moving and motors initialized)
         if (motorsInitialized && !motorZ.StatusReg().bit.StepsActive) {
             currentZSteps = motorZ.PositionRefCommanded();
         }
+        #endif
         
         // Update GRBL state based on motion controller
         if (grblState != STATE_ALARM && motorsInitialized) {
@@ -277,13 +288,19 @@ int main() {
 void InitializeMotors() {
     motorsInitialized = false;
     
-    // Set motors to Step and Direction mode
+    // Set motors to Step and Direction mode (XY only when Z disabled)
+    #if USE_Z_AXIS
     MotorMgr.MotorModeSet(MotorManager::MOTOR_ALL, Connector::CPM_MODE_STEP_AND_DIR);
+    #else
+    MotorMgr.MotorModeSet(MotorManager::MOTOR_M0M1, Connector::CPM_MODE_STEP_AND_DIR);
+    #endif
     
     // Try to enable motors (non-blocking - motors may not be attached)
     motorX.EnableRequest(true);
     motorY.EnableRequest(true);
+    #if USE_Z_AXIS
     motorZ.EnableRequest(true);
+    #endif
     motorsEnabled = true;
     
     // Short delay to allow enable signal to propagate (non-blocking)
@@ -302,8 +319,15 @@ void InitializeMotors() {
     motionController.SetMechanicalParamsX(MOTOR_X_STEPS_PER_REV, MOTOR_X_PITCH_MM, ClearCore::UNIT_MM);
     motionController.SetMechanicalParamsY(MOTOR_Y_STEPS_PER_REV, MOTOR_Y_PITCH_MM, ClearCore::UNIT_MM);
     
+    #if USE_Z_AXIS
     // Configure Z-axis motor mechanical parameters
     motorZ.SetMechanicalParams(MOTOR_Z_STEPS_PER_REV, MOTOR_Z_PITCH_MM, ClearCore::UNIT_MM, 1.0);
+    mechanicalConfigZ.stepsPerRevolution = MOTOR_Z_STEPS_PER_REV;
+    mechanicalConfigZ.pitch = MOTOR_Z_PITCH_MM;
+    mechanicalConfigZ.pitchUnit = ClearCore::UNIT_MM;
+    mechanicalConfigZ.gearRatio = 1.0;
+    UnitConverter::CalculateConversionFactors(mechanicalConfigZ);
+    #endif
     
     // Store config locally for unit conversion
     mechanicalConfigX.stepsPerRevolution = MOTOR_X_STEPS_PER_REV;
@@ -317,12 +341,6 @@ void InitializeMotors() {
     mechanicalConfigY.pitchUnit = ClearCore::UNIT_MM;
     mechanicalConfigY.gearRatio = 1.0;
     UnitConverter::CalculateConversionFactors(mechanicalConfigY);
-    
-    mechanicalConfigZ.stepsPerRevolution = MOTOR_Z_STEPS_PER_REV;
-    mechanicalConfigZ.pitch = MOTOR_Z_PITCH_MM;
-    mechanicalConfigZ.pitchUnit = ClearCore::UNIT_MM;
-    mechanicalConfigZ.gearRatio = 1.0;
-    UnitConverter::CalculateConversionFactors(mechanicalConfigZ);
     
     // Set default feed rate
     motionController.FeedRateMMPerMin(DEFAULT_FEED_RATE_MM_PER_MIN);
@@ -369,7 +387,7 @@ bool ReadCommand(char* buffer, uint16_t maxLen) {
     }
     
     // Handle real-time commands immediately (GRBL protocol)
-    if (ch == '?' || ch == '!' || ch == '~' || ch == 0x18) {  // ?, !, ~, Ctrl-X
+    if (ch == '?' || ch == '!' || ch == '~' || ch == 0x18 || ch == 0x85) {  // ?, !, ~, Ctrl-X, jog cancel
         ProcessRealtimeCommand((char)ch);
         return false;
     }
@@ -406,7 +424,9 @@ void ProcessRealtimeCommand(char cmd) {
             if (grblState == STATE_RUN && motorsInitialized) {
                 feedHoldActive = true;
                 motionController.StopDecel();
+                #if USE_Z_AXIS
                 motorZ.MoveStopDecel();
+                #endif
                 grblState = STATE_HOLD;
             }
             break;
@@ -422,13 +442,53 @@ void ProcessRealtimeCommand(char cmd) {
         case 0x18:  // Ctrl-X (soft reset)
             if (motorsInitialized) {
                 motionController.Stop();
+                #if USE_Z_AXIS
                 motorZ.MoveStopAbrupt();
+                #endif
             }
             feedHoldActive = false;
             grblState = STATE_IDLE;
             SendResponseLine("ok");
+            SendResponseLine("Grbl 1.1f ['$' for help]");
+            break;
+            
+        case 0x85:  // Jog cancel (GRBL v1.1) – stop on release
+            if (motorsInitialized && motionController.IsActive()) {
+                motionController.Stop();
+                #if USE_Z_AXIS
+                motorZ.MoveStopAbrupt();
+                #endif
+            }
+            feedHoldActive = false;
+            if (grblState == STATE_RUN || grblState == STATE_HOLD) {
+                grblState = STATE_IDLE;
+            }
             break;
     }
+}
+
+static void TrimTrailingWhitespace(char* s) {
+    size_t len = strlen(s);
+    while (len > 0 && (s[len - 1] == ' ' || s[len - 1] == '\t' || s[len - 1] == '\r')) {
+        s[--len] = '\0';
+    }
+}
+
+// Wait for XY coordinated motion to finish and queue empty. Poll serial for 0x85 jog cancel; if seen, stop and return false.
+// Returns true if motion completed, false if cancelled.
+static bool WaitForMotionComplete(void) {
+    while (motionController.IsActive() || motionController.MotionQueueCount() != 0) {
+        int16_t ch = SerialPort.CharGet();
+        if (ch >= 0 && ch == 0x85) {
+            motionController.Stop();
+            #if USE_Z_AXIS
+            motorZ.MoveStopAbrupt();
+            #endif
+            return false;
+        }
+        Delay_ms(1);
+    }
+    return true;
 }
 
 void ProcessCommand(const char* command) {
@@ -447,18 +507,51 @@ void ProcessCommand(const char* command) {
             upperCommand[i] = upperCommand[i] - 'a' + 'A';
         }
     }
+    TrimTrailingWhitespace(upperCommand);
     
     // Handle $ commands (GRBL configuration)
     if (upperCommand[0] == '$') {
         if (strcmp(upperCommand, "$") == 0 || strcmp(upperCommand, "$G") == 0) {
-            // Show help or G-code parser state
             SendResponseLine("$G=G90 G21");
         } else if (strcmp(upperCommand, "$I") == 0) {
-            // Build info
             SendResponseLine("ClearCore GRBL-Compatible v1.0");
         } else if (strcmp(upperCommand, "$N") == 0) {
-            // Startup blocks
             SendResponseLine("$N=");
+        } else if (strcmp(upperCommand, "$$") == 0) {
+            // Minimal $$ response for gSender compatibility (GRBL settings)
+            SendResponseLine("$0=10");
+            SendResponseLine("$1=25");
+            SendResponseLine("$10=1");
+            SendResponseLine("$100=250.000");
+            SendResponseLine("$101=250.000");
+            SendResponseLine("$102=250.000");
+            SendResponseLine("$110=500.000");
+            SendResponseLine("$111=500.000");
+            SendResponseLine("$112=500.000");
+            SendResponseLine("$120=10.000");
+            SendResponseLine("$121=10.000");
+            SendResponseLine("$122=10.000");
+            SendResponseLine("$130=200.000");
+            SendResponseLine("$131=200.000");
+            SendResponseLine("$132=200.000");
+            SendResponseLine("ok");
+        } else if (strcmp(upperCommand, "$#") == 0) {
+            // Parameters (WCS offsets) for gSender
+            SendResponseLine("[G54:0.000,0.000,0.000]");
+            SendResponseLine("[G55:0.000,0.000,0.000]");
+            SendResponseLine("[G56:0.000,0.000,0.000]");
+            SendResponseLine("[G57:0.000,0.000,0.000]");
+            SendResponseLine("[G58:0.000,0.000,0.000]");
+            SendResponseLine("[G59:0.000,0.000,0.000]");
+            SendResponseLine("[G28:0.000,0.000,0.000]");
+            SendResponseLine("[G30:0.000,0.000,0.000]");
+            SendResponseLine("ok");
+        } else if (strcmp(upperCommand, "$H") == 0) {
+            // Homing cycle (gSender Home button)
+            ExecuteG28();
+        } else if (strncmp(upperCommand, "$J=", 3) == 0) {
+            // Jog (GRBL v1.1) - minimal support for gSender
+            ExecuteJog(upperCommand + 3);
         } else {
             SendError(20);  // Unsupported command
         }
@@ -471,8 +564,8 @@ void ProcessCommand(const char* command) {
 
 void ParseGCode(const char* line) {
     // Parse command line (e.g., "G01 X10.5 Y20.3 Z5.0 F100")
-    double x = 0, y = 0, z = 0, i = 0, j = 0, f = -1.0;
-    bool hasX = false, hasY = false, hasZ = false, hasI = false, hasJ = false;
+    double x = 0, y = 0, z = 0, i = 0, j = 0, r = 0, f = -1.0, p = 0;
+    bool hasX = false, hasY = false, hasZ = false, hasI = false, hasJ = false, hasR = false, hasP = false;
     
     // Find command code (G## or M##)
     if (line[0] == 'G' || line[0] == 'M') {
@@ -497,8 +590,14 @@ void ParseGCode(const char* line) {
             } else if (*ptr == 'J' || *ptr == 'j') {
                 sscanf(ptr, "J%lf", &j);
                 hasJ = true;
+            } else if (*ptr == 'R' || *ptr == 'r') {
+                sscanf(ptr, "R%lf", &r);
+                hasR = true;
             } else if (*ptr == 'F' || *ptr == 'f') {
                 sscanf(ptr, "F%lf", &f);
+            } else if (*ptr == 'P' || *ptr == 'p') {
+                sscanf(ptr, "P%lf", &p);
+                hasP = true;
             }
             ptr++;
         }
@@ -523,18 +622,67 @@ void ParseGCode(const char* line) {
                     break;
                     
                 case 2:  // G02 - Circular interpolation CW
-                    if (hasX && hasY && hasI && hasJ) {
-                        ExecuteG02(x, y, z, i, j, f);
+                    if (hasX && hasY) {
+                        if ((hasI || hasJ) && hasR) {
+                            SendError(20);  // Use I,J or R, not both
+                        } else if (hasR) {
+                            double startX = (unitMode == UNIT_MODE_INCHES)
+                                ? motionController.CurrentXInches() : motionController.CurrentXMM();
+                            double startY = (unitMode == UNIT_MODE_INCHES)
+                                ? motionController.CurrentYInches() : motionController.CurrentYMM();
+                            double endX = (coordinateMode == COORD_ABSOLUTE) ? x : startX + x;
+                            double endY = (coordinateMode == COORD_ABSOLUTE) ? y : startY + y;
+                            double iVal, jVal;
+                            if (!ArcRToIJ(startX, startY, endX, endY, r, true, iVal, jVal)) {
+                                SendError(2);  // Arc radius error or target same as current
+                            } else {
+                                ExecuteG02(x, y, z, iVal, jVal, f);
+                            }
+                        } else if (hasI && hasJ) {
+                            ExecuteG02(x, y, z, i, j, f);
+                        } else {
+                            SendError(1);  // Missing I,J or R
+                        }
                     } else {
-                        SendError(1);
+                        SendError(1);  // Missing X,Y
                     }
                     break;
                     
                 case 3:  // G03 - Circular interpolation CCW
-                    if (hasX && hasY && hasI && hasJ) {
-                        ExecuteG03(x, y, z, i, j, f);
+                    if (hasX && hasY) {
+                        if ((hasI || hasJ) && hasR) {
+                            SendError(20);  // Use I,J or R, not both
+                        } else if (hasR) {
+                            double startX = (unitMode == UNIT_MODE_INCHES)
+                                ? motionController.CurrentXInches() : motionController.CurrentXMM();
+                            double startY = (unitMode == UNIT_MODE_INCHES)
+                                ? motionController.CurrentYInches() : motionController.CurrentYMM();
+                            double endX = (coordinateMode == COORD_ABSOLUTE) ? x : startX + x;
+                            double endY = (coordinateMode == COORD_ABSOLUTE) ? y : startY + y;
+                            double iVal, jVal;
+                            if (!ArcRToIJ(startX, startY, endX, endY, r, false, iVal, jVal)) {
+                                SendError(2);  // Arc radius error or target same as current
+                            } else {
+                                ExecuteG03(x, y, z, iVal, jVal, f);
+                            }
+                        } else if (hasI && hasJ) {
+                            ExecuteG03(x, y, z, i, j, f);
+                        } else {
+                            SendError(1);  // Missing I,J or R
+                        }
                     } else {
-                        SendError(1);
+                        SendError(1);  // Missing X,Y
+                    }
+                    break;
+                    
+                case 4:  // G4 - Dwell
+                    if (hasP && p >= 0) {
+                        uint32_t ms = (uint32_t)(p * 1000.0 + 0.5);
+                        if (ms > 60000) ms = 60000;  // cap 60 s
+                        Delay_ms(ms);
+                        SendResponseLine("ok");
+                    } else {
+                        SendError(1);  // Missing or invalid P
                     }
                     break;
                     
@@ -604,7 +752,9 @@ void ParseGCode(const char* line) {
                 case 1:  // M1 - Optional stop
                     if (motorsInitialized) {
                         motionController.StopDecel();
+                        #if USE_Z_AXIS
                         motorZ.MoveStopDecel();
+                        #endif
                     }
                     grblState = STATE_IDLE;
                     SendResponseLine("ok");
@@ -619,7 +769,9 @@ void ParseGCode(const char* line) {
                 case 30:  // M30 - Program end
                     if (motorsInitialized) {
                         motionController.Stop();
+                        #if USE_Z_AXIS
                         motorZ.MoveStopAbrupt();
+                        #endif
                     }
                     grblState = STATE_IDLE;
                     SendResponseLine("ok");
@@ -658,49 +810,67 @@ void ExecuteG00(double x, double y, double z) {
     // Calculate target position for X/Y
     double targetX = x;
     double targetY = y;
+    #if USE_Z_AXIS
     double targetZ = z;
+    #endif
     
     if (coordinateMode == COORD_INCREMENTAL) {
         if (unitMode == UNIT_MODE_INCHES) {
             targetX = motionController.CurrentXInches() + x;
             targetY = motionController.CurrentYInches() + y;
+            #if USE_Z_AXIS
             targetZ = GetCurrentZPosition() + z;
+            #endif
         } else {
             targetX = motionController.CurrentXMM() + x;
             targetY = motionController.CurrentYMM() + y;
+            #if USE_Z_AXIS
             targetZ = GetCurrentZPosition() + z;
+            #endif
         }
     }
     
     // Convert to steps
-    int32_t endXSteps, endYSteps, endZSteps;
+    int32_t endXSteps, endYSteps;
+    #if USE_Z_AXIS
+    int32_t endZSteps;
+    #endif
     if (unitMode == UNIT_MODE_INCHES) {
         endXSteps = UnitConverter::DistanceToSteps(targetX, ClearCore::UNIT_INCHES, mechanicalConfigX);
         endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_INCHES, mechanicalConfigY);
+        #if USE_Z_AXIS
         endZSteps = UnitConverter::DistanceToSteps(targetZ, ClearCore::UNIT_INCHES, mechanicalConfigZ);
+        #endif
     } else {
         endXSteps = UnitConverter::DistanceToSteps(targetX, ClearCore::UNIT_MM, mechanicalConfigX);
         endYSteps = UnitConverter::DistanceToSteps(targetY, ClearCore::UNIT_MM, mechanicalConfigY);
+        #if USE_Z_AXIS
         endZSteps = UnitConverter::DistanceToSteps(targetZ, ClearCore::UNIT_MM, mechanicalConfigZ);
+        #endif
     }
     
     // Use high velocity for rapid move
     motionController.ArcVelMax(DEFAULT_VELOCITY_STEPS_PER_SEC * 2);  // 2x normal speed
     
-    // Queue X/Y coordinated move
+    // Queue X/Y coordinated move (retry once after brief delay if queue was busy)
     bool success = motionController.QueueLinear(endXSteps, endYSteps);
-    
-    // Restore velocity
-    motionController.ArcVelMax(savedVelocityMax);
-    
     if (!success) {
-        SendError(24);  // Line exceeds maximum line length
+        Delay_ms(20);
+        success = motionController.QueueLinear(endXSteps, endYSteps);
+    }
+    if (!success) {
+        motionController.ArcVelMax(savedVelocityMax);
+        SendError(24);  // Queue full or reject
         return;
     }
     
+    #if USE_Z_AXIS
     // Move Z axis independently (rapid)
     MoveZAxis(endZSteps, true);
+    #endif
     
+    WaitForMotionComplete();
+    motionController.ArcVelMax(savedVelocityMax);
     SendResponseLine("ok");
 }
 
@@ -766,7 +936,16 @@ void ExecuteG01(double x, double y, double z, double f) {
     }
     
     bool success = motionController.QueueLinear(endXSteps, endYSteps);
+    if (!success) {
+        Delay_ms(20);
+        success = motionController.QueueLinear(endXSteps, endYSteps);
+    }
+    if (!success) {
+        SendError(24);
+        return;
+    }
     
+    #if USE_Z_AXIS
     // Handle Z-axis movement independently
     if (z != 0.0 || coordinateMode == COORD_ABSOLUTE) {
         double targetZ = z;
@@ -783,12 +962,100 @@ void ExecuteG01(double x, double y, double z, double f) {
         
         MoveZAxis(targetZSteps, false);
     }
+    #endif
     
+    WaitForMotionComplete();
+    SendResponseLine("ok");
+}
+
+// Minimal $J= jog (GRBL v1.1). Parses "G91 G20 X0.5 F10" etc. Does not alter parser state.
+static void ExecuteJog(const char* rest) {
+    if (!motorsInitialized) {
+        SendError(9);
+        return;
+    }
+    if (!motorsEnabled) {
+        SendError(9);
+        return;
+    }
+    if (CheckLimitSwitches()) {
+        grblState = STATE_ALARM;
+        SendError(9);
+        return;
+    }
+
+    bool relative = (strstr(rest, "G91") != nullptr);
+    bool inches = (strstr(rest, "G20") != nullptr);
+    if (strstr(rest, "G90") != nullptr) {
+        relative = false;
+    }
+    if (strstr(rest, "G21") != nullptr) {
+        inches = false;
+    }
+
+    double x = 0, y = 0, z = 0, f = -1;
+    bool hasX = false, hasY = false, hasZ = false, hasF = false;
+    const char* ptr = rest;
+    while (*ptr) {
+        if (*ptr == 'X') {
+            sscanf(ptr, "X%lf", &x);
+            hasX = true;
+        } else if (*ptr == 'Y') {
+            sscanf(ptr, "Y%lf", &y);
+            hasY = true;
+        } else if (*ptr == 'Z') {
+            sscanf(ptr, "Z%lf", &z);
+            hasZ = true;
+        } else if (*ptr == 'F') {
+            sscanf(ptr, "F%lf", &f);
+            hasF = true;
+        }
+        ptr++;
+    }
+
+    if (!hasF || (!hasX && !hasY && !hasZ)) {
+        SendError(1);
+        return;
+    }
+
+    double curX = inches ? motionController.CurrentXInches() : motionController.CurrentXMM();
+    double curY = inches ? motionController.CurrentYInches() : motionController.CurrentYMM();
+    double targetX = relative ? (curX + x) : x;
+    double targetY = relative ? (curY + y) : y;
+
+    ClearCore::UnitType u = inches ? ClearCore::UNIT_INCHES : ClearCore::UNIT_MM;
+    int32_t endXSteps = UnitConverter::DistanceToSteps(targetX, u, mechanicalConfigX);
+    int32_t endYSteps = UnitConverter::DistanceToSteps(targetY, u, mechanicalConfigY);
+
+    if (inches) {
+        motionController.FeedRateInchesPerMin(f);
+    } else {
+        motionController.FeedRateMMPerMin(f);
+    }
+
+    bool success = motionController.QueueLinear(endXSteps, endYSteps);
+    if (!success) {
+        Delay_ms(20);
+        success = motionController.QueueLinear(endXSteps, endYSteps);
+    }
     if (!success) {
         SendError(24);
         return;
     }
-    
+
+    bool completed = WaitForMotionComplete();
+
+    #if USE_Z_AXIS
+    if (hasZ && completed) {
+        double curZ = UnitConverter::StepsToDistance(currentZSteps, u, mechanicalConfigZ);
+        double targetZ = relative ? (curZ + z) : z;
+        int32_t endZSteps = UnitConverter::DistanceToSteps(targetZ, u, mechanicalConfigZ);
+        MoveZAxis(endZSteps, false);
+    }
+    #else
+    (void)z;
+    #endif
+
     SendResponseLine("ok");
 }
 
@@ -864,12 +1131,16 @@ void ExecuteG02(double x, double y, double z, double i, double j, double f) {
     }
     
     bool success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, true);
-    
+    if (!success) {
+        Delay_ms(20);
+        success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, true);
+    }
     if (!success) {
         SendError(24);
         return;
     }
     
+    WaitForMotionComplete();
     SendResponseLine("ok");
 }
 
@@ -945,12 +1216,16 @@ void ExecuteG03(double x, double y, double z, double i, double j, double f) {
     }
     
     bool success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, false);
-    
+    if (!success) {
+        Delay_ms(20);
+        success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, false);
+    }
     if (!success) {
         SendError(24);
         return;
     }
     
+    #if USE_Z_AXIS
     // Handle Z-axis movement independently (linear interpolation during arc)
     if (z != 0.0 || coordinateMode == COORD_ABSOLUTE) {
         double targetZ = z;
@@ -967,7 +1242,9 @@ void ExecuteG03(double x, double y, double z, double i, double j, double f) {
         
         MoveZAxis(endZSteps, false);
     }
+    #endif
     
+    WaitForMotionComplete();
     SendResponseLine("ok");
 }
 
@@ -1046,7 +1323,7 @@ void ExecuteG28() {
     yHomed = true;
     #endif
     
-    #ifdef HOME_Z_PIN
+    #if defined(HOME_Z_PIN) && USE_Z_AXIS
     // Move Z axis negative until home switch is triggered
     while (!zHomed) {
         int32_t currentZ = currentZSteps;
@@ -1069,6 +1346,10 @@ void ExecuteG28() {
     #else
     zHomed = true;
     #endif
+    
+    (void)xHomed;
+    (void)yHomed;
+    (void)zHomed;
     
     // Set position to origin after homing
     motionController.SetPosition(0, 0);
@@ -1263,9 +1544,45 @@ void SendResponseLine(const char* message) {
     SendResponse("\n");
 }
 
+// ========== Arc R-to-IJ (GRBL-style) ==========
+
+bool ArcRToIJ(double startX, double startY, double endX, double endY, double r,
+              bool clockwise, double& outI, double& outJ) {
+    double x = endX - startX;
+    double y = endY - startY;
+    if (x == 0.0 && y == 0.0) {
+        return false;  // target same as current, invalid
+    }
+    double d = hypot(x, y);
+    double h2 = 4.0 * r * r - x * x - y * y;
+    // Allow tolerance for semicircle (e.g. R=0.707 for (0,0)->(1,1)) vs fp roundoff
+    const double eps = 1e-3;
+    if (h2 < -eps) {
+        return false;  // arc radius error
+    }
+    if (h2 < 0.0) {
+        h2 = 0.0;
+    }
+    double h_x2_div_d = -sqrt(h2) / d;
+    if (!clockwise) {
+        h_x2_div_d = -h_x2_div_d;
+    }
+    if (r < 0.0) {
+        h_x2_div_d = -h_x2_div_d;
+    }
+    outI = 0.5 * (x - y * h_x2_div_d);
+    outJ = 0.5 * (y + x * h_x2_div_d);
+    return true;
+}
+
 // ========== Z-Axis Helper Functions ==========
 
 void MoveZAxis(int32_t targetZSteps, bool rapid) {
+    #if !USE_Z_AXIS
+    (void)targetZSteps;
+    (void)rapid;
+    return;
+    #else
     // Check if motors are initialized
     if (!motorsInitialized) {
         return;  // Cannot move without motors
@@ -1301,15 +1618,20 @@ void MoveZAxis(int32_t targetZSteps, bool rapid) {
     }
     
     currentZSteps = motorZ.PositionRefCommanded();
+    #endif
 }
 
 double GetCurrentZPosition() {
+    #if !USE_Z_AXIS
+    return 0.0;
+    #else
     // Get current Z position in current units
     if (unitMode == UNIT_MODE_INCHES) {
         return UnitConverter::StepsToDistance(currentZSteps, ClearCore::UNIT_INCHES, mechanicalConfigZ);
     } else {
         return UnitConverter::StepsToDistance(currentZSteps, ClearCore::UNIT_MM, mechanicalConfigZ);
     }
+    #endif
 }
 
 // ========== Input Checking Functions ==========
@@ -1324,7 +1646,7 @@ void InitializeInputs() {
     HOME_Y_PIN.Mode(Connector::INPUT_DIGITAL);
     #endif
     
-    #ifdef HOME_Z_PIN
+    #if defined(HOME_Z_PIN) && USE_Z_AXIS
     HOME_Z_PIN.Mode(Connector::INPUT_DIGITAL);
     #endif
     
@@ -1365,7 +1687,7 @@ bool CheckHomeSwitches() {
     }
     #endif
     
-    #ifdef HOME_Z_PIN
+    #if defined(HOME_Z_PIN) && USE_Z_AXIS
     if (HOME_SWITCH_ACTIVE_LOW ? !HOME_Z_PIN.State() : HOME_Z_PIN.State()) {
         return true;
     }

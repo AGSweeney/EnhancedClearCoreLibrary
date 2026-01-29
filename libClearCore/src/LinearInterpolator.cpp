@@ -130,7 +130,7 @@ bool LinearInterpolator::GenerateNextSteps(int32_t& stepsX, int32_t& stepsY) {
         return false;
     }
     
-    // Position-based completion is primary - step count is just an estimate
+    // Position-based completion; step count is an estimate
     // If step count reaches 0 but we're not at target, recalculate and continue
     if (m_stepsRemaining == 0) {
         // Check if we're actually at the target position
@@ -171,8 +171,12 @@ bool LinearInterpolator::GenerateNextSteps(int32_t& stepsX, int32_t& stepsY) {
         }
     }
     
-    // Minimum speed: 1 step/sec to avoid stalling
-    double minSpeed = 1.0;
+    // Minimum speed: avoid long delay before motion starts (same as arc interpolator).
+    // Use a fraction of max when accel-limited at startup instead of 1 step/sec.
+    double minSpeed = (m_velocityMax > 0) ? (double)(m_velocityMax / 20) : 1.0;
+    if (minSpeed < 1.0) {
+        minSpeed = 1.0;
+    }
     if (targetSpeed < minSpeed) {
         targetSpeed = minSpeed;
     }
@@ -190,52 +194,40 @@ bool LinearInterpolator::GenerateNextSteps(int32_t& stepsX, int32_t& stepsY) {
     int32_t newXSteps = (int32_t)(m_currentXQx >> Q15_SHIFT);
     int32_t newYSteps = (int32_t)(m_currentYQx >> Q15_SHIFT);
     
-    // Calculate step deltas
-    stepsX = newXSteps - m_lastXSteps;
-    stepsY = newYSteps - m_lastYSteps;
-    
-    // Update last step counts
-    m_lastXSteps = newXSteps;
-    m_lastYSteps = newYSteps;
-    
-    // Update current position
-    m_currentX = newXSteps;
-    m_currentY = newYSteps;
-    
-    // Check if we've reached or passed the end point
-    // Only mark as complete when BOTH axes have reached their targets
-    bool pastEndX = (m_stepIncrementXQx > 0) ? (newXSteps >= m_endX) : 
-                    (m_stepIncrementXQx < 0) ? (newXSteps <= m_endX) : 
+    // Would this step overshoot the end?
+    bool pastEndX = (m_stepIncrementXQx > 0) ? (newXSteps >= m_endX) :
+                    (m_stepIncrementXQx < 0) ? (newXSteps <= m_endX) :
                     (newXSteps == m_endX);
-    bool pastEndY = (m_stepIncrementYQx > 0) ? (newYSteps >= m_endY) : 
-                    (m_stepIncrementYQx < 0) ? (newYSteps <= m_endY) : 
+    bool pastEndY = (m_stepIncrementYQx > 0) ? (newYSteps >= m_endY) :
+                    (m_stepIncrementYQx < 0) ? (newYSteps <= m_endY) :
                     (newYSteps == m_endY);
-    
-    // Only complete when both axes have reached their targets
-    // For moves with no Y movement, pastEndY will be true immediately, but we still need to reach X target
+
     if (pastEndX && pastEndY) {
-        // Reached target - snap to exact end position
-        stepsX = m_endX - m_lastXSteps + stepsX;
-        stepsY = m_endY - m_lastYSteps + stepsY;
+        // Clamp to exact end (proper move, no overshoot, no snap burst)
+        stepsX = m_endX - m_lastXSteps;
+        stepsY = m_endY - m_lastYSteps;
+        m_lastXSteps = m_endX;
+        m_lastYSteps = m_endY;
         m_currentX = m_endX;
         m_currentY = m_endY;
         m_currentXQx = (int64_t)m_endX << Q15_SHIFT;
         m_currentYQx = (int64_t)m_endY << Q15_SHIFT;
-        m_lastXSteps = m_endX;
-        m_lastYSteps = m_endY;
         m_stepsRemaining = 0;
         m_stepIncrementXQx = 0;
         m_stepIncrementYQx = 0;
-        
-        // If no correction needed, return false to stop
         if (stepsX == 0 && stepsY == 0) {
             return false;
         }
-        
-        // Return true to apply final correction steps
-        // Next call will return false because position == end
         return true;
     }
+
+    // Normal step
+    stepsX = newXSteps - m_lastXSteps;
+    stepsY = newYSteps - m_lastYSteps;
+    m_lastXSteps = newXSteps;
+    m_lastYSteps = newYSteps;
+    m_currentX = newXSteps;
+    m_currentY = newYSteps;
     
     // Update remaining steps based on actual distance traveled
     // Use the same approximation as CalculateDistance for consistency

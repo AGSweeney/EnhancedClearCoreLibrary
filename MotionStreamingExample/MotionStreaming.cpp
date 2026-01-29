@@ -36,8 +36,11 @@
  *    Commands are sent as text lines, terminated with newline (\n).
  *    Supported commands:
  *    - G01 X<value> Y<value> [F<feedrate>]  : Linear move
- *    - G02 X<value> Y<value> I<value> J<value> [F<feedrate>]  : Arc CW
- *    - G03 X<value> Y<value> I<value> J<value> [F<feedrate>]  : Arc CCW
+ *    - G02 X<value> Y<value> I<value> J<value> [F<feedrate>]  : Arc CW (center offset)
+ *    - G02 X<value> Y<value> R<value> [F<feedrate>]           : Arc CW (radius)
+ *    - G03 X<value> Y<value> I<value> J<value> [F<feedrate>]  : Arc CCW (center offset)
+ *    - G03 X<value> Y<value> R<value> [F<feedrate>]           : Arc CCW (radius)
+ *      Use I,J or R, not both. Negative R = arc > 180 deg (GRBL-style).
  *    - G90  : Absolute coordinates
  *    - G91  : Incremental coordinates
  *    - G92  : Set coordinate system offset (set origin at current position)
@@ -133,7 +136,7 @@ IpAddress manualIp = IpAddress(192, 168, 0, 109);  // Only used if usingDhcp = f
 #define DEFAULT_FEED_RATE_MM_PER_MIN 254.0  // 10 inches/min
 #define DEFAULT_FEED_RATE_INCHES_PER_MIN 10.0
 #define DEFAULT_VELOCITY_STEPS_PER_SEC 5000
-#define DEFAULT_ACCELERATION_STEPS_PER_SEC2 10000
+#define DEFAULT_ACCELERATION_STEPS_PER_SEC2 85000
 
 // ========== Global Variables ==========
 
@@ -185,6 +188,36 @@ void PrintCurrentPosition();
 bool ReadCommandSerial(char* buffer, uint16_t maxLen);
 bool ReadCommandEthernet(char* buffer, uint16_t maxLen);
 
+// GRBL-style R-to-IJ conversion for G2/G3 arc radius mode
+static bool ArcRToIJ(double startX, double startY, double endX, double endY, double r,
+                     bool clockwise, double& outI, double& outJ) {
+    double x = endX - startX;
+    double y = endY - startY;
+    if (x == 0.0 && y == 0.0) {
+        return false;  // target same as current, invalid
+    }
+    double d = hypot(x, y);
+    double h2 = 4.0 * r * r - x * x - y * y;
+    // Allow tolerance for semicircle (e.g. R=0.707 for (0,0)->(1,1)) vs fp roundoff
+    const double eps = 1e-3;
+    if (h2 < -eps) {
+        return false;  // arc radius error
+    }
+    if (h2 < 0.0) {
+        h2 = 0.0;
+    }
+    double h_x2_div_d = -sqrt(h2) / d;
+    if (!clockwise) {
+        h_x2_div_d = -h_x2_div_d;
+    }
+    if (r < 0.0) {
+        h_x2_div_d = -h_x2_div_d;
+    }
+    outI = 0.5 * (x - y * h_x2_div_d);
+    outJ = 0.5 * (y + x * h_x2_div_d);
+    return true;
+}
+
 // Wait helpers for test sequences
 static uint32_t CalculateMoveTimeoutMs(double distance, double feedRate) {
     double moveTimeMs = 0.0;
@@ -209,10 +242,6 @@ static void WaitForMotionComplete(uint32_t timeoutMs) {
         Delay_ms(50);
         uint32_t currentTime = Milliseconds();
         if (currentTime - startTime > timeoutMs) {
-            char timeoutMsg[100];
-            sprintf(timeoutMsg, "Warning: Move timeout after %lu ms",
-                    (unsigned long)(currentTime - startTime));
-            SendResponseLine(timeoutMsg);
             break;
         }
     }
@@ -523,8 +552,8 @@ void ProcessCommand(const char* command) {
 
 void ParseGCode(const char* line) {
     // Parse command line (e.g., "G01 X10.5 Y20.3 F100")
-    double x = 0, y = 0, i = 0, j = 0, f = -1.0;
-    bool hasX = false, hasY = false, hasI = false, hasJ = false;
+    double x = 0, y = 0, i = 0, j = 0, r = 0, f = -1.0;
+    bool hasX = false, hasY = false, hasI = false, hasJ = false, hasR = false;
     
     // Find command code (G## or M##)
     if (line[0] == 'G' || line[0] == 'M') {
@@ -546,6 +575,9 @@ void ParseGCode(const char* line) {
             } else if (*ptr == 'J' || *ptr == 'j') {
                 sscanf(ptr, "J%lf", &j);
                 hasJ = true;
+            } else if (*ptr == 'R' || *ptr == 'r') {
+                sscanf(ptr, "R%lf", &r);
+                hasR = true;
             } else if (*ptr == 'F' || *ptr == 'f') {
                 sscanf(ptr, "F%lf", &f);
             }
@@ -568,18 +600,56 @@ void ParseGCode(const char* line) {
                     break;
                     
                 case 2:  // G02 - Circular interpolation CW
-                    if (hasX && hasY && hasI && hasJ) {
-                        ExecuteG02(x, y, i, j, f);
+                    if (hasX && hasY) {
+                        if ((hasI || hasJ) && hasR) {
+                            SendResponseLine("G02: use I,J or R, not both");
+                        } else if (hasR) {
+                            double startX = (unitMode == UNIT_MODE_INCHES)
+                                ? motionController.CurrentXInches() : motionController.CurrentXMM();
+                            double startY = (unitMode == UNIT_MODE_INCHES)
+                                ? motionController.CurrentYInches() : motionController.CurrentYMM();
+                            double endX = (coordinateMode == COORD_ABSOLUTE) ? x : startX + x;
+                            double endY = (coordinateMode == COORD_ABSOLUTE) ? y : startY + y;
+                            double iVal, jVal;
+                            if (!ArcRToIJ(startX, startY, endX, endY, r, true, iVal, jVal)) {
+                                SendResponseLine("G02: arc radius error or target same as current");
+                            } else {
+                                ExecuteG02(x, y, iVal, jVal, f);
+                            }
+                        } else if (hasI && hasJ) {
+                            ExecuteG02(x, y, i, j, f);
+                        } else {
+                            SendResponseLine("G02 requires X, Y, and either I,J or R");
+                        }
                     } else {
-                        SendResponseLine("G02 requires X, Y, I, J");
+                        SendResponseLine("G02 requires X, Y, and either I,J or R");
                     }
                     break;
                     
                 case 3:  // G03 - Circular interpolation CCW
-                    if (hasX && hasY && hasI && hasJ) {
-                        ExecuteG03(x, y, i, j, f);
+                    if (hasX && hasY) {
+                        if ((hasI || hasJ) && hasR) {
+                            SendResponseLine("G03: use I,J or R, not both");
+                        } else if (hasR) {
+                            double startX = (unitMode == UNIT_MODE_INCHES)
+                                ? motionController.CurrentXInches() : motionController.CurrentXMM();
+                            double startY = (unitMode == UNIT_MODE_INCHES)
+                                ? motionController.CurrentYInches() : motionController.CurrentYMM();
+                            double endX = (coordinateMode == COORD_ABSOLUTE) ? x : startX + x;
+                            double endY = (coordinateMode == COORD_ABSOLUTE) ? y : startY + y;
+                            double iVal, jVal;
+                            if (!ArcRToIJ(startX, startY, endX, endY, r, false, iVal, jVal)) {
+                                SendResponseLine("G03: arc radius error or target same as current");
+                            } else {
+                                ExecuteG03(x, y, iVal, jVal, f);
+                            }
+                        } else if (hasI && hasJ) {
+                            ExecuteG03(x, y, i, j, f);
+                        } else {
+                            SendResponseLine("G03 requires X, Y, and either I,J or R");
+                        }
                     } else {
-                        SendResponseLine("G03 requires X, Y, I, J");
+                        SendResponseLine("G03 requires X, Y, and either I,J or R");
                     }
                     break;
                     
@@ -798,55 +868,22 @@ void ParseGCode(const char* line) {
                         // Suppress immediate position prints; we'll print after moves complete
                         suppressAutoPosition = true;
 
-                        // Test 1: Simple linear move
-                        SendResponseLine("Test 1: G01 X0.5 Y0");
-                        ExecuteG01(0.5, 0.0);
-                        WaitForMotionComplete(CalculateMoveTimeoutMs(0.5, feedRate));
+                        // 180° arc out: (0,0) -> (4,0), center (2,0), radius 2"
+                        SendResponseLine("Test 1: G02 X4 Y0 I2 J0 (180 deg arc out)");
+                        ExecuteG02(4.0, 0.0, 2.0, 0.0);
+                        const double arcLenHalf = M_PI * 2.0;  // pi * radius
+                        WaitForMotionComplete(CalculateMoveTimeoutMs(arcLenHalf, feedRate));
                         SendResponseLine("Test 1 complete - Position:");
                         PrintCurrentPosition();
                         
-                        // Test 2: Return to origin
-                        SendResponseLine("Test 2: G01 X0 Y0");
-                        ExecuteG01(0.0, 0.0);
-                        double currentX = 0.0;
-                        double currentY = 0.0;
-                        if (unitMode == UNIT_MODE_INCHES) {
-                            currentX = motionController.CurrentXInches();
-                            currentY = motionController.CurrentYInches();
-                        } else {
-                            currentX = motionController.CurrentXMM();
-                            currentY = motionController.CurrentYMM();
-                        }
-                        double returnDistance = sqrt(currentX * currentX + currentY * currentY);
-                        WaitForMotionComplete(CalculateMoveTimeoutMs(returnDistance, feedRate));
+                        // 180° arc back: (4,0) -> (0,0), center (2,0), radius 2"
+                        SendResponseLine("Test 2: G02 X0 Y0 I-2 J0 (180 deg arc back)");
+                        ExecuteG02(0.0, 0.0, -2.0, 0.0);
+                        WaitForMotionComplete(CalculateMoveTimeoutMs(arcLenHalf, feedRate));
                         SendResponseLine("Test 2 complete - Position:");
-                        PrintCurrentPosition();
-                        
-                        // Test 3: Arc move (quarter circle, radius 2)
-                        SendResponseLine("Test 3: G02 X2 Y2 I0 J2");
-                        ExecuteG02(2.0, 2.0, 0.0, 2.0);
-                        const double arcLength = (M_PI / 2.0) * 2.0;
-                        WaitForMotionComplete(CalculateMoveTimeoutMs(arcLength, feedRate));
-                        SendResponseLine("Test 3 complete - Position:");
-                        PrintCurrentPosition();
-                        
-                        // Test 4: Return to origin
-                        SendResponseLine("Test 4: G01 X0 Y0");
-                        ExecuteG01(0.0, 0.0);
-                        if (unitMode == UNIT_MODE_INCHES) {
-                            currentX = motionController.CurrentXInches();
-                            currentY = motionController.CurrentYInches();
-                        } else {
-                            currentX = motionController.CurrentXMM();
-                            currentY = motionController.CurrentYMM();
-                        }
-                        returnDistance = sqrt(currentX * currentX + currentY * currentY);
-                        WaitForMotionComplete(CalculateMoveTimeoutMs(returnDistance, feedRate));
-                        SendResponseLine("Test 4 complete - Position:");
                         PrintCurrentPosition();
                         suppressAutoPosition = false;
                         
-                        // Final position check
                         SendResponseLine("Test complete - Final position:");
                         PrintCurrentPosition();
                     }
@@ -1038,6 +1075,11 @@ void ExecuteG01(double x, double y, double f) {
     
     SendResponseLine("ok");
     if (!suppressAutoPosition) {
+        double startX = (unitMode == UNIT_MODE_INCHES) ? motionController.CurrentXInches() : motionController.CurrentXMM();
+        double startY = (unitMode == UNIT_MODE_INCHES) ? motionController.CurrentYInches() : motionController.CurrentYMM();
+        double dist = hypot(targetX - startX, targetY - startY);
+        double feed = (currentFeedRate > 0.0) ? currentFeedRate : 10.0;
+        WaitForMotionComplete(CalculateMoveTimeoutMs(dist, feed));
         PrintCurrentPosition();
     }
 }
@@ -1163,6 +1205,11 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
     
     SendResponseLine("ok");
     if (!suppressAutoPosition) {
+        double diff = (endAngle >= startAngle) ? (endAngle - startAngle) : (startAngle - endAngle);
+        double angleSpan = (diff <= M_PI) ? diff : (2.0 * M_PI - diff);
+        double arcLen = radius * angleSpan;
+        double feed = (currentFeedRate > 0.0) ? currentFeedRate : 10.0;
+        WaitForMotionComplete(CalculateMoveTimeoutMs(arcLen, feed));
         PrintCurrentPosition();
     }
 }
@@ -1220,6 +1267,8 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
     // Calculate end angle (start angle calculated automatically by QueueArc)
     double endAngle = atan2(endY - centerY, endX - centerX);
     if (endAngle < 0) endAngle += 2 * M_PI;
+    double startAngle = atan2(startY - centerY, startX - centerX);
+    if (startAngle < 0) startAngle += 2 * M_PI;
     
     // Convert to steps for queuing
     int32_t centerXSteps, centerYSteps, radiusSteps;
@@ -1257,6 +1306,11 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
     
     SendResponseLine("ok");
     if (!suppressAutoPosition) {
+        double diff = (endAngle >= startAngle) ? (endAngle - startAngle) : (startAngle - endAngle);
+        double angleSpan = (diff <= M_PI) ? diff : (2.0 * M_PI - diff);
+        double arcLen = radius * angleSpan;
+        double feed = (currentFeedRate > 0.0) ? currentFeedRate : 10.0;
+        WaitForMotionComplete(CalculateMoveTimeoutMs(arcLen, feed));
         PrintCurrentPosition();
     }
 }

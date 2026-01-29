@@ -17,7 +17,7 @@ This example provides a GRBL-compatible interface for ClearCore, allowing use wi
 
 ## Requirements
 
-1. Three ClearPath motors connected to Connector M-0 (X), M-1 (Y), and M-2 (Z)
+1. **Motors**: Two ClearPath motors on M-0 (X) and M-1 (Y). With `USE_Z_AXIS` set to `1`, a third motor on M-2 (Z) is required.
 2. Motors configured for Step and Direction mode
 3. HLFB mode: "ASG-Position w/Measured Torque" with 482 Hz PWM carrier frequency
 
@@ -170,6 +170,7 @@ This implementation supports **3-axis motion**:
 
 Edit `GRBLCompatible.cpp` to configure:
 
+- **Z-axis**: `USE_Z_AXIS` — set to `1` for 3-axis (X/Y/Z), `0` for XY-only. When `0`, Z is not used; status reports Z as 0, and Z is ignored in G00/G01/G02/G03.
 - **Motor steps per revolution**: `MOTOR_X_STEPS_PER_REV`, `MOTOR_Y_STEPS_PER_REV`, `MOTOR_Z_STEPS_PER_REV`
 - **Pitch**: `MOTOR_X_PITCH_MM`, `MOTOR_Y_PITCH_MM`, `MOTOR_Z_PITCH_MM`
 - **Default feed rate**: `DEFAULT_FEED_RATE_MM_PER_MIN`

@@ -170,7 +170,13 @@ private:
     uint32_t m_velocityMax;      // Tangential velocity along arc path (steps/sec)
     uint32_t m_accelMax;         // Tangential acceleration along arc path (steps/sec^2)
     uint16_t m_sampleRateHz;    // Sample rate (Hz)
-    
+    double m_angleFracRad;       // Fractional angle accumulator (rad) for sub-Q15 increments
+    double m_currentAngleRad;    // Current angle (rad) for continuous advance
+    double m_lastXExact;         // Last X position (steps, double) for delta
+    double m_lastYExact;         // Last Y position (steps, double) for delta
+    double m_remainX;            // Fractional step remainder X
+    double m_remainY;            // Fractional step remainder Y
+
     // Constants
     static const int32_t TWO_PI_QX = 32768; // 2π in Q15 format
     static const int32_t PI_QX = 16384;     // π in Q15 format
