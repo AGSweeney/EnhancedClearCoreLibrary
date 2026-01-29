@@ -5,12 +5,11 @@ This example demonstrates streaming motion commands to ClearCore over serial (US
 ## Features
 
 - **Dual Communication Modes**: Supports both serial (USB CDC) and Ethernet (TCP server)
-- **G-Code Compatible**: Accepts standard G-code commands for motion control
+- **G-Code Compatible**: Accepts a GRBL-style subset of G-code for motion control
 - **Unit Support**: Works with both inches and millimeters
 - **Coordinated Motion**: Supports linear moves (G01) and arc moves (G02/G03)
-- **Automatic Command Queuing**: Commands are automatically queued and executed in order
-  - If motion is active, new commands are queued (up to 8 commands)
-  - If no motion is active, commands execute immediately
+- **Automatic Command Queuing**: Commands are queued and executed in order
+  - Up to 8 coordinated moves are buffered
   - Commands execute sequentially without interrupting each other
 - **Status Queries**: Query current position and motion status
 
@@ -62,6 +61,12 @@ Commands are sent as text lines, terminated with newline (`\n`). The system resp
 
 ### Motion Commands
 
+#### G00 - Rapid Move (Not Implemented)
+```
+G00 X10 Y10
+```
+Not implemented in this example. Use `G01` instead.
+
 #### G01 - Linear Move
 ```
 G01 X10.5 Y20.3 F100
@@ -76,6 +81,7 @@ G02 X10 Y10 I5 J0 F100
 ```
 - `X`, `Y`: End position
 - `I`, `J`: Center offset from start position
+- `R`: Radius (alternative to I,J)
 - `F`: Feed rate (optional)
 - **Note**: Motors must be enabled (M202) before motion commands will execute. If motors are disabled, returns error: "Motors not enabled (use M202 to enable)"
 
@@ -85,6 +91,12 @@ G03 X10 Y10 I5 J0 F100
 ```
 Same parameters as G02, but counterclockwise direction.
 - **Note**: Motors must be enabled (M202) before motion commands will execute. If motors are disabled, returns error: "Motors not enabled (use M202 to enable)"
+
+#### G4 - Dwell
+```
+G4 P0.5
+```
+Pauses for `P` seconds.
 
 ### Coordinate System Commands
 
@@ -158,6 +170,12 @@ M115
 ```
 Response: `Status: Active=1 Queue=2 Units=mm Coords=abs`
 
+#### M500 - Automated Arc Test
+Runs a 180° arc out/back test. Optional `F` parameter sets feed rate (default 10 ipm).
+
+#### M501 - Random Move Test
+Runs a random move sequence (auto-enables motors, returns to origin). Optional `F` parameter sets feed rate (default 10 ipm).
+
 ## Usage Examples
 
 ### Serial Mode
@@ -166,9 +184,10 @@ Response: `Status: Active=1 Queue=2 Units=mm Coords=abs`
 2. Open serial terminal (115200 baud)
 3. Send commands:
    ```
-   G21        ; Set units to millimeters
+   G20        ; Set units to inches (default)
    G90        ; Set absolute coordinates
-   G01 X10 Y10 F100  ; Move to (10mm, 10mm) at 100mm/min
+   M202       ; Enable motors
+   G01 X10 Y10 F100  ; Move to (10, 10) at 100 units/min
    M114       ; Query position
    ```
 
@@ -181,13 +200,13 @@ Response: `Status: Active=1 Queue=2 Units=mm Coords=abs`
 ### Example Sequence
 
 ```
-G21          ; Millimeters
+G20          ; Inches
 G90          ; Absolute
 M202         ; Enable motors
-G01 X0 Y0 F100  ; Home position
-G01 X50 Y0 F100  ; Move right 50mm
-G02 X50 Y50 I0 J25 F100  ; Arc up (25mm radius)
-G01 X0 Y50 F100  ; Move left
+G01 X0 Y0 F100   ; Home position
+G01 X5 Y0 F100   ; Move right 5 in
+G02 X5 Y5 I0 J2.5 F100  ; Arc up (2.5 in radius)
+G01 X0 Y5 F100   ; Move left
 G01 X0 Y0 F100   ; Return home
 M114         ; Check position
 ```
@@ -202,11 +221,12 @@ M114         ; Check position
 
 ## Notes
 
-- Commands are executed immediately when received
-- Motion commands queue automatically if previous motion is active
+- Commands are queued and executed in order
 - Feed rate persists until changed
 - Coordinate and unit modes persist until changed
 - For Ethernet mode, status messages also appear on USB serial port for debugging
+- Default units are inches; use `G21` for millimeters
+- Motors start disabled; use `M202` before motion commands
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
-# ClearCore-library 
+# Enhanced ClearCore Library
 
-This repository contains the ClearCore Motion and I/O Library, providing a foundation to build ClearCore applications. Also included are Microchip Studio example programs that demonstrate various features of the ClearCore, and an Microchip Studio template project that can be used to start building your own application.
+This repository contains the ClearCore Motion and I/O Library, enhanced with coordinated motion (arcs, linear) and unit conversion support. It provides a foundation to build ClearCore applications. Also included are Microchip Studio example programs—including G-code streaming and GRBL-compatible firmware—and a Microchip Studio template project for building your own application.
 
 ## Enhanced Features
 
@@ -28,64 +28,63 @@ See `NEW_FILES.md` for a complete list of new files added for these features.
 
 #### Microchip Studio requirements
 
-The included Microchip Studio projects require Microchip Studio version 7.0.1645 or later (latest version is recommended).
+The included Microchip Studio projects require Microchip Studio 7.0.1645 or later (latest recommended).
 
-From the Microchip Studio Tools menu, open the Device Pack Manager. Ensure the following packs are installed:
-* SAME53_DFP version 1.1.118
-* CMSIS version 4.5.0
+From **Tools → Device Pack Manager**, ensure these packs are installed:
+* **SAME53_DFP** 1.1.118
+* **CMSIS** 4.5.0
 
-#### Installers and Resources
-
-https://www.teknic.com/downloads/
+**Installers and resources**: https://www.teknic.com/downloads/
 
 ### libClearCore
 
-libClearCore provides a C++ object oriented API to interface with the ClearCore hardware. Each connector of the ClearCore has an associated object to use in your application. A Doxygen reference manual for the libClearCore API is available at https://teknic-inc.github.io/ClearCore-library/.
+libClearCore provides a C++ object-oriented API for the ClearCore hardware. Each connector has an associated object. API reference: https://teknic-inc.github.io/ClearCore-library/.
 
-There is an Microchip Studio project file (*.cppproj) included to load and compile this library in Microchip Studio.
+A Microchip Studio project (*.cppproj) is included to build the library.
 
 ### LwIP
 
-The ClearCore Ethernet implementation is based off of the LwIP stack. Ethernet applications should be developed using the ethernet API provided by libClearCore. The LwIP source code is included for completeness.
+Ethernet support uses the LwIP stack. Use the ethernet API from libClearCore for Ethernet apps. LwIP source is included. A Microchip Studio project (*.cppproj) is provided to build LwIP.
 
-There is an Microchip Studio project file (*.cppproj) included to load and compile this library in Microchip Studio.
+### Root-level examples
+
+| Example | Description |
+|--------|-------------|
+| **MotionStreamingExample** | Stream G-code over serial (USB CDC) or Ethernet TCP. Supports G01, G02/G03 (I,J or R), G20/G21, G90/G91, G92, G4, M200–M203, M114, M115, M500, M501. See `MotionStreamingExample/README.md` and `MotionStreamingExample/STREAMING_GUIDE.md`. |
+| **GRBLCompatibleExample** | GRBL-style firmware: G0/G1/G2/G03, $ commands, jogging ($J=), homing ($H), gSender-friendly. Serial only. See `GRBLCompatibleExample/README.md`. |
+| **ProjectTemplate** | Minimal Microchip Studio template. Put your code in `main.cpp`. |
+
+Open the matching `.atsln`, set the project as **Startup Project**, then **Start Without Debugging (Ctrl+Alt+F5)** to build, flash, and run.
 
 ### Microchip_Examples
 
-This folder contains example applications for a variety of ClearCore features. To run a provided example, first choose which subdirectory describes the feature that you want to run. Within each subdirectory is an Microchip solution file (*.atsln) that contains various examples related to that feature, as well as the required interface libraries. After the solution is loaded in Microchip Studio, browse for the project with the example that you wish to run within the solution explorer panel. Right click on the project and select "Set as Startup Project". 
+Official-style examples for ClearCore features (Analog I/O, CCIO, Serial, Ethernet, Step & Direction, etc.). Each subfolder has a solution (*.atsln). Load it, set the desired project as Startup Project, then build and run.
 
-The example programs are configured with a custom firmware loading script that will search for a connected ClearCore USB port and load the example programs on the ClearCore hardware. Simply click "Start Without Debugging (Ctrl+Alt+F5)" and the example program will compile, load the firmware, and start executing.
+#### Coordinated motion (Microchip_Examples)
 
-#### Coordinated Motion Examples
+- **CoordinatedArcMoves** and **CoordinatedMovesWithUnits** live under `Microchip_Examples/ClearPathModeExamples/ClearPath-SD_Series/`. They demonstrate arc chaining, unit conversion, and feed rate in physical units.
 
-- **CoordinatedArcMoves**: Demonstrates coordinated arc moves with continuous chaining
-- **CoordinatedMovesWithUnits**: Comprehensive example showing:
-  - Single motor moves in physical units (inches, mm)
-  - Coordinated linear moves with unit conversion
-  - Coordinated arc moves with unit conversion
-  - Feed rate programming in physical units
-  - Continuous move chaining
+See `docs/CoordinatedArcMotion/README.md` for coordinated motion theory and API details.
 
-For detailed documentation on coordinated motion features, see `docs/CoordinatedArcMotion/README.md`.
+### ProjectTemplate
 
-### Project Template
-The Project Template directory is included as a starting point for writing your own application. Simply open the Microchip Studio solution file (*.atsln), and put your application code in main.cpp.
+Minimal starter for new apps. Open `ProjectTemplate/ProjectTemplate.atsln`, add your code to `main.cpp`, then build and flash.
 
 ### Tools
 
-We have included Windows tools for loading the firmware onto the ClearCore using the USB connector. 
+Windows tools for flashing firmware via USB (see `Tools/README.md`):
 
-**bossac** A command line flashing application
-
-**flash_clearcore.cmd** A script that searches for a connected ClearCore USB port and uses bossac to load the firmware
-
-**uf2-builder** Converts the compiled firmware binary file into a UF2 file that allows drag and drop flashing onto the bootloader's mass storage drive.
+- **bossac** — Command-line flasher
+- **flash_clearcore.cmd** — Finds ClearCore USB port and flashes with bossac
+- **uf2-builder** — Converts firmware to UF2 for drag-and-drop flashing via bootloader
 
 ## Documentation
 
-- **API Reference**: https://teknic-inc.github.io/ClearCore-library/
-- **Coordinated Motion Documentation**: See `docs/CoordinatedArcMotion/README.md` for detailed theory of operation, usage guide, and API reference
-- **New Files**: See `NEW_FILES.md` for a complete listing of files added for coordinated motion and unit support features
+- **API reference**: https://teknic-inc.github.io/ClearCore-library/
+- **Coordinated motion**: `docs/CoordinatedArcMotion/README.md` — theory, usage, API
+- **Motion streaming**: `MotionStreamingExample/README.md`, `MotionStreamingExample/STREAMING_GUIDE.md`
+- **GRBL-compatible example**: `GRBLCompatibleExample/README.md`
+- **New/modified files**: `NEW_FILES.md`, `MODIFICATIONS.md`
 
 ## License
 
