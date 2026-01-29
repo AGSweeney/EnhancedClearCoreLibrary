@@ -35,7 +35,7 @@
  * Command Protocol:
  *    Commands are sent as text lines, terminated with newline (\n).
  *    Supported commands:
- *    - G01 X<value> Y<value> [F<feedrate>]  : Linear move
+ *    - G01 X<value> Y<value> [F<feedrate>]  : Linear move (feed rate optional)
  *    - G02 X<value> Y<value> I<value> J<value> [F<feedrate>]  : Arc CW (center offset)
  *    - G02 X<value> Y<value> R<value> [F<feedrate>]           : Arc CW (radius)
  *    - G03 X<value> Y<value> I<value> J<value> [F<feedrate>]  : Arc CCW (center offset)
@@ -46,14 +46,20 @@
  *    - G92  : Set coordinate system offset (set origin at current position)
  *    - G20  : Units in inches
  *    - G21  : Units in millimeters
+ *    - G4 P<seconds> : Dwell
  *    - M200 : Emergency stop (immediate stop, clear queue)
  *    - M201 : Stop with deceleration (smooth stop, clear queue)
  *    - M202 : Enable motors
  *    - M203 : Disable motors (stops motion and disables)
  *    - M114 : Get current position
  *    - M115 : Get status
- *    - M500 : Save configuration
- *    - M501 : Load configuration
+ *    - M500 [F<feedrate>] : Run 180° arc out/back test (defaults to 10 ipm)
+ *    - M501 [F<feedrate>] : Run random move test sequence, auto-enable motors,
+ *                            returns to origin (defaults to 10 ipm)
+ * 
+ * Notes:
+ *    - Default units: inches (G20). Use G21 to switch to mm.
+ *    - Motors start disabled on boot; use M202 to enable before motion.
  *
  * Links:
  * ** ClearCore Documentation: https://teknic-inc.github.io/ClearCore-library/
