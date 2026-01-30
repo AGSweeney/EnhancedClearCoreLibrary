@@ -487,6 +487,7 @@ private:
     volatile uint8_t m_motionQueueHead;
     volatile uint8_t m_motionQueueTail;
     volatile uint8_t m_motionQueueCount;
+    uint8_t m_motionQueuePlanned;  // Optimization: Points to first block after last optimally planned block (only used when kUseGrblPlanner = true)
     
     // Legacy separate queues (for backward compatibility)
     struct QueuedArc {

@@ -64,6 +64,7 @@ CoordinatedMotionController::CoordinatedMotionController()
       m_motionQueueHead(0),
       m_motionQueueTail(0),
       m_motionQueueCount(0),
+      m_motionQueuePlanned(0),
       m_arcQueueHead(0),
       m_arcQueueTail(0),
       m_arcQueueCount(0),
@@ -235,6 +236,7 @@ void CoordinatedMotionController::Stop() {
     m_motionQueueHead = 0;
     m_motionQueueTail = 0;
     m_motionQueueCount = 0;
+    m_motionQueuePlanned = 0;
     m_arcQueueHead = 0;
     m_arcQueueTail = 0;
     m_arcQueueCount = 0;
@@ -266,6 +268,7 @@ void CoordinatedMotionController::StopDecel() {
     m_motionQueueHead = 0;
     m_motionQueueTail = 0;
     m_motionQueueCount = 0;
+    m_motionQueuePlanned = 0;
     m_arcQueueHead = 0;
     m_arcQueueTail = 0;
     m_arcQueueCount = 0;
@@ -791,7 +794,9 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
     motion.valid = true;
     m_motionQueueTail = (tail + 1) % ARC_QUEUE_SIZE;
     m_motionQueueCount++;
-    RecalculatePlanner();
+    if (kUseGrblPlanner) {
+        RecalculatePlanner();
+    }
     if (!m_active) {
         bool started = ProcessNextMotion();
         m_active = started;
@@ -883,7 +888,9 @@ bool CoordinatedMotionController::QueueLinear(int32_t endX, int32_t endY) {
     motion.valid = true;
     m_motionQueueTail = (tail + 1) % ARC_QUEUE_SIZE;
     m_motionQueueCount++;
-    RecalculatePlanner();
+    if (kUseGrblPlanner) {
+        RecalculatePlanner();
+    }
     if (!m_active) {
         bool started = ProcessNextMotion();
         m_active = started;
@@ -893,7 +900,12 @@ bool CoordinatedMotionController::QueueLinear(int32_t endX, int32_t endY) {
 }
 
 void CoordinatedMotionController::RecalculatePlanner() {
+    if (!kUseGrblPlanner) {
+        return;  // Planner disabled, exit early
+    }
+    
     if (m_motionQueueCount == 0) {
+        m_motionQueuePlanned = m_motionQueueHead;  // Reset planned pointer
         return;
     }
     
@@ -905,75 +917,277 @@ void CoordinatedMotionController::RecalculatePlanner() {
         idx = (idx + 1) % ARC_QUEUE_SIZE;
     }
     
-    // Initial junction-limited entry speeds
-    for (uint8_t i = 0; i < count; i++) {
+    // Optimization: Start planning from planned pointer, not from head
+    // Only recalculate blocks that could be affected by new additions
+    uint8_t plannedIdx = 0;
+    if (kUseGrblPlanner && m_motionQueuePlanned != m_motionQueueHead) {
+        // Find where planned pointer is in the order array
+        for (uint8_t i = 0; i < count; i++) {
+            if (order[i] == m_motionQueuePlanned) {
+                plannedIdx = i;
+                break;
+            }
+        }
+        // If planned pointer not found (shouldn't happen), start from beginning
+        if (plannedIdx >= count) {
+            plannedIdx = 0;
+        }
+    }
+    
+    // Estimate current speed of active motion (if any) for first queued segment
+    uint32_t activeExitSpeed = 0;
+    double activeExitSpeedSqr = 0.0;
+    if (m_active && count > 0) {
+        // When active motion exists, estimate its exit speed
+        // Use nominal speed as approximation (could be improved with actual speed tracking)
+        activeExitSpeed = m_velocityMax;
+        activeExitSpeedSqr = (double)activeExitSpeed * (double)activeExitSpeed;
+    }
+    
+    // Helper function to calculate axis-limited acceleration for junction
+    // For now, uses single m_accelMax, but structured for future per-axis limits
+    auto GetJunctionAcceleration = [this](double dirX, double dirY) -> double {
+        // Calculate junction unit vector magnitude
+        double mag = sqrt(dirX * dirX + dirY * dirY);
+        if (mag < 1e-9) {
+            return (double)m_accelMax;  // Fallback
+        }
+        
+        // Normalize direction
+        double unitX = dirX / mag;
+        double unitY = dirY / mag;
+        
+        // For now, use single acceleration limit
+        // Future: Could check per-axis limits here:
+        // double accelX = m_motorX->GetAccelMax();
+        // double accelY = m_motorY->GetAccelMax();
+        // return min(accelX / abs(unitX), accelY / abs(unitY));
+        
+        return (double)m_accelMax;
+    };
+    
+    // Step 1: Calculate initial junction-limited entry speeds (in squared space for efficiency)
+    // Work from planned pointer forward to optimize performance
+    for (uint8_t i = plannedIdx; i < count; i++) {
         QueuedMotion &cur = m_motionQueue[order[i]];
-        double nominal = (double)cur.nominalSpeed;
-        double maxEntry = nominal;
+        double nominalSqr = (double)cur.nominalSpeed * (double)cur.nominalSpeed;
+        double maxEntrySqr = nominalSqr;
         
         if (i == 0 && !m_active) {
-            maxEntry = 0.0;  // start from rest
+            maxEntrySqr = 0.0;  // start from rest
+        } else if (i == 0 && m_active) {
+            // First queued segment: use active motion exit speed
+            maxEntrySqr = activeExitSpeedSqr;
         } else if (i > 0) {
+            // Calculate junction speed based on angle between segments
             QueuedMotion &prev = m_motionQueue[order[i - 1]];
             double cosTheta = (double)prev.exitDirX * (double)cur.entryDirX +
                               (double)prev.exitDirY * (double)cur.entryDirY;
+            
+            // Clamp cosTheta to valid range [-1, 1]
             if (cosTheta > 1.0) cosTheta = 1.0;
             if (cosTheta < -1.0) cosTheta = -1.0;
             
+            // Calculate half-angle sine: sin(θ/2) = sqrt((1 - cos(θ)) / 2)
             double sinHalf = sqrt(0.5 * (1.0 - cosTheta));
-            double vmax;
+            
+            // Calculate junction unit vector for axis-limited acceleration
+            double junctionDirX = (double)cur.entryDirX - (double)prev.exitDirX;
+            double junctionDirY = (double)cur.entryDirY - (double)prev.exitDirY;
+            double junctionAccel = GetJunctionAcceleration(junctionDirX, junctionDirY);
+            
+            double vmaxSqr;
+            // Handle edge cases: straight line (sinHalf ≈ 0) and 180° turn (sinHalf ≈ 1)
             if (sinHalf < 1e-6) {
-                vmax = fmin((double)prev.nominalSpeed, (double)cur.nominalSpeed);
+                // Straight line or very small angle - use minimum of both speeds (squared)
+                double prevNominalSqr = (double)prev.nominalSpeed * (double)prev.nominalSpeed;
+                vmaxSqr = fmin(prevNominalSqr, nominalSqr);
+            } else if (sinHalf > 0.999) {
+                // Near 180° turn - very sharp corner, limit speed significantly
+                vmaxSqr = junctionAccel * m_junctionDeviationSteps * 0.5;
             } else {
-                vmax = sqrt(((double)m_accelMax * m_junctionDeviationSteps * sinHalf) /
-                            (1.0 - sinHalf));
+                // Standard junction speed formula (GRBL-style) - compute squared speed directly
+                // vmax² = (accel * junctionDeviation * sinHalf) / (1 - sinHalf)
+                double denominator = 1.0 - sinHalf;
+                if (denominator < 1e-6) {
+                    denominator = 1e-6;  // Prevent division by zero
+                }
+                vmaxSqr = (junctionAccel * m_junctionDeviationSteps * sinHalf) / denominator;
             }
-            double maxJunction = fmin(fmin((double)prev.nominalSpeed, (double)cur.nominalSpeed), vmax);
-            maxEntry = maxJunction;
+            
+            // Junction speed is limited by both segments' nominal speeds (squared)
+            double prevNominalSqr = (double)prev.nominalSpeed * (double)prev.nominalSpeed;
+            double maxJunctionSqr = fmin(fmin(prevNominalSqr, nominalSqr), vmaxSqr);
+            maxEntrySqr = maxJunctionSqr;
         }
         
+        // Handle zero-length segments
         if (cur.lengthSteps == 0) {
             cur.entrySpeed = 0;
         } else {
-            if (maxEntry > nominal) {
-                maxEntry = nominal;
+            // Clamp entry speed squared to valid range [0, nominal²]
+            if (maxEntrySqr > nominalSqr) {
+                maxEntrySqr = nominalSqr;
             }
-            if (maxEntry < 0.0) {
-                maxEntry = 0.0;
+            if (maxEntrySqr < 0.0) {
+                maxEntrySqr = 0.0;
             }
-            cur.entrySpeed = (uint32_t)maxEntry;
+            // Convert squared speed to regular speed (only conversion needed)
+            cur.entrySpeed = (uint32_t)sqrt(maxEntrySqr);
         }
     }
     
-    // Backward pass (limit by decel into next segment)
-    for (int i = (int)count - 2; i >= 0; i--) {
-        QueuedMotion &cur = m_motionQueue[order[i]];
-        QueuedMotion &next = m_motionQueue[order[i + 1]];
-        double maxEntry = sqrt((double)next.entrySpeed * (double)next.entrySpeed +
-                               2.0 * (double)m_accelMax * (double)cur.lengthSteps);
-        if ((double)cur.entrySpeed > maxEntry) {
-            cur.entrySpeed = (uint32_t)maxEntry;
-        }
-    }
-    
-    // Forward pass (limit by accel from previous)
-    for (uint8_t i = 1; i < count; i++) {
-        QueuedMotion &prev = m_motionQueue[order[i - 1]];
-        QueuedMotion &cur = m_motionQueue[order[i]];
-        double maxEntry = sqrt((double)prev.entrySpeed * (double)prev.entrySpeed +
-                               2.0 * (double)m_accelMax * (double)prev.lengthSteps);
-        if ((double)cur.entrySpeed > maxEntry) {
-            cur.entrySpeed = (uint32_t)maxEntry;
-        }
-    }
-    
-    // Exit speeds follow next entry speeds
+    // Step 2: Set exit speeds based on look-ahead logic
+    // Look ahead: if there's a next move, exit speed = next move's entry speed (junction speed)
+    // If no next move, exit speed = 0 (full stop)
     for (uint8_t i = 0; i < count; i++) {
         if (i + 1 < count) {
+            // Look ahead: there IS a next move
+            // Exit speed = next segment's entry speed (junction speed)
             m_motionQueue[order[i]].exitSpeed = m_motionQueue[order[i + 1]].entrySpeed;
         } else {
+            // Look ahead: there is NO next move
+            // Exit speed = 0 (full stop)
             m_motionQueue[order[i]].exitSpeed = 0;
         }
+    }
+    
+    // Step 3: Backward pass - verify deceleration is possible (work in squared space)
+    // Work backwards from last block to planned pointer
+    // Start from last block (exit speed = 0)
+    if (count > 0) {
+        QueuedMotion &last = m_motionQueue[order[count - 1]];
+        // Last block: maximum entry speed that allows deceleration to exit speed (0)
+        if (last.lengthSteps > 0 && m_accelMax > 0) {
+            double maxEntrySqr = 2.0 * (double)m_accelMax * (double)last.lengthSteps;
+            double currentEntrySqr = (double)last.entrySpeed * (double)last.entrySpeed;
+            if (currentEntrySqr > maxEntrySqr) {
+                last.entrySpeed = (uint32_t)sqrt(maxEntrySqr);
+            }
+        }
+        // Clamp to nominal
+        if (last.entrySpeed > last.nominalSpeed) {
+            last.entrySpeed = last.nominalSpeed;
+        }
+    }
+    
+    // Continue backward pass for remaining blocks
+    for (int i = (int)count - 2; i >= (int)plannedIdx; i--) {
+        QueuedMotion &cur = m_motionQueue[order[i]];
+        QueuedMotion &next = m_motionQueue[order[i + 1]];
+        
+        // Work in squared space: entry_speed_sqr = next.entry_speed_sqr + 2 * accel * distance
+        double nextEntrySqr = (double)next.entrySpeed * (double)next.entrySpeed;
+        double maxEntrySqr;
+        
+        if (cur.lengthSteps > 0 && m_accelMax > 0) {
+            maxEntrySqr = nextEntrySqr + 2.0 * (double)m_accelMax * (double)cur.lengthSteps;
+        } else if (cur.lengthSteps == 0) {
+            // Zero-length segment: entry speed must equal exit speed
+            maxEntrySqr = nextEntrySqr;
+        } else {
+            maxEntrySqr = nextEntrySqr;  // No acceleration limit
+        }
+        
+        double currentEntrySqr = (double)cur.entrySpeed * (double)cur.entrySpeed;
+        double nominalSqr = (double)cur.nominalSpeed * (double)cur.nominalSpeed;
+        
+        // Limit to minimum of: calculated max, current entry, and nominal
+        maxEntrySqr = fmin(fmin(maxEntrySqr, currentEntrySqr), nominalSqr);
+        
+        // Convert back to regular speed
+        cur.entrySpeed = (uint32_t)sqrt(maxEntrySqr);
+        
+        // Update exit speed to match next entry speed (maintain consistency)
+        cur.exitSpeed = next.entrySpeed;
+    }
+    
+    // Step 4: Forward pass - optimize speeds (allow increases when acceleration is possible)
+    // Work forward from planned pointer, can increase speeds when possible
+    uint8_t optimalPlanned = plannedIdx;  // Track optimal planned pointer
+    for (uint8_t i = plannedIdx + 1; i < count; i++) {
+        QueuedMotion &prev = m_motionQueue[order[i - 1]];
+        QueuedMotion &cur = m_motionQueue[order[i]];
+        
+        // Work in squared space
+        double prevEntrySqr = (double)prev.entrySpeed * (double)prev.entrySpeed;
+        double curEntrySqr = (double)cur.entrySpeed * (double)cur.entrySpeed;
+        double nominalSqr = (double)cur.nominalSpeed * (double)cur.nominalSpeed;
+        
+        // Check if we can accelerate from prev to cur
+        if (prev.lengthSteps > 0 && m_accelMax > 0) {
+            // Maximum achievable entry speed from previous segment
+            double maxEntryFromPrevSqr = prevEntrySqr + 2.0 * (double)m_accelMax * (double)prev.lengthSteps;
+            
+            if (curEntrySqr < maxEntryFromPrevSqr) {
+                // Can accelerate! Increase current entry speed
+                curEntrySqr = fmin(maxEntryFromPrevSqr, nominalSqr);
+                cur.entrySpeed = (uint32_t)sqrt(curEntrySqr);
+                // Update prev's exit speed to match (maintain consistency)
+                prev.exitSpeed = cur.entrySpeed;
+                // This block is now optimally planned
+                optimalPlanned = i;
+            } else if (curEntrySqr > maxEntryFromPrevSqr) {
+                // Cannot reach current entry speed, reduce it
+                curEntrySqr = maxEntryFromPrevSqr;
+                cur.entrySpeed = (uint32_t)sqrt(curEntrySqr);
+                prev.exitSpeed = cur.entrySpeed;
+            }
+        }
+        
+        // If entry speed equals nominal (maximum), this and all previous blocks are optimal
+        if (cur.entrySpeed == cur.nominalSpeed) {
+            optimalPlanned = i;
+        }
+    }
+    
+    // Update planned pointer to skip optimally planned blocks next time
+    if (optimalPlanned < count) {
+        m_motionQueuePlanned = order[optimalPlanned];
+    } else {
+        m_motionQueuePlanned = m_motionQueueHead;
+    }
+    
+    // Step 5: Handle active motion transition (first segment)
+    // If active motion exists, ensure first queued segment can transition smoothly
+    if (m_active && count > 0) {
+        QueuedMotion &first = m_motionQueue[order[0]];
+        
+        // Work in squared space
+        double firstEntrySqr = (double)first.entrySpeed * (double)first.entrySpeed;
+        double maxFromActiveSqr = activeExitSpeedSqr + 2.0 * (double)m_accelMax * 1000.0;  // Assume some distance
+        
+        if (firstEntrySqr > maxFromActiveSqr) {
+            double nominalSqr = (double)first.nominalSpeed * (double)first.nominalSpeed;
+            firstEntrySqr = fmin(maxFromActiveSqr, nominalSqr);
+            first.entrySpeed = (uint32_t)sqrt(firstEntrySqr);
+        }
+    }
+    
+    // Step 6: Final validation - ensure all speeds are within bounds
+    for (uint8_t i = 0; i < count; i++) {
+        QueuedMotion &cur = m_motionQueue[order[i]];
+        
+        // Ensure entry speed doesn't exceed nominal
+        if (cur.entrySpeed > cur.nominalSpeed) {
+            cur.entrySpeed = cur.nominalSpeed;
+        }
+        
+        // Ensure exit speed is achievable from entry speed
+        if (cur.exitSpeed > cur.entrySpeed && cur.lengthSteps > 0 && m_accelMax > 0) {
+            // Can we accelerate from entrySpeed to exitSpeed?
+            double entrySqr = (double)cur.entrySpeed * (double)cur.entrySpeed;
+            double exitSqr = (double)cur.exitSpeed * (double)cur.exitSpeed;
+            double maxExitSqr = entrySqr + 2.0 * (double)m_accelMax * (double)cur.lengthSteps;
+            
+            if (exitSqr > maxExitSqr) {
+                cur.exitSpeed = (uint32_t)sqrt(maxExitSqr);
+            }
+        }
+        
+        // Ensure speeds are non-negative
+        if (cur.entrySpeed < 0) cur.entrySpeed = 0;
+        if (cur.exitSpeed < 0) cur.exitSpeed = 0;
     }
 }
 
@@ -1034,6 +1248,13 @@ bool CoordinatedMotionController::ProcessNextMotion() {
     motion.valid = false;
     m_motionQueueHead = (head + 1) % ARC_QUEUE_SIZE;
     m_motionQueueCount--;
+    
+    // Update planned pointer if it was pointing to the removed block
+    if (kUseGrblPlanner) {
+        if (m_motionQueuePlanned == head) {
+            m_motionQueuePlanned = m_motionQueueHead;  // Move planned pointer forward
+        }
+    }
     
     return success;
 }
