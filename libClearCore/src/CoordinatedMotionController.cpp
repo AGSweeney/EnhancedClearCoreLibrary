@@ -28,7 +28,7 @@
 
 namespace ClearCore {
 
-static const bool kUseGrblPlanner = false;
+static const bool kUseGrblPlanner = true;  // Enable GRBL-style path planner for testing
 static inline void NormalizeVec(double &x, double &y) {
     double mag = sqrt(x * x + y * y);
     if (mag > 1e-9) {
@@ -74,6 +74,9 @@ CoordinatedMotionController::CoordinatedMotionController()
       m_active(false),
       m_initialized(false),
       m_motionType(MOTION_TYPE_NONE),
+      m_junctionDeviationSteps(1.0),
+      m_activeTargetX(0),
+      m_activeTargetY(0),
       m_stopCounter(0),
       m_currentX(0),
       m_currentY(0),
@@ -81,10 +84,7 @@ CoordinatedMotionController::CoordinatedMotionController()
       m_velocityMax(5000),
       m_accelMax(50000),
       m_unitsConfiguredX(false),
-      m_unitsConfiguredY(false),
-      m_junctionDeviationSteps(1.0),
-      m_activeTargetX(0),
-      m_activeTargetY(0) {
+      m_unitsConfiguredY(false) {
     // Initialize queues
     for (uint8_t i = 0; i < ARC_QUEUE_SIZE; i++) {
         m_motionQueue[i].valid = false;
@@ -953,9 +953,9 @@ void CoordinatedMotionController::RecalculatePlanner() {
             return (double)m_accelMax;  // Fallback
         }
         
-        // Normalize direction
-        double unitX = dirX / mag;
-        double unitY = dirY / mag;
+        // Normalize direction (commented out for future per-axis limits)
+        // double unitX = dirX / mag;
+        // double unitY = dirY / mag;
         
         // For now, use single acceleration limit
         // Future: Could check per-axis limits here:
@@ -1185,9 +1185,8 @@ void CoordinatedMotionController::RecalculatePlanner() {
             }
         }
         
-        // Ensure speeds are non-negative
-        if (cur.entrySpeed < 0) cur.entrySpeed = 0;
-        if (cur.exitSpeed < 0) cur.exitSpeed = 0;
+        // Note: entrySpeed and exitSpeed are uint32_t (unsigned), so they cannot be negative
+        // No need to check for negative values
     }
 }
 
