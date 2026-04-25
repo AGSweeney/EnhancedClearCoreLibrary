@@ -1,0 +1,25 @@
+{
+	"BUILD_DIR" : "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/ClearCNC_Controller_autogen",
+	"CMAKE_BINARY_DIR" : "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release",
+	"CMAKE_CURRENT_BINARY_DIR" : "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release",
+	"CMAKE_CURRENT_SOURCE_DIR" : "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/QtController",
+	"CMAKE_SOURCE_DIR" : "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/QtController",
+	"CROSS_CONFIG" : false,
+	"GENERATOR" : "Ninja",
+	"INCLUDE_DIR" : "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/ClearCNC_Controller_autogen/include",
+	"INPUTS" : 
+	[
+		"D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/QtController/resources/icons/clearcnc_app_icon.svg"
+	],
+	"LOCK_FILE" : "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/ClearCNC_Controller_autogen.dir/AutoRcc_app_resources_3YJK5W5UP7_Lock.lock",
+	"MULTI_CONFIG" : false,
+	"OPTIONS" : [ "-name", "app_resources" ],
+	"OUTPUT_CHECKSUM" : "3YJK5W5UP7",
+	"OUTPUT_NAME" : "qrc_app_resources.cpp",
+	"RCC_EXECUTABLE" : "C:/Users/Adam/vcpkg/installed/x64-windows/tools/Qt6/bin/rcc.exe",
+	"RCC_LIST_OPTIONS" : [ "--list" ],
+	"SETTINGS_FILE" : "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/ClearCNC_Controller_autogen.dir/AutoRcc_app_resources_3YJK5W5UP7_Used.txt",
+	"SOURCE" : "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/QtController/resources/app_resources.qrc",
+	"USE_BETTER_GRAPH" : true,
+	"VERBOSITY" : 0
+}

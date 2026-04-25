@@ -387,6 +387,28 @@ public:
     void JunctionDeviationSteps(double deviationSteps) {
         m_junctionDeviationSteps = deviationSteps;
     }
+
+    /**
+        \brief Configure queue-end behavior for planned motion
+
+        When disabled (default), the planner favors continuous motion and avoids
+        forcing a stop at the tail block so additional queued moves can blend in.
+        When enabled, the planner enforces stop-at-end behavior.
+
+        \param[in] stopAtQueueEnd true to enforce stop at queue end
+    **/
+    void StopAtQueueEnd(bool stopAtQueueEnd) {
+        m_stopAtQueueEnd = stopAtQueueEnd;
+    }
+
+    /**
+        \brief Get queue-end stop policy
+
+        \return true if stop-at-end policy is enabled
+    **/
+    bool StopAtQueueEnd() const {
+        return m_stopAtQueueEnd;
+    }
     
     /**
         \brief Get current X position in inches
@@ -520,6 +542,7 @@ private:
     bool m_initialized;
     volatile MotionType m_motionType;
     double m_junctionDeviationSteps;
+    volatile bool m_stopAtQueueEnd;
     int32_t m_activeTargetX;
     int32_t m_activeTargetY;
 

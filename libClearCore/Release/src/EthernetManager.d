@@ -142,9 +142,7 @@ src/EthernetManager.d src/EthernetManager.o: ../src/EthernetManager.cpp \
  ../../LwIP/LwIP/src/include/netif/ethernet.h \
  ../../LwIP/LwIP/src/include/lwip/init.h \
  ../../LwIP/LwIP/src/include/lwip/dns.h \
- ../../LwIP/LwIP/src/include/lwip/timeouts.h \
- ../../LwIP/LwIP/src/include/lwip/sys.h \
- ../../LwIP/LwIP/port/include/arch/sys_arch.h ../inc/NvmManager.h \
+ ../../LwIP/LwIP/src/include/lwip/timeouts.h ../inc/NvmManager.h \
  ../inc/SysTiming.h
 
 ../inc/EthernetManager.h:
@@ -448,10 +446,6 @@ C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include
 ../../LwIP/LwIP/src/include/lwip/dns.h:
 
 ../../LwIP/LwIP/src/include/lwip/timeouts.h:
-
-../../LwIP/LwIP/src/include/lwip/sys.h:
-
-../../LwIP/LwIP/port/include/arch/sys_arch.h:
 
 ../inc/NvmManager.h:
 

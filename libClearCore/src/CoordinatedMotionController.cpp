@@ -75,6 +75,7 @@ CoordinatedMotionController::CoordinatedMotionController()
       m_initialized(false),
       m_motionType(MOTION_TYPE_NONE),
       m_junctionDeviationSteps(1.0),
+      m_stopAtQueueEnd(false),
       m_activeTargetX(0),
       m_activeTargetY(0),
       m_stopCounter(0),
@@ -307,6 +308,12 @@ void CoordinatedMotionController::UpdateFast() {
     }
     
     bool motionComplete = false;
+    auto StartNextMotion = [this](bool arcWasActive) -> bool {
+        if (ProcessNextMotion()) {
+            return true;
+        }
+        return arcWasActive ? ProcessNextArc() : ProcessNextLinear();
+    };
     
     // Check motion type and completion
     if (m_motionType == MOTION_TYPE_ARC) {
@@ -316,12 +323,9 @@ void CoordinatedMotionController::UpdateFast() {
             m_arcInterpolator.GetCurrentPosition(tempX, tempY);
             m_currentX = tempX;
             m_currentY = tempY;
-            
-            // Try unified queue first, then legacy queues
-            if (!ProcessNextMotion()) {
-                if (!ProcessNextArc()) {
-                    motionComplete = true;
-                }
+
+            if (!StartNextMotion(true)) {
+                motionComplete = true;
             }
         }
     } else if (m_motionType == MOTION_TYPE_LINEAR) {
@@ -331,12 +335,9 @@ void CoordinatedMotionController::UpdateFast() {
             m_linearInterpolator.GetCurrentPosition(tempX, tempY);
             m_currentX = tempX;
             m_currentY = tempY;
-            
-            // Try unified queue first, then legacy queues
-            if (!ProcessNextMotion()) {
-                if (!ProcessNextLinear()) {
-                    motionComplete = true;
-                }
+
+            if (!StartNextMotion(false)) {
+                motionComplete = true;
             }
         }
     }
@@ -345,7 +346,7 @@ void CoordinatedMotionController::UpdateFast() {
         // No more moves, stop motion
         m_active = false;
         m_motionType = MOTION_TYPE_NONE;
-        m_stopCounter = 10;  // Send zero steps for 10 more cycles (2ms at 5kHz)
+        m_stopCounter = m_stopAtQueueEnd ? 10 : 0;
         return;
     }
     
@@ -362,24 +363,29 @@ void CoordinatedMotionController::UpdateFast() {
     if (stepsGenerated) {
         // Safety check: if both steps are zero, motion is complete
         if (stepsX == 0 && stepsY == 0) {
-            // Explicitly send zero steps to stop motors
-            if (m_motorX) {
-                m_motorX->SetCoordinatedSteps(0);
-            }
-            if (m_motorY) {
-                m_motorY->SetCoordinatedSteps(0);
-            }
-            
-            // No steps to apply - motion is complete
+            // No steps to apply - if completed, try immediate handoff.
             if (m_motionType == MOTION_TYPE_LINEAR && m_linearInterpolator.IsLinearComplete()) {
-                m_active = false;
-                m_motionType = MOTION_TYPE_NONE;
-                m_stopCounter = 10;  // Send zero steps for 10 more cycles (2ms at 5kHz)
-                return;
+                if (StartNextMotion(false)) {
+                    return;
+                }
+                motionComplete = true;
             } else if (m_motionType == MOTION_TYPE_ARC && m_arcInterpolator.IsArcComplete()) {
+                if (StartNextMotion(true)) {
+                    return;
+                }
+                motionComplete = true;
+            }
+
+            if (motionComplete) {
+                if (m_motorX) {
+                    m_motorX->SetCoordinatedSteps(0);
+                }
+                if (m_motorY) {
+                    m_motorY->SetCoordinatedSteps(0);
+                }
                 m_active = false;
                 m_motionType = MOTION_TYPE_NONE;
-                m_stopCounter = 10;  // Send zero steps for 10 more cycles (2ms at 5kHz)
+                m_stopCounter = m_stopAtQueueEnd ? 10 : 0;
                 return;
             }
         }
@@ -402,16 +408,7 @@ void CoordinatedMotionController::UpdateFast() {
             m_currentY = tempY;
         }
     } else {
-        // GenerateNextSteps returned false - motion should be complete
-        // Explicitly send zero steps to stop motors
-        if (m_motorX) {
-            m_motorX->SetCoordinatedSteps(0);
-        }
-        if (m_motorY) {
-            m_motorY->SetCoordinatedSteps(0);
-        }
-        
-        // Double-check completion status and stop if needed
+        // GenerateNextSteps returned false - if complete, try immediate handoff.
         if (m_motionType == MOTION_TYPE_ARC) {
             if (m_arcInterpolator.IsArcComplete()) {
                 // Update position from interpolator one final time
@@ -419,9 +416,10 @@ void CoordinatedMotionController::UpdateFast() {
                 m_arcInterpolator.GetCurrentPosition(tempX, tempY);
                 m_currentX = tempX;
                 m_currentY = tempY;
-                m_active = false;
-                m_motionType = MOTION_TYPE_NONE;
-                m_stopCounter = 10;  // Send zero steps for 10 more cycles (2ms at 5kHz)
+                if (StartNextMotion(true)) {
+                    return;
+                }
+                motionComplete = true;
             }
         } else if (m_motionType == MOTION_TYPE_LINEAR) {
             if (m_linearInterpolator.IsLinearComplete()) {
@@ -430,10 +428,23 @@ void CoordinatedMotionController::UpdateFast() {
                 m_linearInterpolator.GetCurrentPosition(tempX, tempY);
                 m_currentX = tempX;
                 m_currentY = tempY;
-                m_active = false;
-                m_motionType = MOTION_TYPE_NONE;
-                m_stopCounter = 10;  // Send zero steps for 10 more cycles (2ms at 5kHz)
+                if (StartNextMotion(false)) {
+                    return;
+                }
+                motionComplete = true;
             }
+        }
+
+        if (motionComplete) {
+            if (m_motorX) {
+                m_motorX->SetCoordinatedSteps(0);
+            }
+            if (m_motorY) {
+                m_motorY->SetCoordinatedSteps(0);
+            }
+            m_active = false;
+            m_motionType = MOTION_TYPE_NONE;
+            m_stopCounter = m_stopAtQueueEnd ? 10 : 0;
         }
     }
 }
@@ -1039,27 +1050,30 @@ void CoordinatedMotionController::RecalculatePlanner() {
     
     // Step 2: Set exit speeds based on look-ahead logic
     // Look ahead: if there's a next move, exit speed = next move's entry speed (junction speed)
-    // If no next move, exit speed = 0 (full stop)
+    // If no next move, tail behavior is policy-driven.
     for (uint8_t i = 0; i < count; i++) {
         if (i + 1 < count) {
             // Look ahead: there IS a next move
             // Exit speed = next segment's entry speed (junction speed)
             m_motionQueue[order[i]].exitSpeed = m_motionQueue[order[i + 1]].entrySpeed;
         } else {
-            // Look ahead: there is NO next move
-            // Exit speed = 0 (full stop)
-            m_motionQueue[order[i]].exitSpeed = 0;
+            // Look ahead tail behavior:
+            // - stop mode: force full stop
+            // - continuous mode: keep rolling speed so a following queued block can blend in
+            m_motionQueue[order[i]].exitSpeed = m_stopAtQueueEnd
+                ? 0
+                : m_motionQueue[order[i]].entrySpeed;
         }
     }
     
     // Step 3: Backward pass - verify deceleration is possible (work in squared space)
-    // Work backwards from last block to planned pointer
-    // Start from last block (exit speed = 0)
+    // Work backwards from last block to planned pointer.
     if (count > 0) {
         QueuedMotion &last = m_motionQueue[order[count - 1]];
-        // Last block: maximum entry speed that allows deceleration to exit speed (0)
+        // Last block: maximum entry speed that allows transition to its configured exit speed.
         if (last.lengthSteps > 0 && m_accelMax > 0) {
-            double maxEntrySqr = 2.0 * (double)m_accelMax * (double)last.lengthSteps;
+            double exitSqr = (double)last.exitSpeed * (double)last.exitSpeed;
+            double maxEntrySqr = exitSqr + 2.0 * (double)m_accelMax * (double)last.lengthSteps;
             double currentEntrySqr = (double)last.entrySpeed * (double)last.entrySpeed;
             if (currentEntrySqr > maxEntrySqr) {
                 last.entrySpeed = (uint32_t)sqrt(maxEntrySqr);
