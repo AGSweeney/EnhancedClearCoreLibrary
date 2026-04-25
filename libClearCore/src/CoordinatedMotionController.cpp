@@ -73,6 +73,9 @@ CoordinatedMotionController::CoordinatedMotionController()
       m_active(false),
       m_initialized(false),
       m_motionType(MOTION_TYPE_NONE),
+      m_junctionDeviationSteps(1.0),
+      m_activeTargetX(0),
+      m_activeTargetY(0),
       m_stopCounter(0),
       m_currentX(0),
       m_currentY(0),
@@ -80,10 +83,7 @@ CoordinatedMotionController::CoordinatedMotionController()
       m_velocityMax(5000),
       m_accelMax(50000),
       m_unitsConfiguredX(false),
-      m_unitsConfiguredY(false),
-      m_junctionDeviationSteps(1.0),
-      m_activeTargetX(0),
-      m_activeTargetY(0) {
+      m_unitsConfiguredY(false) {
     // Initialize queues
     for (uint8_t i = 0; i < ARC_QUEUE_SIZE; i++) {
         m_motionQueue[i].valid = false;

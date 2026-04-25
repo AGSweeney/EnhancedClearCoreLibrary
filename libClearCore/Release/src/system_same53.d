@@ -1,6 +1,5 @@
-src/EthernetManager.d src/EthernetManager.o: ../src/EthernetManager.cpp \
- ../inc/EthernetManager.h \
- C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/sam.h \
+src/system_same53.d src/system_same53.o: ../src/system_same53.c \
+ C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/same53.h \
  C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/same53n19a.h \
  C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\4.5.0\CMSIS\Include/core_cm4.h \
  C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\4.5.0\CMSIS\Include/core_cmInstr.h \
@@ -104,52 +103,9 @@ src/EthernetManager.d src/EthernetManager.o: ../src/EthernetManager.cpp \
  C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/instance/usb.h \
  C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/instance/wdt.h \
  C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/pio/same53n19a.h \
- ../inc/EthernetApi.h ../inc/HardwareMapping.h ../inc/PeripheralRoute.h \
- ../inc/Connector.h ../inc/SysConnectors.h ../inc/IpAddress.h \
- ../../LwIP/LwIP/src/include/lwip/ip_addr.h \
- ../../LwIP/LwIP/src/include/lwip/opt.h \
- ../../LwIP/LwIP/port/include/lwipopts.h \
- ../../LwIP/LwIP/src/include/lwip/debug.h \
- ../../LwIP/LwIP/src/include/lwip/arch.h \
- ../../LwIP/LwIP/port/include/arch/cc.h \
- ../../LwIP/LwIP/src/include/lwip/def.h \
- ../../LwIP/LwIP/src/include/lwip/ip4_addr.h \
- ../../LwIP/LwIP/src/include/lwip/ip6_addr.h \
- ../../LwIP/LwIP/src/include/lwip/def.h ../inc/Phy.h ../inc/SysUtils.h \
- ../../LwIP/LwIP/src/include/lwip/dhcp.h \
- ../../LwIP/LwIP/src/include/lwip/netif.h \
- ../../LwIP/LwIP/src/include/lwip/err.h \
- ../../LwIP/LwIP/src/include/lwip/pbuf.h \
- ../../LwIP/LwIP/src/include/lwip/stats.h \
- ../../LwIP/LwIP/src/include/lwip/mem.h \
- ../../LwIP/LwIP/src/include/lwip/memp.h \
- ../../LwIP/LwIP/src/include/lwip/priv/memp_std.h \
- ../../LwIP/LwIP/src/include/lwip/priv/memp_priv.h \
- ../../LwIP/LwIP/src/include/lwip/priv/mem_priv.h \
- ../../LwIP/LwIP/src/include/lwip/udp.h \
- ../../LwIP/LwIP/src/include/lwip/ip.h \
- ../../LwIP/LwIP/src/include/lwip/ip4.h \
- ../../LwIP/LwIP/src/include/lwip/prot/ip4.h \
- ../../LwIP/LwIP/src/include/lwip/ip6.h \
- ../../LwIP/LwIP/src/include/lwip/prot/ip.h \
- ../../LwIP/LwIP/src/include/lwip/prot/udp.h \
- ../../LwIP/LwIP/port/include/ethernetif.c ../inc/EthernetApi.h \
- ../../LwIP/LwIP/src/include/netif/etharp.h \
- ../../LwIP/LwIP/src/include/lwip/etharp.h \
- ../../LwIP/LwIP/src/include/lwip/prot/ethernet.h \
- ../../LwIP/LwIP/src/include/lwip/prot/ieee.h \
- ../../LwIP/LwIP/src/include/lwip/prot/etharp.h \
- ../../LwIP/LwIP/src/include/netif/ethernet.h \
- ../../LwIP/LwIP/src/include/lwip/init.h \
- ../../LwIP/LwIP/src/include/lwip/dns.h \
- ../../LwIP/LwIP/src/include/lwip/timeouts.h \
- ../../LwIP/LwIP/src/include/lwip/sys.h \
- ../../LwIP/LwIP/port/include/arch/sys_arch.h ../inc/NvmManager.h \
- ../inc/SysTiming.h
+ ../inc/SysUtils.h
 
-../inc/EthernetManager.h:
-
-C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/sam.h:
+C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/same53.h:
 
 C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/same53n19a.h:
 
@@ -357,102 +313,4 @@ C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include
 
 C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/pio/same53n19a.h:
 
-../inc/EthernetApi.h:
-
-../inc/HardwareMapping.h:
-
-../inc/PeripheralRoute.h:
-
-../inc/Connector.h:
-
-../inc/SysConnectors.h:
-
-../inc/IpAddress.h:
-
-../../LwIP/LwIP/src/include/lwip/ip_addr.h:
-
-../../LwIP/LwIP/src/include/lwip/opt.h:
-
-../../LwIP/LwIP/port/include/lwipopts.h:
-
-../../LwIP/LwIP/src/include/lwip/debug.h:
-
-../../LwIP/LwIP/src/include/lwip/arch.h:
-
-../../LwIP/LwIP/port/include/arch/cc.h:
-
-../../LwIP/LwIP/src/include/lwip/def.h:
-
-../../LwIP/LwIP/src/include/lwip/ip4_addr.h:
-
-../../LwIP/LwIP/src/include/lwip/ip6_addr.h:
-
-../../LwIP/LwIP/src/include/lwip/def.h:
-
-../inc/Phy.h:
-
 ../inc/SysUtils.h:
-
-../../LwIP/LwIP/src/include/lwip/dhcp.h:
-
-../../LwIP/LwIP/src/include/lwip/netif.h:
-
-../../LwIP/LwIP/src/include/lwip/err.h:
-
-../../LwIP/LwIP/src/include/lwip/pbuf.h:
-
-../../LwIP/LwIP/src/include/lwip/stats.h:
-
-../../LwIP/LwIP/src/include/lwip/mem.h:
-
-../../LwIP/LwIP/src/include/lwip/memp.h:
-
-../../LwIP/LwIP/src/include/lwip/priv/memp_std.h:
-
-../../LwIP/LwIP/src/include/lwip/priv/memp_priv.h:
-
-../../LwIP/LwIP/src/include/lwip/priv/mem_priv.h:
-
-../../LwIP/LwIP/src/include/lwip/udp.h:
-
-../../LwIP/LwIP/src/include/lwip/ip.h:
-
-../../LwIP/LwIP/src/include/lwip/ip4.h:
-
-../../LwIP/LwIP/src/include/lwip/prot/ip4.h:
-
-../../LwIP/LwIP/src/include/lwip/ip6.h:
-
-../../LwIP/LwIP/src/include/lwip/prot/ip.h:
-
-../../LwIP/LwIP/src/include/lwip/prot/udp.h:
-
-../../LwIP/LwIP/port/include/ethernetif.c:
-
-../inc/EthernetApi.h:
-
-../../LwIP/LwIP/src/include/netif/etharp.h:
-
-../../LwIP/LwIP/src/include/lwip/etharp.h:
-
-../../LwIP/LwIP/src/include/lwip/prot/ethernet.h:
-
-../../LwIP/LwIP/src/include/lwip/prot/ieee.h:
-
-../../LwIP/LwIP/src/include/lwip/prot/etharp.h:
-
-../../LwIP/LwIP/src/include/netif/ethernet.h:
-
-../../LwIP/LwIP/src/include/lwip/init.h:
-
-../../LwIP/LwIP/src/include/lwip/dns.h:
-
-../../LwIP/LwIP/src/include/lwip/timeouts.h:
-
-../../LwIP/LwIP/src/include/lwip/sys.h:
-
-../../LwIP/LwIP/port/include/arch/sys_arch.h:
-
-../inc/NvmManager.h:
-
-../inc/SysTiming.h:
