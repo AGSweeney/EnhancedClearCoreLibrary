@@ -8,7 +8,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS OpenGL OpenGLWidgets Widgets SerialPort Network)
+find_package(Qt6 REQUIRED COMPONENTS OpenGL OpenGLWidgets Widgets SerialPort Network Svg)
 
 qt_add_executable(ClearCNC_Controller WIN32
     src/main.cpp
@@ -25,6 +25,7 @@ target_link_libraries(ClearCNC_Controller PRIVATE
     Qt6::OpenGLWidgets
     Qt6::OpenGL
     Qt6::Widgets
+    Qt6::Svg
     Qt6::SerialPort
     Qt6::Network
 )

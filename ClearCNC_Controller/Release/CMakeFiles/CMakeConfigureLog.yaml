@@ -63,8 +63,8 @@ events:
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-bpz2gh"
-      binary: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-bpz2gh"
+      source: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-lo1izu"
+      binary: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-lo1izu"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
       CMAKE_CXX_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
@@ -78,11 +78,11 @@ events:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-bpz2gh'
+        Change Dir: 'D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-lo1izu'
         
-        Run Build Command(s): C:/PROGRA~1/MICROS~2/2022/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe -v cmTC_a36e1
-        [1/2] C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /EHsc  /Zi /Ob0 /Od /RTC1 -MDd /showIncludes /FoCMakeFiles\\cmTC_a36e1.dir\\CMakeCXXCompilerABI.cpp.obj /FdCMakeFiles\\cmTC_a36e1.dir\\ /FS -c C:\\Qt\\Tools\\CMake_64\\share\\cmake-3.30\\Modules\\CMakeCXXCompilerABI.cpp
-        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_a36e1.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_a36e1.dir\\CMakeCXXCompilerABI.cpp.obj  /out:cmTC_a36e1.exe /implib:cmTC_a36e1.lib /pdb:cmTC_a36e1.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        Run Build Command(s): C:/PROGRA~1/MICROS~2/2022/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe -v cmTC_0f415
+        [1/2] C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /EHsc  /Zi /Ob0 /Od /RTC1 -MDd /showIncludes /FoCMakeFiles\\cmTC_0f415.dir\\CMakeCXXCompilerABI.cpp.obj /FdCMakeFiles\\cmTC_0f415.dir\\ /FS -c C:\\Qt\\Tools\\CMake_64\\share\\cmake-3.30\\Modules\\CMakeCXXCompilerABI.cpp
+        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_0f415.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_0f415.dir\\CMakeCXXCompilerABI.cpp.obj  /out:cmTC_0f415.exe /implib:cmTC_0f415.lib /pdb:cmTC_0f415.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
         
       exitCode: 0
   -
@@ -130,8 +130,8 @@ events:
     checks:
       - "Performing Test CMAKE_HAVE_LIBC_PTHREAD"
     directories:
-      source: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-iazncx"
-      binary: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-iazncx"
+      source: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-5ny1ip"
+      binary: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-5ny1ip"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
       CMAKE_CXX_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
@@ -145,13 +145,13 @@ events:
       variable: "CMAKE_HAVE_LIBC_PTHREAD"
       cached: true
       stdout: |
-        Change Dir: 'D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-iazncx'
+        Change Dir: 'D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-5ny1ip'
         
-        Run Build Command(s): C:/PROGRA~1/MICROS~2/2022/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe -v cmTC_1d186
-        [1/2] C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP -DCMAKE_HAVE_LIBC_PTHREAD  /DWIN32 /D_WINDOWS /EHsc  /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_1d186.dir\\src.cxx.obj /FdCMakeFiles\\cmTC_1d186.dir\\ /FS -c D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-iazncx\\src.cxx
-        FAILED: CMakeFiles/cmTC_1d186.dir/src.cxx.obj 
-        C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP -DCMAKE_HAVE_LIBC_PTHREAD  /DWIN32 /D_WINDOWS /EHsc  /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_1d186.dir\\src.cxx.obj /FdCMakeFiles\\cmTC_1d186.dir\\ /FS -c D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-iazncx\\src.cxx
-        D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-iazncx\\src.cxx(1): fatal error C1083: Cannot open include file: 'pthread.h': No such file or directory
+        Run Build Command(s): C:/PROGRA~1/MICROS~2/2022/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe -v cmTC_a35a0
+        [1/2] C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP -DCMAKE_HAVE_LIBC_PTHREAD  /DWIN32 /D_WINDOWS /EHsc  /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_a35a0.dir\\src.cxx.obj /FdCMakeFiles\\cmTC_a35a0.dir\\ /FS -c D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-5ny1ip\\src.cxx
+        FAILED: CMakeFiles/cmTC_a35a0.dir/src.cxx.obj 
+        C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP -DCMAKE_HAVE_LIBC_PTHREAD  /DWIN32 /D_WINDOWS /EHsc  /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_a35a0.dir\\src.cxx.obj /FdCMakeFiles\\cmTC_a35a0.dir\\ /FS -c D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-5ny1ip\\src.cxx
+        D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-5ny1ip\\src.cxx(1): fatal error C1083: Cannot open include file: 'pthread.h': No such file or directory
         ninja: build stopped: subcommand failed.
         
       exitCode: 1
@@ -171,8 +171,8 @@ events:
     checks:
       - "Looking for pthread_create in pthreads"
     directories:
-      source: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-5kc1iw"
-      binary: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-5kc1iw"
+      source: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-pqrsli"
+      binary: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-pqrsli"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
       CMAKE_CXX_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
@@ -186,14 +186,14 @@ events:
       variable: "CMAKE_HAVE_PTHREADS_CREATE"
       cached: true
       stdout: |
-        Change Dir: 'D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-5kc1iw'
+        Change Dir: 'D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-pqrsli'
         
-        Run Build Command(s): C:/PROGRA~1/MICROS~2/2022/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe -v cmTC_8aca9
-        [1/2] C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /EHsc -DCHECK_FUNCTION_EXISTS=pthread_create /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_8aca9.dir\\CheckFunctionExists.cxx.obj /FdCMakeFiles\\cmTC_8aca9.dir\\ /FS -c D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-5kc1iw\\CheckFunctionExists.cxx
-        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_8aca9.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_8aca9.dir\\CheckFunctionExists.cxx.obj  /out:cmTC_8aca9.exe /implib:cmTC_8aca9.lib /pdb:cmTC_8aca9.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthreads.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
-        FAILED: cmTC_8aca9.exe 
-        C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_8aca9.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_8aca9.dir\\CheckFunctionExists.cxx.obj  /out:cmTC_8aca9.exe /implib:cmTC_8aca9.lib /pdb:cmTC_8aca9.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthreads.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
-        LINK Pass 1: command "C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_8aca9.dir\\CheckFunctionExists.cxx.obj /out:cmTC_8aca9.exe /implib:cmTC_8aca9.lib /pdb:cmTC_8aca9.pdb /version:0.0 /machine:x64 /debug /INCREMENTAL /subsystem:console pthreads.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTFILE:CMakeFiles\\cmTC_8aca9.dir/intermediate.manifest CMakeFiles\\cmTC_8aca9.dir/manifest.res" failed (exit code 1104) with the following output:
+        Run Build Command(s): C:/PROGRA~1/MICROS~2/2022/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe -v cmTC_d250a
+        [1/2] C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /EHsc -DCHECK_FUNCTION_EXISTS=pthread_create /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_d250a.dir\\CheckFunctionExists.cxx.obj /FdCMakeFiles\\cmTC_d250a.dir\\ /FS -c D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-pqrsli\\CheckFunctionExists.cxx
+        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_d250a.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_d250a.dir\\CheckFunctionExists.cxx.obj  /out:cmTC_d250a.exe /implib:cmTC_d250a.lib /pdb:cmTC_d250a.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthreads.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        FAILED: cmTC_d250a.exe 
+        C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_d250a.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_d250a.dir\\CheckFunctionExists.cxx.obj  /out:cmTC_d250a.exe /implib:cmTC_d250a.lib /pdb:cmTC_d250a.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthreads.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        LINK Pass 1: command "C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_d250a.dir\\CheckFunctionExists.cxx.obj /out:cmTC_d250a.exe /implib:cmTC_d250a.lib /pdb:cmTC_d250a.pdb /version:0.0 /machine:x64 /debug /INCREMENTAL /subsystem:console pthreads.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTFILE:CMakeFiles\\cmTC_d250a.dir/intermediate.manifest CMakeFiles\\cmTC_d250a.dir/manifest.res" failed (exit code 1104) with the following output:
         LINK : fatal error LNK1104: cannot open file 'pthreads.lib'\x0d
         ninja: build stopped: subcommand failed.
         
@@ -214,8 +214,8 @@ events:
     checks:
       - "Looking for pthread_create in pthread"
     directories:
-      source: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-6535ia"
-      binary: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-6535ia"
+      source: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-zobje7"
+      binary: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-zobje7"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
       CMAKE_CXX_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
@@ -229,14 +229,14 @@ events:
       variable: "CMAKE_HAVE_PTHREAD_CREATE"
       cached: true
       stdout: |
-        Change Dir: 'D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-6535ia'
+        Change Dir: 'D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-zobje7'
         
-        Run Build Command(s): C:/PROGRA~1/MICROS~2/2022/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe -v cmTC_de6e9
-        [1/2] C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /EHsc -DCHECK_FUNCTION_EXISTS=pthread_create /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_de6e9.dir\\CheckFunctionExists.cxx.obj /FdCMakeFiles\\cmTC_de6e9.dir\\ /FS -c D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-6535ia\\CheckFunctionExists.cxx
-        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_de6e9.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_de6e9.dir\\CheckFunctionExists.cxx.obj  /out:cmTC_de6e9.exe /implib:cmTC_de6e9.lib /pdb:cmTC_de6e9.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthread.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
-        FAILED: cmTC_de6e9.exe 
-        C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_de6e9.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_de6e9.dir\\CheckFunctionExists.cxx.obj  /out:cmTC_de6e9.exe /implib:cmTC_de6e9.lib /pdb:cmTC_de6e9.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthread.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
-        LINK Pass 1: command "C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_de6e9.dir\\CheckFunctionExists.cxx.obj /out:cmTC_de6e9.exe /implib:cmTC_de6e9.lib /pdb:cmTC_de6e9.pdb /version:0.0 /machine:x64 /debug /INCREMENTAL /subsystem:console pthread.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTFILE:CMakeFiles\\cmTC_de6e9.dir/intermediate.manifest CMakeFiles\\cmTC_de6e9.dir/manifest.res" failed (exit code 1104) with the following output:
+        Run Build Command(s): C:/PROGRA~1/MICROS~2/2022/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe -v cmTC_a5b14
+        [1/2] C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /EHsc -DCHECK_FUNCTION_EXISTS=pthread_create /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_a5b14.dir\\CheckFunctionExists.cxx.obj /FdCMakeFiles\\cmTC_a5b14.dir\\ /FS -c D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-zobje7\\CheckFunctionExists.cxx
+        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_a5b14.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_a5b14.dir\\CheckFunctionExists.cxx.obj  /out:cmTC_a5b14.exe /implib:cmTC_a5b14.lib /pdb:cmTC_a5b14.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthread.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        FAILED: cmTC_a5b14.exe 
+        C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_a5b14.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_a5b14.dir\\CheckFunctionExists.cxx.obj  /out:cmTC_a5b14.exe /implib:cmTC_a5b14.lib /pdb:cmTC_a5b14.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  pthread.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        LINK Pass 1: command "C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_a5b14.dir\\CheckFunctionExists.cxx.obj /out:cmTC_a5b14.exe /implib:cmTC_a5b14.lib /pdb:cmTC_a5b14.pdb /version:0.0 /machine:x64 /debug /INCREMENTAL /subsystem:console pthread.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTFILE:CMakeFiles\\cmTC_a5b14.dir/intermediate.manifest CMakeFiles\\cmTC_a5b14.dir/manifest.res" failed (exit code 1104) with the following output:
         LINK : fatal error LNK1104: cannot open file 'pthread.lib'\x0d
         ninja: build stopped: subcommand failed.
         
@@ -264,8 +264,8 @@ events:
     checks:
       - "Performing Test HAVE_STDATOMIC"
     directories:
-      source: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-11k475"
-      binary: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-11k475"
+      source: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-9fczwo"
+      binary: "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-9fczwo"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
       CMAKE_CXX_FLAGS_DEBUG: "/Zi /Ob0 /Od /RTC1"
@@ -279,11 +279,11 @@ events:
       variable: "HAVE_STDATOMIC"
       cached: true
       stdout: |
-        Change Dir: 'D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-11k475'
+        Change Dir: 'D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/CMakeScratch/TryCompile-9fczwo'
         
-        Run Build Command(s): C:/PROGRA~1/MICROS~2/2022/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe -v cmTC_6facd
-        [1/2] C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP -DHAVE_STDATOMIC  /DWIN32 /D_WINDOWS /EHsc  /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_6facd.dir\\src.cxx.obj /FdCMakeFiles\\cmTC_6facd.dir\\ /FS -c D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-11k475\\src.cxx
-        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_6facd.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_6facd.dir\\src.cxx.obj  /out:cmTC_6facd.exe /implib:cmTC_6facd.lib /pdb:cmTC_6facd.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        Run Build Command(s): C:/PROGRA~1/MICROS~2/2022/COMMUN~1/Common7/IDE/COMMON~1/MICROS~1/CMake/Ninja/ninja.exe -v cmTC_e9531
+        [1/2] C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP -DHAVE_STDATOMIC  /DWIN32 /D_WINDOWS /EHsc  /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_e9531.dir\\src.cxx.obj /FdCMakeFiles\\cmTC_e9531.dir\\ /FS -c D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCNC_Controller\\Release\\CMakeFiles\\CMakeScratch\\TryCompile-9fczwo\\src.cxx
+        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && C:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_e9531.dir --rc=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\rc.exe --mt=C:\\PROGRA~2\\WI3CF2~1\\10\\bin\\100261~1.0\\x64\\mt.exe --manifests  -- C:\\PROGRA~1\\MICROS~2\\2022\\COMMUN~1\\VC\\Tools\\MSVC\\1444~1.352\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_e9531.dir\\src.cxx.obj  /out:cmTC_e9531.exe /implib:cmTC_e9531.lib /pdb:cmTC_e9531.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
         
       exitCode: 0
 ...

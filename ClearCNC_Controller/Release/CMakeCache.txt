@@ -269,6 +269,9 @@ Qt6OpenGL_DIR:PATH=C:/Users/Adam/vcpkg/installed/x64-windows/share/Qt6OpenGL
 //The directory containing a CMake configuration file for Qt6SerialPort.
 Qt6SerialPort_DIR:PATH=C:/Users/Adam/vcpkg/installed/x64-windows/share/Qt6SerialPort
 
+//The directory containing a CMake configuration file for Qt6Svg.
+Qt6Svg_DIR:PATH=C:/Users/Adam/vcpkg/installed/x64-windows/share/Qt6Svg
+
 //The directory containing a CMake configuration file for Qt6WidgetsTools.
 Qt6WidgetsTools_DIR:PATH=C:/Users/Adam/vcpkg/installed/x64-windows/share/Qt6WidgetsTools
 

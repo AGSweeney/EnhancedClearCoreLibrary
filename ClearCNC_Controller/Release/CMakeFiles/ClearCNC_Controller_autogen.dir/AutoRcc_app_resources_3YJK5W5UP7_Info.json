@@ -9,7 +9,9 @@
 	"INCLUDE_DIR" : "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/ClearCNC_Controller_autogen/include",
 	"INPUTS" : 
 	[
-		"D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/QtController/resources/icons/clearcnc_app_icon.svg"
+		"D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/QtController/resources/icons/spin-up.svg",
+		"D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/QtController/resources/icons/clearcnc_app_icon.svg",
+		"D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/QtController/resources/icons/combo-down.svg"
 	],
 	"LOCK_FILE" : "D:/CCDev/EnhancedClearCoreLibrary/ClearCNC_Controller/Release/CMakeFiles/ClearCNC_Controller_autogen.dir/AutoRcc_app_resources_3YJK5W5UP7_Lock.lock",
 	"MULTI_CONFIG" : false,
