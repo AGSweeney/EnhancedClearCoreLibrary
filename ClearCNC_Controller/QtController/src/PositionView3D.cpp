@@ -96,6 +96,13 @@ void PositionView3D::setProgramPath(const QVector<QVector3D> &points) {
     update();
 }
 
+void PositionView3D::setProgramPathSplit(const QVector<QVector<QVector3D>> &cutStrips,
+                                         const QVector<QVector3D> &rapidSegments) {
+    m_cutStrips = cutStrips;
+    m_rapidSegments = rapidSegments;
+    update();
+}
+
 void PositionView3D::setPathTraceEnabled(bool on) {
     if (m_pathTraceEnabled == on) {
         return;
@@ -179,7 +186,7 @@ void PositionView3D::paintGL() {
     drawGrid(halfFloor);
     const float axLen = 2.5f * s; // short RGB axis ticks (~2.5" / ~63 mm)
     drawAxes(axLen);
-    if (m_pathTraceEnabled && m_programPath.size() >= 2) {
+    if (m_pathTraceEnabled && (!m_cutStrips.isEmpty() || m_programPath.size() >= 2)) {
         drawProgramPath();
     }
     drawTool();
@@ -224,13 +231,42 @@ void PositionView3D::drawProgramPath() {
         return;
     }
     f->glDisable(GL_LIGHTING);
-    f->glColor3f(1.0f, 0.92f, 0.2f);
-    f->glLineWidth(1.5f);
-    f->glBegin(GL_LINE_STRIP);
-    for (const QVector3D &p : m_programPath) {
-        f->glVertex3f(p.x(), p.y(), p.z());
+
+    if (!m_cutStrips.isEmpty()) {
+        // --- New split-path rendering ---
+        // Rapids: thin gray lines
+        if (!m_rapidSegments.isEmpty()) {
+            f->glColor3f(0.45f, 0.45f, 0.45f);
+            f->glLineWidth(1.0f);
+            f->glBegin(GL_LINES);
+            for (const QVector3D &p : m_rapidSegments) {
+                f->glVertex3f(p.x(), p.y(), p.z());
+            }
+            f->glEnd();
+        }
+        // Cuts: bright yellow, one LINE_STRIP per run
+        f->glColor3f(1.0f, 0.92f, 0.2f);
+        f->glLineWidth(1.8f);
+        for (const QVector<QVector3D> &strip : m_cutStrips) {
+            if (strip.size() < 2) {
+                continue;
+            }
+            f->glBegin(GL_LINE_STRIP);
+            for (const QVector3D &p : strip) {
+                f->glVertex3f(p.x(), p.y(), p.z());
+            }
+            f->glEnd();
+        }
+    } else {
+        // Legacy fallback: single yellow strip (rapids included)
+        f->glColor3f(1.0f, 0.92f, 0.2f);
+        f->glLineWidth(1.5f);
+        f->glBegin(GL_LINE_STRIP);
+        for (const QVector3D &p : m_programPath) {
+            f->glVertex3f(p.x(), p.y(), p.z());
+        }
+        f->glEnd();
     }
-    f->glEnd();
 }
 
 void PositionView3D::drawGrid(float halfExtent) {

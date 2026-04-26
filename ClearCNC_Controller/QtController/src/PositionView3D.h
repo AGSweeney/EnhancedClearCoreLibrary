@@ -19,7 +19,12 @@ public:
     void setGridCellStep(float cellStep);
     // Arrow sizes are derived from "mm" design sizes; DRO in inches must scale 1/25.4 to stay small on screen.
     void setDroInches(bool inches);
-    // Polyline in DRO / machine units; shown when path tracing is on.
+    // Cutting polylines and rapid segments from GCodeProgramKinematics.
+    // cutStrips: consecutive G1/G2/G3 runs between rapids (drawn yellow).
+    // rapidSegments: flat list of start/end pairs for G0 moves (drawn gray).
+    void setProgramPathSplit(const QVector<QVector<QVector3D>> &cutStrips,
+                             const QVector<QVector3D> &rapidSegments);
+    // Legacy single-path overload kept for backward compatibility.
     void setProgramPath(const QVector<QVector3D> &points);
     void setPathTraceEnabled(bool on);
     // Multi-line DRO; drawn in 2D on top of the GL view (reliable on Windows vs stacked QLabel).
@@ -51,7 +56,9 @@ private:
     float m_gridCellStep = 25.4f; // 1" in mm; MainWindow overwrites
     bool m_droInches = false; // if true, 1.0 in DRO = 1" (not 1 mm) — must scale tool glyph
     bool m_pathTraceEnabled = false;
-    QVector<QVector3D> m_programPath;
+    QVector<QVector3D> m_programPath;            // legacy flat path
+    QVector<QVector<QVector3D>> m_cutStrips;     // one polyline per consecutive cut run
+    QVector<QVector3D> m_rapidSegments;          // flat start/end pairs for G0 moves
     QString m_droOverlayText;
     QPoint m_lastMouse;
 };

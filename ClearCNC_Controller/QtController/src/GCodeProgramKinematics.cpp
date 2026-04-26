@@ -234,59 +234,54 @@ void applyLine(
         QVector3D::dotProduct(endGui - startGui, endGui - startGui) > 1.0e-20f;
 
     if (motionG == 0) {
-        // Rapid — store as a gray segment pair and break the current cut strip.
+        // Rapid: record as a gray line segment, close the current cut strip.
         if (hasMoved) {
             out->rapidSegments.append(startGui);
             out->rapidSegments.append(endGui);
+            out->pathInGuiUnits.append(endGui);
         }
-        // Legacy flat path: include rapid but break the cut strip so subsequent cuts
-        // start a new polyline (the viewer will open a new GL_LINE_STRIP).
-        out->pathInGuiUnits.append(endGui);
+        k->needNewStrip = true; // next cut starts a new polyline
         k->x = tx;
         k->y = ty;
         k->z = tz;
         return;
+    }
+
+    // G1 / G2 / G3 — cutting move.
+    // Open a new cut strip when coming from a rapid (or at the very start).
+    if (k->needNewStrip || out->cutStrips.isEmpty()) {
+        out->cutStrips.append(QVector<QVector3D>());
+        out->cutStrips.last().append(startGui);
+        k->needNewStrip = false;
     }
 
     if (motionG == 1) {
-        // Linear cut — append to current cut strip.
-        if (out->cutStrips.isEmpty()) {
-            out->cutStrips.append(QVector<QVector3D>());
-            out->cutStrips.last().append(startGui);
-        }
         if (hasMoved) {
             out->cutStrips.last().append(endGui);
             out->pathInGuiUnits.append(endGui);
-        }
-        k->x = tx;
-        k->y = ty;
-        k->z = tz;
-        return;
-    }
-
-    // Arc: G2 CW, G3 CCW
-    if (out->cutStrips.isEmpty()) {
-        out->cutStrips.append(QVector<QVector3D>());
-        out->cutStrips.last().append(startGui);
-    }
-    const bool hasIJ = haveI && haveJ;
-    if (hasIJ) {
-        const double iMm = toMmValue(valI, fIn);
-        const double jMm = toMmValue(valJ, fIn);
-        k->appendArc(startGui, endGui, guiInches, iMm, jMm, (motionG == 3),
-                     &out->cutStrips.last());
-        // Mirror into legacy flat path too
-        int added = out->cutStrips.last().size() - 1;
-        const QVector<QVector3D> &strip = out->cutStrips.last();
-        for (int idx = strip.size() - added; idx < strip.size(); ++idx) {
-            out->pathInGuiUnits.append(strip.at(idx));
         }
     } else {
-        (void)valR;
-        (void)haveR;
-        if (hasMoved) {
-            out->cutStrips.last().append(endGui);
-            out->pathInGuiUnits.append(endGui);
+        // Arc: G2 (CW) or G3 (CCW)
+        const bool hasIJ = haveI && haveJ;
+        if (hasIJ) {
+            const double iMm = toMmValue(valI, fIn);
+            const double jMm = toMmValue(valJ, fIn);
+            const int beforeSize = out->cutStrips.last().size();
+            k->appendArc(startGui, endGui, guiInches, iMm, jMm, (motionG == 3),
+                         &out->cutStrips.last());
+            // Mirror new arc points into legacy flat path
+            const QVector<QVector3D> &strip = out->cutStrips.last();
+            for (int idx = beforeSize; idx < strip.size(); ++idx) {
+                out->pathInGuiUnits.append(strip.at(idx));
+            }
+        } else {
+            // R-only or no center: straight chord approximation
+            (void)valR;
+            (void)haveR;
+            if (hasMoved) {
+                out->cutStrips.last().append(endGui);
+                out->pathInGuiUnits.append(endGui);
+            }
         }
     }
     k->x = tx;
@@ -306,28 +301,14 @@ bool BuildProgramKinematics(const QStringList &lines, bool guiInches, ProgramKin
         return false;
     }
     Kine k;
-    for (int i = 0; i < lines.size(); ++i) {
-        const QString u = lines.at(i).trimmed();
+    for (const QString &line : lines) {
+        const QString u = line.trimmed();
         if (u.isEmpty()) {
             continue;
         }
-        const int prevStrips = out->cutStrips.size();
         applyLine(u, &k, guiInches, out);
-        // After a G0 rapid, start a new cut strip so the next G1/G2/G3 begins fresh.
-        const bool rapidHappened = out->rapidSegments.size() > 0 &&
-                                    out->cutStrips.size() == prevStrips;
-        if (rapidHappened || (out->cutStrips.size() > prevStrips)) {
-            // Nothing extra needed — applyLine already handles strip management.
-        }
-        // If the last G0 left no open cut strip, open one at the new position.
-        if (!out->rapidSegments.isEmpty() &&
-            (out->cutStrips.isEmpty() ||
-             out->cutStrips.last().isEmpty())) {
-            out->cutStrips.append(QVector<QVector3D>());
-            out->cutStrips.last().append(toGui3(k.x, k.y, k.z, guiInches));
-        }
     }
-    // Remove empty strips
+    // Drop single-point strips (no actual move)
     out->cutStrips.erase(
         std::remove_if(out->cutStrips.begin(), out->cutStrips.end(),
                        [](const QVector<QVector3D> &s) { return s.size() < 2; }),

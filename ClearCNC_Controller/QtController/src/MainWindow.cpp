@@ -2235,6 +2235,7 @@ void MainWindow::RebuildProgramVizKinematics() {
         return;
     }
     m_positionView3D->setProgramPath(QVector<QVector3D>());
+    m_positionView3D->setProgramPathSplit({}, {});
     if (m_viewportPathTraceCheck) {
         m_viewportPathTraceCheck->setEnabled(!m_programLines.isEmpty());
     }
@@ -2244,7 +2245,7 @@ void MainWindow::RebuildProgramVizKinematics() {
     }
     ProgramKinematicsResult r;
     BuildProgramKinematics(m_programLines, m_guiUnitsInches, &r);
-    m_positionView3D->setProgramPath(r.pathInGuiUnits);
+    m_positionView3D->setProgramPathSplit(r.cutStrips, r.rapidSegments);
     UpdateToolVizForViewport();
 }
 
