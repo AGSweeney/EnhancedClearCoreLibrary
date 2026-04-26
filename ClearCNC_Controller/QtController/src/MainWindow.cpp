@@ -151,6 +151,7 @@ MainWindow::MainWindow(QWidget *parent)
       m_velocity(5000.0),
       m_accel(85000.0),
       m_decel(85000.0),
+      m_junctionDVmax(0.0),
       m_guiUnitsInches(false),
       m_singleMotorBench(false),
       m_programIndex(0),
@@ -991,6 +992,7 @@ void MainWindow::LoadMotionSettings() {
     m_accel = settings.value("motion/accelStepsPerSec2", m_accel).toDouble();
     m_decel = settings.value("motion/decelStepsPerSec2", m_decel).toDouble();
     m_singleMotorBench = settings.value("motion/singleMotorBench", false).toBool();
+    m_junctionDVmax = settings.value("motion/junctionDVmax", 0.0).toDouble();
     SyncActiveMotionSettingsFromPorts();
 }
 
@@ -1002,6 +1004,7 @@ void MainWindow::SaveMotionSettings() {
     settings.setValue("motion/accelStepsPerSec2", m_accel);
     settings.setValue("motion/decelStepsPerSec2", m_decel);
     settings.setValue("motion/singleMotorBench", m_singleMotorBench);
+    settings.setValue("motion/junctionDVmax", m_junctionDVmax);
 
     for (int i = 0; i < 4; ++i) {
         const auto &port = m_motorPorts[i];
@@ -1135,13 +1138,37 @@ void MainWindow::SendMotionConfigCommand() {
     if (IsLogicalAxisEnabled(4)) {
         axMask |= 8;
     }
-    const QString cmd = QString("CONFIG SPMMX=%1 VEL=%2 ACCEL=%3 DECEL=%4 SINGLE=%5 AX=%6")
-                            .arg(m_stepsPerUnit, 0, 'f', 6)
-                            .arg(m_velocity, 0, 'f', 0)
-                            .arg(m_accel, 0, 'f', 0)
-                            .arg(m_decel, 0, 'f', 0)
-                            .arg(single)
-                            .arg(axMask);
+    // Firmware converts G-code to pulses using SPMMX / SPMMY separately. Previously only
+    // SPMMX was sent while SyncActiveMotionSettingsFromPorts() used the X port alone, so Y
+    // always kept the firmware default scale — wrong pulse counts whenever Y ≠ X mechanics.
+    auto portStepsPerMm = [](const MotorPortSettings &port) -> double {
+        if (port.axisType == 0) {
+            return (port.stepsPerRev * port.gearRatio) / port.linearPitchMm;
+        }
+        return (port.stepsPerRev * port.gearRatio) / 360.0;
+    };
+    double spmmX = m_stepsPerUnit;
+    double spmmY = m_stepsPerUnit;
+    for (const auto &port : m_motorPorts) {
+        if (!port.enabled) {
+            continue;
+        }
+        if (port.axis == 1) {
+            spmmX = portStepsPerMm(port);
+        } else if (port.axis == 2) {
+            spmmY = portStepsPerMm(port);
+        }
+    }
+    const QString cmd =
+        QString("CONFIG SPMMX=%1 SPMMY=%2 VEL=%3 ACCEL=%4 DECEL=%5 DVMAX=%6 SINGLE=%7 AX=%8")
+            .arg(spmmX, 0, 'f', 6)
+            .arg(spmmY, 0, 'f', 6)
+            .arg(m_velocity, 0, 'f', 0)
+            .arg(m_accel, 0, 'f', 0)
+            .arg(m_decel, 0, 'f', 0)
+            .arg(m_junctionDVmax, 0, 'f', 0)
+            .arg(single)
+            .arg(axMask);
     SendCommand(cmd);
 }
 
@@ -1500,12 +1527,29 @@ void MainWindow::ShowMotionParametersDialog() {
     units->setCurrentIndex(m_guiUnitsInches ? 1 : 0);
     auto *topForm = new QFormLayout();
     topForm->addRow("GUI units:", units);
+
+    auto *dvmaxSpin = new QDoubleSpinBox(&dialog);
+    dvmaxSpin->setRange(0.0, 1000000.0);
+    dvmaxSpin->setDecimals(0);
+    dvmaxSpin->setSingleStep(100.0);
+    dvmaxSpin->setSuffix(" steps/sec");
+    dvmaxSpin->setSpecialValueText("0  (disabled — GRBL angle method)");
+    dvmaxSpin->setValue(m_junctionDVmax);
+    dvmaxSpin->setToolTip(
+        "Corner junction speed cap (dVmax) — Centroid-style per-axis velocity-delta limit.\n"
+        "At each junction the planner allows at most this many steps/sec of velocity change\n"
+        "on the fastest-moving axis. Smaller = more deceleration at corners, smoother feel.\n"
+        "Typical starting point: 20-30% of max velocity (e.g. 1000 when VEL=5000).\n"
+        "0 = disabled; falls back to GRBL angle-based junction deviation formula.");
+    topForm->addRow("Corner DVmax:", dvmaxSpin);
+
     auto *singleMotor = new QCheckBox(
         "Single-motor / bench (independent M0 and M1 — not coordinated XY in firmware)", &dialog);
     singleMotor->setChecked(m_singleMotorBench);
     singleMotor->setToolTip(
-        "Sends CONFIG SINGLE=1. Use when you only have one axis drive, or M1 is not connected. "
-        "Clear this for a normal 2+ axis machine (CONFIG SINGLE=0, vector G01 in XY).");
+        "Sends CONFIG SINGLE=1: always independent M0/M1 step generators (bench / one-motor). "
+        "Unchecked sends SINGLE=0: diagonals use coordinated vector feed; pure X or pure Y "
+        "segments still use independent moves (same math as bench for cardinals).");
     topForm->addRow(singleMotor);
     layout->addLayout(topForm);
 
@@ -1626,6 +1670,7 @@ void MainWindow::ShowMotionParametersDialog() {
 
     m_guiUnitsInches = units->currentIndex() == 1;
     m_singleMotorBench = singleMotor->isChecked();
+    m_junctionDVmax = dvmaxSpin->value();
     for (int i = 0; i < 4; ++i) {
         auto &port = m_motorPorts[i];
         const auto &w = widgets[i];
@@ -1689,11 +1734,21 @@ void MainWindow::SendJog(double dx, double dy) {
         return;
     }
     SendActiveUnitsCommand();
-    const QString cmd = QString("G91 G01 X%1 Y%2 F%3")
-                            .arg(dx, 0, 'f', 3)
-                            .arg(dy, 0, 'f', 3)
-                            .arg(ParseDoubleLine(m_feedEdit, 500.0), 0, 'f', 3);
-    SendCommand(cmd);
+    QStringList parts;
+    parts.append(QStringLiteral("G91"));
+    parts.append(QStringLiteral("G01"));
+    if (dx != 0.0) {
+        parts.append(QStringLiteral("X%1").arg(dx, 0, 'f', 3));
+    }
+    if (dy != 0.0) {
+        parts.append(QStringLiteral("Y%1").arg(dy, 0, 'f', 3));
+    }
+    if (parts.size() <= 2) {
+        return;
+    }
+    parts.append(
+        QStringLiteral("F%1").arg(ParseDoubleLine(m_feedEdit, 500.0), 0, 'f', 3));
+    SendCommand(parts.join(QLatin1Char(' ')));
 }
 
 void MainWindow::SendJogXPos() { SendJog(ParseDoubleLine(m_jogStepEdit, 1.0), 0.0); }
@@ -1731,20 +1786,22 @@ void MainWindow::SendJogANeg() {
 
 QString MainWindow::CleanGCodeLine(const QString &line) const {
     QString cleaned;
-    bool inParenComment = false;
+    int parenDepth = 0;  // Track nesting so ( center=(6,2) ) doesn't leak text
     for (QChar ch : line) {
         if (ch == ';') {
-            break;
+            break;  // Rest-of-line comment
         }
         if (ch == '(') {
-            inParenComment = true;
+            parenDepth++;
             continue;
         }
         if (ch == ')') {
-            inParenComment = false;
+            if (parenDepth > 0) {
+                parenDepth--;
+            }
             continue;
         }
-        if (!inParenComment) {
+        if (parenDepth == 0) {
             cleaned.append(ch);
         }
     }

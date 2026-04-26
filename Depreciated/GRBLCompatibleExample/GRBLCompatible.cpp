@@ -1224,6 +1224,8 @@ void ExecuteG02(double x, double y, double z, double i, double j, double f) {
         return;
     }
     
+    double startAngle = atan2(startY - centerY, startX - centerX);
+    if (startAngle < 0) startAngle += 2 * M_PI;
     double endAngle = atan2(endY - centerY, endX - centerX);
     if (endAngle < 0) endAngle += 2 * M_PI;
     
@@ -1242,7 +1244,8 @@ void ExecuteG02(double x, double y, double z, double i, double j, double f) {
     bool success = false;
     uint32_t startWait = Milliseconds();
     while (!success) {
-        success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, true);
+        success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, startAngle,
+                                            endAngle, true);
         if (success) {
             break;
         }
@@ -1315,6 +1318,8 @@ void ExecuteG03(double x, double y, double z, double i, double j, double f) {
         return;
     }
     
+    double startAngle = atan2(startY - centerY, startX - centerX);
+    if (startAngle < 0) startAngle += 2 * M_PI;
     double endAngle = atan2(endY - centerY, endX - centerX);
     if (endAngle < 0) endAngle += 2 * M_PI;
     
@@ -1333,7 +1338,8 @@ void ExecuteG03(double x, double y, double z, double i, double j, double f) {
     bool success = false;
     uint32_t startWait = Milliseconds();
     while (!success) {
-        success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, false);
+        success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, startAngle,
+                                            endAngle, false);
         if (success) {
             break;
         }

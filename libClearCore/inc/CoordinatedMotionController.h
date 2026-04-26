@@ -108,15 +108,43 @@ public:
         \param[in] centerX Arc center X position in steps
         \param[in] centerY Arc center Y position in steps
         \param[in] radius Arc radius in steps
-        \param[in] endAngle End angle in radians
+        \param[in] startAngle Start angle in radians (from arc center to start point; must match
+                             the segment that was parsed into the motion block — recomputing from
+                             queued step endpoints can drift vs. I/J geometry and yield wrong span)
+        \param[in] endAngle End angle in radians (from arc center to end point)
         \param[in] clockwise Direction (true = clockwise)
         
         \return true if arc command accepted
     **/
     bool QueueArc(int32_t centerX, int32_t centerY,
                  int32_t radius,
+                 double startAngle,
                  double endAngle,
                  bool clockwise);
+
+    /**
+        \brief Maximum number of segments the planner queue can hold.
+        Use this to cap the batch size in the host firmware so it never tries to submit
+        more segments than fit, which would cause QueueArc/QueueLinear to fail.
+    **/
+    uint8_t PlannerQueueCapacity() const {
+        return ARC_QUEUE_SIZE;
+    }
+
+    /**
+        \brief When true, QueueArc/QueueLinear (planner path) only enqueue; call
+        StartDeferredMotionIfPending() after batching so RecalculatePlanner sees
+        the full chain (smoother arc quadrants, etc.). Default false.
+    **/
+    void SetDeferMotionQueueStart(bool defer) {
+        m_deferQueueStart = defer;
+    }
+
+    /**
+        \brief Start first queued motion if idle and queue non-empty (after batch enqueue).
+        \return true if motion started
+    **/
+    bool StartDeferredMotionIfPending();
     
     /**
         \brief Queue a linear move (can chain from any motion type)
@@ -382,10 +410,37 @@ public:
     void FeedRateMMPerSec(double feedRate);
 
     /**
-        \brief Set junction deviation in steps for cornering speed
+        \brief Set junction deviation in steps for cornering speed (GRBL-style angle method).
+        Used as a fallback when dVmax is zero.
     **/
     void JunctionDeviationSteps(double deviationSteps) {
         m_junctionDeviationSteps = deviationSteps;
+    }
+
+    /**
+        \brief Set maximum per-axis velocity delta allowed at segment junctions (Centroid dVmax).
+
+        At each junction the velocity change vector is Δv⃗ = v_junction × (entryDir − exitDir).
+        This cap limits how fast each individual axis may change speed at a corner, independent
+        of the inter-segment angle.  The junction speed is:
+
+            v_junction ≤ dVmax / max(|ΔdirX|, |ΔdirY|)
+
+        A smaller value gives smoother corners with more deceleration; a larger value allows
+        the machine to carry more speed through sharp turns.  Set to 0 to use only the
+        GRBL angle-based junction deviation formula instead.
+
+        \param[in] dVmaxStepsPerSec  Maximum axis velocity delta in steps/sec (0 = disabled)
+    **/
+    void JunctionDVmax(uint32_t dVmaxStepsPerSec) {
+        m_junctionDVmax = dVmaxStepsPerSec;
+    }
+
+    /**
+        \brief Get current dVmax junction speed cap (steps/sec, 0 = disabled)
+    **/
+    uint32_t JunctionDVmax() const {
+        return m_junctionDVmax;
     }
 
     /**
@@ -450,7 +505,10 @@ public:
     bool GetDebugInfo(uint32_t& stepsRemaining, int32_t& currentX, int32_t& currentY) const;
 
 private:
-    static const uint8_t ARC_QUEUE_SIZE = 8;
+    // Must be >= firmware MOTION_QUEUE_SIZE so a full firmware chain fits in one planner batch.
+    // Smaller values cause batch-boundary full-stops mid-program (each new batch restarts at
+    // entrySpeed = 0, producing a visible hesitation at the junction between batches).
+    static const uint8_t ARC_QUEUE_SIZE = 16;
     
     enum MotionType {
         MOTION_TYPE_NONE,
@@ -542,7 +600,9 @@ private:
     bool m_initialized;
     volatile MotionType m_motionType;
     double m_junctionDeviationSteps;
+    uint32_t m_junctionDVmax;       // Per-axis max delta-V at junctions (steps/sec); 0 = use angle method
     volatile bool m_stopAtQueueEnd;
+    bool m_deferQueueStart;
     int32_t m_activeTargetX;
     int32_t m_activeTargetY;
 
@@ -607,6 +667,15 @@ private:
         \brief Process next motion from unified queue (arc or linear)
     **/
     bool ProcessNextMotion();
+
+    /**
+        \brief Clear interpolators and internal queues without MoveStopAbrupt on motors.
+
+        MoveLinear/MoveArc previously called Stop() before every segment; Stop() always
+        issued MoveStopAbrupt on M0/M1 even when already idle. That perturbs ClearPath
+        closed-loop tracking between back-to-back G01 blocks and can trip following-error.
+    **/
+    void ResetPlannerStateWithoutMotorStop();
 };
 
 } // ClearCore namespace

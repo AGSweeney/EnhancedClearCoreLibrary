@@ -29,6 +29,35 @@
 namespace ClearCore {
 
 static const bool kUseGrblPlanner = true;  // Enable GRBL-style path planner for testing
+
+static void NormalizeAngle0TwoPi(double *a) {
+    while (*a < 0.0) {
+        *a += 2.0 * M_PI;
+    }
+    while (*a >= 2.0 * M_PI) {
+        *a -= 2.0 * M_PI;
+    }
+}
+
+// Matches firmware ArcSpanRadians: angles normalized to [0, 2*pi); CCW/CW long/short convention.
+static double PlannerArcSpanRadians(double startNorm, double endNorm, bool clockwise) {
+    if (!clockwise) {
+        if (endNorm > startNorm) {
+            return endNorm - startNorm;
+        }
+        if (endNorm < startNorm) {
+            return 2.0 * M_PI - (startNorm - endNorm);
+        }
+        return 2.0 * M_PI;
+    }
+    if (endNorm < startNorm) {
+        return startNorm - endNorm;
+    }
+    if (endNorm > startNorm) {
+        return 2.0 * M_PI - (endNorm - startNorm);
+    }
+    return 2.0 * M_PI;
+}
 static inline void NormalizeVec(double &x, double &y) {
     double mag = sqrt(x * x + y * y);
     if (mag > 1e-9) {
@@ -75,7 +104,9 @@ CoordinatedMotionController::CoordinatedMotionController()
       m_initialized(false),
       m_motionType(MOTION_TYPE_NONE),
       m_junctionDeviationSteps(1.0),
+      m_junctionDVmax(0),
       m_stopAtQueueEnd(false),
+      m_deferQueueStart(false),
       m_activeTargetX(0),
       m_activeTargetY(0),
       m_stopCounter(0),
@@ -142,10 +173,13 @@ bool CoordinatedMotionController::MoveArc(int32_t centerX, int32_t centerY,
     if (!ValidateArc(centerX, centerY, radius)) {
         return false;
     }
-    
-    // Stop any current motion
-    Stop();
-    
+
+    if (m_active) {
+        Stop();
+    } else {
+        ResetPlannerStateWithoutMotorStop();
+    }
+
     // Initialize arc interpolator
     if (!m_arcInterpolator.InitializeArc(centerX, centerY, radius,
                                          startAngle, endAngle, clockwise,
@@ -222,13 +256,13 @@ bool CoordinatedMotionController::MoveArcContinuous(int32_t centerX, int32_t cen
     return true;
 }
 
-void CoordinatedMotionController::Stop() {
+void CoordinatedMotionController::ResetPlannerStateWithoutMotorStop() {
     m_active = false;
     m_motionType = MOTION_TYPE_NONE;
+    m_stopCounter = 0;
     m_arcInterpolator.Reset();
     m_linearInterpolator.Reset();
-    
-    // Clear all queues
+
     for (uint8_t i = 0; i < ARC_QUEUE_SIZE; i++) {
         m_motionQueue[i].valid = false;
         m_arcQueue[i].valid = false;
@@ -244,8 +278,12 @@ void CoordinatedMotionController::Stop() {
     m_linearQueueHead = 0;
     m_linearQueueTail = 0;
     m_linearQueueCount = 0;
-    
-    // Stop motors
+    m_deferQueueStart = false;
+}
+
+void CoordinatedMotionController::Stop() {
+    ResetPlannerStateWithoutMotorStop();
+
     if (m_motorX) {
         m_motorX->MoveStopAbrupt();
     }
@@ -276,6 +314,7 @@ void CoordinatedMotionController::StopDecel() {
     m_linearQueueHead = 0;
     m_linearQueueTail = 0;
     m_linearQueueCount = 0;
+    m_deferQueueStart = false;
     
     // Stop motors with deceleration
     if (m_motorX) {
@@ -541,10 +580,13 @@ bool CoordinatedMotionController::MoveLinear(int32_t endX, int32_t endY) {
     if (!ValidateLinear(endX, endY)) {
         return false;
     }
-    
-    // Stop any current motion
-    Stop();
-    
+
+    if (m_active) {
+        Stop();
+    } else {
+        ResetPlannerStateWithoutMotorStop();
+    }
+
     // Initialize linear interpolator
     if (!m_linearInterpolator.InitializeLinear(m_currentX, m_currentY,
                                               endX, endY,
@@ -570,10 +612,13 @@ bool CoordinatedMotionController::MoveLinearAbsolute(int32_t startX, int32_t sta
     if (!ValidateLinear(endX, endY)) {
         return false;
     }
-    
-    // Stop any current motion
-    Stop();
-    
+
+    if (m_active) {
+        Stop();
+    } else {
+        ResetPlannerStateWithoutMotorStop();
+    }
+
     // Set current position (protected - called from main thread, but motion stopped)
     __disable_irq();
     m_currentX = startX;
@@ -697,6 +742,7 @@ bool CoordinatedMotionController::ValidateLinear(int32_t /*endX*/, int32_t /*end
 
 bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
                                           int32_t radius,
+                                          double startAngle,
                                           double endAngle,
                                           bool clockwise) {
     if (!m_initialized) {
@@ -720,7 +766,6 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
         // If no active motion, start immediately
         if (!m_active) {
             __enable_irq();
-            double startAngle = CalculateStartAngle(centerX, centerY);
             return MoveArc(centerX, centerY, radius, startAngle, endAngle, clockwise);
         }
         
@@ -731,6 +776,7 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
         motion.arc.centerX = centerX;
         motion.arc.centerY = centerY;
         motion.arc.radius = radius;
+        motion.arc.startAngle = startAngle;
         motion.arc.endAngle = endAngle;
         motion.arc.clockwise = clockwise;
         motion.valid = true;
@@ -759,27 +805,19 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
         startX = m_activeTargetX;
         startY = m_activeTargetY;
     }
-    double startAngle = atan2((double)startY - (double)centerY,
-                              (double)startX - (double)centerX);
-    if (startAngle < 0.0) {
-        startAngle += 2.0 * M_PI;
-    }
+    double sn = startAngle;
+    double en = endAngle;
+    NormalizeAngle0TwoPi(&sn);
+    NormalizeAngle0TwoPi(&en);
     double endXf = (double)centerX + (double)radius * cos(endAngle);
     double endYf = (double)centerY + (double)radius * sin(endAngle);
     int32_t endX = (int32_t)llround(endXf);
     int32_t endY = (int32_t)llround(endYf);
     double entryDirX = 0.0, entryDirY = 0.0;
     double exitDirX = 0.0, exitDirY = 0.0;
-    TangentDir(startAngle, clockwise, entryDirX, entryDirY);
-    TangentDir(endAngle, clockwise, exitDirX, exitDirY);
-    double angleSpan;
-    if (clockwise) {
-        angleSpan = (startAngle >= endAngle) ? (startAngle - endAngle) :
-                    (startAngle + 2.0 * M_PI - endAngle);
-    } else {
-        angleSpan = (endAngle >= startAngle) ? (endAngle - startAngle) :
-                    (endAngle + 2.0 * M_PI - startAngle);
-    }
+    TangentDir(sn, clockwise, entryDirX, entryDirY);
+    TangentDir(en, clockwise, exitDirX, exitDirY);
+    double angleSpan = PlannerArcSpanRadians(sn, en, clockwise);
     uint32_t lengthSteps = (uint32_t)(fabs((double)radius) * angleSpan + 0.5);
     uint8_t tail = m_motionQueueTail;
     QueuedMotion& motion = m_motionQueue[tail];
@@ -799,8 +837,8 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
     motion.arc.centerX = centerX;
     motion.arc.centerY = centerY;
     motion.arc.radius = radius;
-    motion.arc.startAngle = startAngle;
-    motion.arc.endAngle = endAngle;
+    motion.arc.startAngle = sn;
+    motion.arc.endAngle = en;
     motion.arc.clockwise = clockwise;
     motion.valid = true;
     m_motionQueueTail = (tail + 1) % ARC_QUEUE_SIZE;
@@ -808,12 +846,27 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
     if (kUseGrblPlanner) {
         RecalculatePlanner();
     }
-    if (!m_active) {
+    if (!m_active && !m_deferQueueStart) {
         bool started = ProcessNextMotion();
         m_active = started;
     }
     __enable_irq();
     return true;
+}
+
+bool CoordinatedMotionController::StartDeferredMotionIfPending() {
+    if (!m_initialized || m_active) {
+        return false;
+    }
+    __disable_irq();
+    if (m_motionQueueCount == 0) {
+        __enable_irq();
+        return false;
+    }
+    bool started = ProcessNextMotion();
+    m_active = started;
+    __enable_irq();
+    return started;
 }
 
 bool CoordinatedMotionController::QueueLinear(int32_t endX, int32_t endY) {
@@ -902,7 +955,7 @@ bool CoordinatedMotionController::QueueLinear(int32_t endX, int32_t endY) {
     if (kUseGrblPlanner) {
         RecalculatePlanner();
     }
-    if (!m_active) {
+    if (!m_active && !m_deferQueueStart) {
         bool started = ProcessNextMotion();
         m_active = started;
     }
@@ -990,46 +1043,58 @@ void CoordinatedMotionController::RecalculatePlanner() {
             // First queued segment: use active motion exit speed
             maxEntrySqr = activeExitSpeedSqr;
         } else if (i > 0) {
-            // Calculate junction speed based on angle between segments
             QueuedMotion &prev = m_motionQueue[order[i - 1]];
-            double cosTheta = (double)prev.exitDirX * (double)cur.entryDirX +
-                              (double)prev.exitDirY * (double)cur.entryDirY;
-            
-            // Clamp cosTheta to valid range [-1, 1]
-            if (cosTheta > 1.0) cosTheta = 1.0;
-            if (cosTheta < -1.0) cosTheta = -1.0;
-            
-            // Calculate half-angle sine: sin(θ/2) = sqrt((1 - cos(θ)) / 2)
-            double sinHalf = sqrt(0.5 * (1.0 - cosTheta));
-            
-            // Calculate junction unit vector for axis-limited acceleration
-            double junctionDirX = (double)cur.entryDirX - (double)prev.exitDirX;
-            double junctionDirY = (double)cur.entryDirY - (double)prev.exitDirY;
-            double junctionAccel = GetJunctionAcceleration(junctionDirX, junctionDirY);
-            
+
+            // Direction-change vector at the junction (unit scale: each component in [-2, 2]).
+            double dDirX = (double)cur.entryDirX - (double)prev.exitDirX;
+            double dDirY = (double)cur.entryDirY - (double)prev.exitDirY;
+
             double vmaxSqr;
-            // Handle edge cases: straight line (sinHalf ≈ 0) and 180° turn (sinHalf ≈ 1)
-            if (sinHalf < 1e-6) {
-                // Straight line or very small angle - use minimum of both speeds (squared)
-                double prevNominalSqr = (double)prev.nominalSpeed * (double)prev.nominalSpeed;
-                vmaxSqr = fmin(prevNominalSqr, nominalSqr);
-            } else if (sinHalf > 0.999) {
-                // Near 180° turn - very sharp corner, limit speed significantly
-                vmaxSqr = junctionAccel * m_junctionDeviationSteps * 0.5;
-            } else {
-                // Standard junction speed formula (GRBL-style) - compute squared speed directly
-                // vmax² = (accel * junctionDeviation * sinHalf) / (1 - sinHalf)
-                double denominator = 1.0 - sinHalf;
-                if (denominator < 1e-6) {
-                    denominator = 1e-6;  // Prevent division by zero
+
+            if (m_junctionDVmax > 0) {
+                // ── Centroid-style dVmax per-axis cap ─────────────────────────────────
+                // Δv⃗ = v_junction × (entryDir − exitDir)
+                // |Δv_axis| = v_junction × |dDir_axis|
+                // Constraint: v_junction × max(|dDirX|, |dDirY|) ≤ dVmax
+                // → v_junction ≤ dVmax / max(|dDirX|, |dDirY|)
+                //
+                // Corner cases:
+                //   |dDir| ≈ 0  → no direction change, full speed allowed
+                //   |dDir| ≈ 2  → 180° reversal, must stop
+                double maxDeltaDir = fmax(fabs(dDirX), fabs(dDirY));
+                double vJunction;
+                if (maxDeltaDir < 1e-6) {
+                    // Straight-through or negligible turn — full nominal speed
+                    double prevNominal = (double)prev.nominalSpeed;
+                    vJunction = fmin(prevNominal, (double)cur.nominalSpeed);
+                } else {
+                    vJunction = (double)m_junctionDVmax / maxDeltaDir;
                 }
-                vmaxSqr = (junctionAccel * m_junctionDeviationSteps * sinHalf) / denominator;
+                vmaxSqr = vJunction * vJunction;
+            } else {
+                // ── GRBL angle-based junction deviation formula (fallback) ─────────────
+                double cosTheta = (double)prev.exitDirX * (double)cur.entryDirX +
+                                  (double)prev.exitDirY * (double)cur.entryDirY;
+                if (cosTheta > 1.0) cosTheta = 1.0;
+                if (cosTheta < -1.0) cosTheta = -1.0;
+                double sinHalf = sqrt(0.5 * (1.0 - cosTheta));
+
+                double junctionAccel = GetJunctionAcceleration(dDirX, dDirY);
+
+                if (sinHalf < 1e-6) {
+                    double prevNominalSqr = (double)prev.nominalSpeed * (double)prev.nominalSpeed;
+                    vmaxSqr = fmin(prevNominalSqr, nominalSqr);
+                } else if (sinHalf > 0.999) {
+                    vmaxSqr = junctionAccel * m_junctionDeviationSteps * 0.5;
+                } else {
+                    double denominator = 1.0 - sinHalf;
+                    if (denominator < 1e-6) denominator = 1e-6;
+                    vmaxSqr = (junctionAccel * m_junctionDeviationSteps * sinHalf) / denominator;
+                }
             }
-            
-            // Junction speed is limited by both segments' nominal speeds (squared)
+
             double prevNominalSqr = (double)prev.nominalSpeed * (double)prev.nominalSpeed;
-            double maxJunctionSqr = fmin(fmin(prevNominalSqr, nominalSqr), vmaxSqr);
-            maxEntrySqr = maxJunctionSqr;
+            maxEntrySqr = fmin(fmin(prevNominalSqr, nominalSqr), vmaxSqr);
         }
         
         // Handle zero-length segments
@@ -1201,6 +1266,20 @@ void CoordinatedMotionController::RecalculatePlanner() {
         
         // Note: entrySpeed and exitSpeed are uint32_t (unsigned), so they cannot be negative
         // No need to check for negative values
+    }
+
+    // Active segment was started with exitSpeed=0; once a successor is queued, blend out at
+    // junction speed instead of decelerating to a full stop at a batch boundary.
+    if (m_active && m_motionQueueCount > 0) {
+        uint8_t head = m_motionQueueHead;
+        const QueuedMotion &next = m_motionQueue[head];
+        if (next.valid) {
+            if (m_motionType == MOTION_TYPE_ARC) {
+                m_arcInterpolator.SetExitSpeed(next.entrySpeed);
+            } else if (m_motionType == MOTION_TYPE_LINEAR) {
+                m_linearInterpolator.SetExitSpeed(next.entrySpeed);
+            }
+        }
     }
 }
 

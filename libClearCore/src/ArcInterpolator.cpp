@@ -113,6 +113,7 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
     m_currentArc.radiusQx = ((int64_t)radius) << FRACT_BITS;
     m_currentArc.startAngleQx = startAngleQx;
     m_currentArc.endAngleQx = endAngleQx;
+    m_currentArc.spanQx = angleSpanQx;
     m_currentArc.clockwise = clockwise;
     m_currentArc.totalSteps = totalSteps;
     m_currentArc.stepsRemaining = totalSteps;
@@ -159,39 +160,35 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
 }
 
 bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
-    // Check if arc is complete by angle (more reliable than step count)
-    // Calculate remaining angle in the direction of travel
-    // Use the same logic as angle span calculation to ensure consistency
+    // Compute remaining angle in the direction of travel.
+    // BUG GUARD: if the continuous-angle tracker has stepped PAST endAngle, the formula
+    // below would wrap to ~2π (full circle).  Clamp using spanQx: any remaining > span
+    // means we have overshot, so treat as complete (remaining = 0).
     int32_t angleRemainingQx;
     if (m_currentArc.clockwise) {
-        // Clockwise: angle decreases
         if (m_currentArc.endAngleQx < m_currentAngleQx) {
-            // Normal clockwise case
             angleRemainingQx = m_currentAngleQx - m_currentArc.endAngleQx;
         } else {
-            // Wrap around through 2π
             angleRemainingQx = TWO_PI_QX - (m_currentArc.endAngleQx - m_currentAngleQx);
         }
     } else {
-        // Counterclockwise: angle increases
         if (m_currentArc.endAngleQx > m_currentAngleQx) {
-            // Normal case: end > current
             angleRemainingQx = m_currentArc.endAngleQx - m_currentAngleQx;
         } else {
-            // Wraps around: end < current
             angleRemainingQx = TWO_PI_QX - (m_currentAngleQx - m_currentArc.endAngleQx);
         }
     }
-    
-    // Update remaining steps estimate from angle remaining
+    if (angleRemainingQx > m_currentArc.spanQx) {
+        angleRemainingQx = 0;
+    }
+
     int64_t radiusSteps = m_currentArc.radiusQx >> FRACT_BITS;
     if (radiusSteps == 0) {
         radiusSteps = 1;
     }
-    uint32_t stepsRemainingEstimate = (uint32_t)(((int64_t)radiusSteps * angleRemainingQx) >> 15);
-    m_currentArc.stepsRemaining = stepsRemainingEstimate;
+    m_currentArc.stepsRemaining =
+        (uint32_t)(((int64_t)radiusSteps * angleRemainingQx) >> 15);
 
-    // Already at end (should not generate more steps)
     if (angleRemainingQx <= 0) {
         stepsX = 0;
         stepsY = 0;
@@ -294,6 +291,10 @@ bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
         } else {
             angleRemainingQxPost = TWO_PI_QX - (m_currentAngleQx - m_currentArc.endAngleQx);
         }
+    }
+    // Same overshoot guard as the pre-advance check.
+    if (angleRemainingQxPost > m_currentArc.spanQx) {
+        angleRemainingQxPost = 0;
     }
     m_currentArc.stepsRemaining = (uint32_t)(((int64_t)radiusSteps * angleRemainingQxPost) >> 15);
 

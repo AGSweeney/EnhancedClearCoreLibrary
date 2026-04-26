@@ -41,13 +41,16 @@ namespace ClearCore {
     \brief Represents a single arc segment with all parameters
 **/
 struct ArcSegment {
-    int64_t centerXQx;      // Arc center X position (Q15 fixed-point)
-    int64_t centerYQx;      // Arc center Y position (Q15 fixed-point)
-    int64_t radiusQx;       // Arc radius (Q15 fixed-point)
-    int32_t startAngleQx;  // Start angle (Q15 fixed-point, 0-2π = 0-32768)
-    int32_t endAngleQx;    // End angle (Q15 fixed-point, 0-2π = 0-32768)
-    bool clockwise;         // Direction of rotation
-    uint32_t totalSteps;   // Total steps in this arc segment
+    int64_t centerXQx;       // Arc center X position (Q15 fixed-point)
+    int64_t centerYQx;       // Arc center Y position (Q15 fixed-point)
+    int64_t radiusQx;        // Arc radius (Q15 fixed-point)
+    int32_t startAngleQx;    // Start angle (Q15 fixed-point, 0-2π = 0-32768)
+    int32_t endAngleQx;      // End angle (Q15 fixed-point, 0-2π = 0-32768)
+    int32_t spanQx;          // Total arc span (>0, ≤ TWO_PI_QX); used to clamp remaining so
+                             // an overshoot beyond endAngle (current > end for CCW, or current
+                             // < end for CW) doesn't wrap remaining to ~2π and produce a circle.
+    bool clockwise;          // Direction of rotation
+    uint32_t totalSteps;     // Total steps in this arc segment
     uint32_t stepsRemaining; // Steps remaining in this arc
     
     ArcSegment()
@@ -56,6 +59,7 @@ struct ArcSegment {
           radiusQx(0),
           startAngleQx(0),
           endAngleQx(0),
+          spanQx(0),
           clockwise(true),
           totalSteps(0),
           stepsRemaining(0) {}
@@ -99,6 +103,13 @@ public:
                        uint32_t exitSpeed = 0);
 
     /**
+        \brief Update planned exit tangential speed while the arc is running (planner lookahead).
+    **/
+    void SetExitSpeed(uint32_t exitSpeed) {
+        m_exitSpeed = exitSpeed;
+    }
+
+    /**
         \brief Generate next step pair for current arc
         
         \param[out] stepsX Steps for X motor
@@ -114,8 +125,6 @@ public:
         \return true if arc is complete
     **/
     bool IsArcComplete() const {
-        // Check if angle has reached end angle (with small threshold)
-        // Calculate remaining angle in the direction of travel (same logic as GenerateNextSteps)
         int32_t angleRemainingQx;
         if (m_currentArc.clockwise) {
             if (m_currentArc.endAngleQx < m_currentAngleQx) {
@@ -130,7 +139,11 @@ public:
                 angleRemainingQx = TWO_PI_QX - (m_currentAngleQx - m_currentArc.endAngleQx);
             }
         }
-        
+        // Clamp: if remaining > span we've overshot the endpoint (angle stepped past it).
+        // Without this, the wrap formula gives ~2π remaining and draws a full extra circle.
+        if (angleRemainingQx > m_currentArc.spanQx) {
+            angleRemainingQx = 0;
+        }
         const int32_t ANGLE_THRESHOLD_QX = (TWO_PI_QX / 3600); // ~0.1 degree
         return angleRemainingQx <= ANGLE_THRESHOLD_QX;
     }

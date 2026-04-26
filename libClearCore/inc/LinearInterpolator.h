@@ -105,6 +105,17 @@ public:
     }
     
     /**
+        \brief Update planned exit speed while the move is running (planner lookahead).
+        Mirrors ArcInterpolator::SetExitSpeed — called by RecalculatePlanner when a
+        new successor segment is queued behind an already-active linear move, so the
+        linear interpolator can blend out at junction speed instead of decelerating to
+        a full stop at the batch boundary.
+    **/
+    void SetExitSpeed(uint32_t exitSpeed) {
+        m_exitSpeed = exitSpeed;
+    }
+
+    /**
         \brief Reset interpolator state
     **/
     void Reset();

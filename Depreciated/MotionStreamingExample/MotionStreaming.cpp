@@ -1192,7 +1192,8 @@ void ExecuteG02(double x, double y, double i, double j, double f) {
     
     // Queue arc move (clockwise)
     // QueueArc automatically starts if no motion is active, or queues if motion is active
-    bool success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, true);
+    bool success =
+        motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, startAngle, endAngle, true);
     
     if (!success) {
         char errorMsg[100];
@@ -1262,7 +1263,9 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
     // Calculate radius
     double radius = sqrt(i * i + j * j);
     
-    // Calculate end angle (start angle calculated automatically by QueueArc)
+    // Calculate start/end angle from arc center (job space; must match I/J geometry)
+    double startAngle = atan2(startY - centerY, startX - centerX);
+    if (startAngle < 0) startAngle += 2 * M_PI;
     double endAngle = atan2(endY - centerY, endX - centerX);
     if (endAngle < 0) endAngle += 2 * M_PI;
     
@@ -1285,8 +1288,8 @@ void ExecuteG03(double x, double y, double i, double j, double f) {
     }
     
     // Queue arc move (counterclockwise)
-    // QueueArc automatically starts if no motion is active, or queues if motion is active
-    bool success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, endAngle, false);
+    bool success = motionController.QueueArc(centerXSteps, centerYSteps, radiusSteps, startAngle,
+                                             endAngle, false);
     
     if (!success) {
         char errorMsg[100];

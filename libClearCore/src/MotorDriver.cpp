@@ -469,15 +469,19 @@ void MotorDriver::Refresh() {
 
     // Calculate the next S&D output step count
     if (Connector::m_mode == Connector::CPM_MODE_STEP_AND_DIR) {
-        if (m_coordinatedMode && m_coordinatedController) {
-            // Coordinated motion mode - controller handles step generation
-            // Only update on one motor (X-axis) to avoid double execution
+        // Coordinated connectors stay in CoordinatedMotionMode(true) even when CONFIG SINGLE=0,
+        // but we must only consume UpdateFast/SetCoordinatedSteps while the planner is driving.
+        // Otherwise StepGenerator::Move() never runs StepsCalculated() on M0/M1 and bench-style
+        // motion fails; when idle, fall back to per-motor step generation (same as SINGLE=1).
+        const bool coordDriving =
+            m_coordinatedController &&
+            (m_coordinatedController->IsActive() || m_coordinatedController->MotionQueueCount() > 0);
+        if (m_coordinatedMode && m_coordinatedController && coordDriving) {
             if (this == m_coordinatedMotorX) {
                 m_coordinatedController->UpdateFast();
             }
-            // Steps are set via SetCoordinatedSteps() by the controller
         } else {
-            // Normal independent motion
+            // Independent motion (or coordinated planner idle on both motors)
             // Calculate the number of steps to send in the next sample time
             StepGenerator::StepsCalculated();
             // Check the status of the limits

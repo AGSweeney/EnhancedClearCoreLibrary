@@ -205,6 +205,8 @@ private:
     double m_velocity;
     double m_accel;
     double m_decel;
+    /// Per-axis max velocity delta at junctions (steps/sec). 0 = GRBL angle-based fallback.
+    double m_junctionDVmax;
     bool m_guiUnitsInches;
     /// When true, CONFIG SINGLE=1 (independent M0/M1; no CoordinatedMotionController in firmware).
     bool m_singleMotorBench;
