@@ -70,8 +70,9 @@ struct Kine {
     double y = 0.0;
     double z = 0.0;
     bool fileInches = false; // G20
-    bool abs = true; // G90
-    int modalMotionG = 1; // last G0..3 seen (default G1 for bare axis lines)
+    bool abs = true;         // G90
+    int modalMotionG = 1;    // last G0..3 seen (default G1 for bare axis lines)
+    bool needNewStrip = true; // start fresh cut strip on next G1/G2/G3
 
     void appendArc(
         const QVector3D &startGui,
@@ -228,12 +229,33 @@ void applyLine(
 
     const QVector3D endGui = toGui3(tx, ty, tz, guiInches);
 
-    if (motionG == 0 || motionG == 1) {
-        if (out->pathInGuiUnits.isEmpty()) {
-            out->pathInGuiUnits.append(toGui3(0.0, 0.0, 0.0, guiInches));
+    const QVector3D startGui = toGui3(k->x, k->y, k->z, guiInches);
+    const bool hasMoved =
+        QVector3D::dotProduct(endGui - startGui, endGui - startGui) > 1.0e-20f;
+
+    if (motionG == 0) {
+        // Rapid — store as a gray segment pair and break the current cut strip.
+        if (hasMoved) {
+            out->rapidSegments.append(startGui);
+            out->rapidSegments.append(endGui);
         }
-        const QVector3D startGui = toGui3(k->x, k->y, k->z, guiInches);
-        if (QVector3D::dotProduct(endGui - startGui, endGui - startGui) > 1.0e-20f) {
+        // Legacy flat path: include rapid but break the cut strip so subsequent cuts
+        // start a new polyline (the viewer will open a new GL_LINE_STRIP).
+        out->pathInGuiUnits.append(endGui);
+        k->x = tx;
+        k->y = ty;
+        k->z = tz;
+        return;
+    }
+
+    if (motionG == 1) {
+        // Linear cut — append to current cut strip.
+        if (out->cutStrips.isEmpty()) {
+            out->cutStrips.append(QVector<QVector3D>());
+            out->cutStrips.last().append(startGui);
+        }
+        if (hasMoved) {
+            out->cutStrips.last().append(endGui);
             out->pathInGuiUnits.append(endGui);
         }
         k->x = tx;
@@ -243,20 +265,27 @@ void applyLine(
     }
 
     // Arc: G2 CW, G3 CCW
-    if (out->pathInGuiUnits.isEmpty()) {
-        out->pathInGuiUnits.append(toGui3(0.0, 0.0, 0.0, guiInches));
+    if (out->cutStrips.isEmpty()) {
+        out->cutStrips.append(QVector<QVector3D>());
+        out->cutStrips.last().append(startGui);
     }
-    const QVector3D startGui = toGui3(k->x, k->y, k->z, guiInches);
     const bool hasIJ = haveI && haveJ;
     if (hasIJ) {
         const double iMm = toMmValue(valI, fIn);
         const double jMm = toMmValue(valJ, fIn);
-        k->appendArc(startGui, endGui, guiInches, iMm, jMm, (motionG == 3), &out->pathInGuiUnits);
+        k->appendArc(startGui, endGui, guiInches, iMm, jMm, (motionG == 3),
+                     &out->cutStrips.last());
+        // Mirror into legacy flat path too
+        int added = out->cutStrips.last().size() - 1;
+        const QVector<QVector3D> &strip = out->cutStrips.last();
+        for (int idx = strip.size() - added; idx < strip.size(); ++idx) {
+            out->pathInGuiUnits.append(strip.at(idx));
+        }
     } else {
-        // R format or no center: connect with a straight line (chord) for a usable preview
         (void)valR;
         (void)haveR;
-        if (QVector3D::dotProduct(endGui - startGui, endGui - startGui) > 1.0e-20f) {
+        if (hasMoved) {
+            out->cutStrips.last().append(endGui);
             out->pathInGuiUnits.append(endGui);
         }
     }
@@ -271,6 +300,8 @@ bool BuildProgramKinematics(const QStringList &lines, bool guiInches, ProgramKin
         return false;
     }
     out->pathInGuiUnits.clear();
+    out->cutStrips.clear();
+    out->rapidSegments.clear();
     if (lines.isEmpty()) {
         return false;
     }
@@ -280,7 +311,26 @@ bool BuildProgramKinematics(const QStringList &lines, bool guiInches, ProgramKin
         if (u.isEmpty()) {
             continue;
         }
+        const int prevStrips = out->cutStrips.size();
         applyLine(u, &k, guiInches, out);
+        // After a G0 rapid, start a new cut strip so the next G1/G2/G3 begins fresh.
+        const bool rapidHappened = out->rapidSegments.size() > 0 &&
+                                    out->cutStrips.size() == prevStrips;
+        if (rapidHappened || (out->cutStrips.size() > prevStrips)) {
+            // Nothing extra needed — applyLine already handles strip management.
+        }
+        // If the last G0 left no open cut strip, open one at the new position.
+        if (!out->rapidSegments.isEmpty() &&
+            (out->cutStrips.isEmpty() ||
+             out->cutStrips.last().isEmpty())) {
+            out->cutStrips.append(QVector<QVector3D>());
+            out->cutStrips.last().append(toGui3(k.x, k.y, k.z, guiInches));
+        }
     }
-    return true;
+    // Remove empty strips
+    out->cutStrips.erase(
+        std::remove_if(out->cutStrips.begin(), out->cutStrips.end(),
+                       [](const QVector<QVector3D> &s) { return s.size() < 2; }),
+        out->cutStrips.end());
+    return !out->cutStrips.isEmpty() || !out->rapidSegments.isEmpty();
 }
