@@ -1434,7 +1434,18 @@ static void HandleArcCommand(bool inlineRelative, int arcDir, const char *line, 
     // arc — coordBusy stays true while IsActive/MotionQueueCount/motionRunning. Without this
     // split, the next G3 (new corner, new I J) wrongly gets "busy" and the program stalls
     // (e.g. rounded-rectangle after a vertical G1).
-    if (coordBusyForArcStream) {
+    // When TryExtendCoordinatedBatch is active (motionRunning with coordinated XY), it owns the
+    // planner feed path — arcs go to the firmware queue and TryExtendCoordinatedBatch submits them
+    // to the planner at the right moment.  Using the old same-circle direct-stream path while
+    // TryExtendCoordinatedBatch is also running creates duplicate planner submissions (the streaming
+    // path submits directly AND pops from the firmware queue, then TryExtendCoordinatedBatch sees
+    // the next queue entry and submits it too, causing out-of-order or doubled arcs).
+    //
+    // When NOT running via the batch mechanism (motionRunning=false OR not coordinated XY), the
+    // old streaming path is still valid: it allows consecutive same-circle arcs to pipeline
+    // directly into the planner without going through the firmware queue.
+    const bool batchStreamActive = motionRunning && s_blockUsedCoordinatedXy;
+    if (coordBusyForArcStream && !batchStreamActive) {
         if (CoordinatedArcMatchesStream(cx, cy, rSteps, clockwise, nominalSpeed)) {
             motionController.ArcVelMax(pathSpeed);
             motionController.ArcAccelMax(axisConfig[AXIS_X].accelMax);
@@ -1445,18 +1456,13 @@ static void HandleArcCommand(bool inlineRelative, int arcDir, const char *line, 
             }
             commandedSteps[AXIS_X] = ex;
             commandedSteps[AXIS_Y] = ey;
-            // Keep streaming-refill tracker in sync so TryExtendCoordinatedBatch can check
-            // contiguity correctly for the arc that follows this streamed one.
             s_streamLastEndX = ex;
             s_streamLastEndY = ey;
             PopOrEraseStreamDuplicateFirmwareArc(ex, ey, clockwise, nominalSpeed);
             SendLine("ok");
             return;
         }
-        // Arc doesn't match the current stream (different circle / different path).
-        // Fall through to the firmware queue — TryExtendCoordinatedBatch will pick it up
-        // from there and add it to the planner at the right moment.  No "busy" here;
-        // the queue-full guard below handles back-pressure.
+        // Different circle / path: fall through to firmware queue.
     }
 
     if (MotionQueueFull()) {
