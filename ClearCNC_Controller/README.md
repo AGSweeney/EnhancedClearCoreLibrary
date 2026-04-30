@@ -4,7 +4,7 @@
 
 Desktop host application and ClearCore firmware for driving a small CNC or bench motion setup. The controller connects over **USB serial** or **Ethernet** (control + optional telemetry), sends motion and setup commands, and can **stream a G-code file** with queue-aware program execution, MDI motion/jog, and a **3D tool-position view** with optional path preview.
 
-![ClearCNC Controller main window (Program tab, Ethernet, 3D DRO)](images/Screenshot 2026-04-29 200411.png)
+![ClearCNC Controller main window (Program tab, Ethernet, 3D DRO)](images/Screenshot%202026-04-29%20200411.png)
 
 ## What’s in this folder
 
