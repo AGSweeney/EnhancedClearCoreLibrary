@@ -301,6 +301,9 @@ bool BuildProgramKinematics(const QStringList &lines, bool guiInches, ProgramKin
         return false;
     }
     Kine k;
+    // If a file omits G20/G21, follow the current app/controller unit mode.
+    // This matches runtime behavior where the host sends G20/G21 from GUI units.
+    k.fileInches = guiInches;
     for (const QString &line : lines) {
         const QString u = line.trimmed();
         if (u.isEmpty()) {

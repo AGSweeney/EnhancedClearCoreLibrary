@@ -96,6 +96,7 @@ private:
     bool ProgramLineRequiresQueueDrain(const QString &line) const;
     bool ProgramLineIsTerminalStop(const QString &line) const;
     bool ProgramLineQueuesMotion(const QString &line) const;
+    void SendCurrentProgramLineAfterDrain();
     void SendNextProgramLine();
     void HandleProgramResponse(const QString &line);
     void SetProgramUiRunning(bool running);
@@ -107,9 +108,12 @@ private:
     void UpdateDroFromTelemetry(const QString &line);
     void UpdateDroOverlayText();
     bool IsLogicalAxisEnabled(int axis) const; // 1=X .. 4=4th; uses motor port Enabled + axis mapping
+    /// True if the mapped 4th-axis motor is rotary (deg); false = linear (same units as X–Z).
+    bool IsLogicalAxisRotary(int axis1Based) const;
     void UpdateAxisCapabilityUi();
     void UpdateConnectionWindowTitle(bool connected);
     void UpdateControllerEnabledStateUi();
+    void UpdateHardwareEstopButtonUi();
     void RebuildProgramVizKinematics();
     void UpdateToolVizForViewport();
     void SetBufferIndicatorFull(bool full);
@@ -175,6 +179,7 @@ private:
     QTextEdit *m_logEdit;
     QGroupBox *m_logGroup;
     QAction *m_toggleLogAction;
+    QAction *m_laserModeAction;  // unused — laser mode removed, kept to avoid init list churn
     QPushButton *m_showLogButton;
 
     QSplitter *m_workAreaSplitter;
@@ -210,6 +215,13 @@ private:
     bool m_guiUnitsInches;
     /// When true, CONFIG SINGLE=1 (independent M0/M1; no CoordinatedMotionController in firmware).
     bool m_singleMotorBench;
+    bool m_laserMode;  // always false — laser mode removed
+    /// Max G0 rapid: linear axes stored in mm/min (GUI inches converts for display only).
+    double m_rapidMmMinX;
+    double m_rapidMmMinY;
+    double m_rapidMmMinZ;
+    /// Fourth mapped axis: deg/min when that port is rotary, else mm/min (internal).
+    double m_rapidRateFourth;
 
     QStringList m_programLines;
     QString m_programPath;
@@ -223,6 +235,8 @@ private:
     int m_activeProgramLine;
     QList<int> m_pendingMotionLineIndices;
     bool m_controllerEnabled;
+    /// -1 = unknown (no HwEstopOk yet); 0 = hardware estop chain fault (RED); 1 = OK (YELLOW).
+    int m_hwDi6EstopState;
 
     bool m_usingEthernet;
     bool m_didWorkAreaInitialSplit; // one-time 40/60 work-area sizes on first show

@@ -81,6 +81,7 @@ Windows tools for flashing firmware via USB (see `Tools/README.md`):
 ## Documentation
 
 - **API reference**: https://teknic-inc.github.io/ClearCore-library/
+- **ClearCNC Controller** (Qt host + ClearCore firmware): `ClearCNC_Controller/README.md` — protocol, spindle, estop, dwell
 - **Coordinated motion**: `docs/CoordinatedArcMotion/README.md` — theory, usage, API
 - **Motion streaming**: `MotionStreamingExample/README.md`, `MotionStreamingExample/STREAMING_GUIDE.md`
 - **GRBL-compatible example**: `GRBLCompatibleExample/README.md`

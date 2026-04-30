@@ -53,6 +53,7 @@ namespace {
 constexpr int kDefaultPollMs = 500;
 constexpr int kDefaultControlPort = 8888;
 constexpr int kDefaultTelemetryPort = 8889;
+constexpr int kMaxLogBlocks = 3000;
 
 QSettings AppSettings() {
     return QSettings("ClearCNC", "ClearCNC_Controller");
@@ -136,6 +137,7 @@ MainWindow::MainWindow(QWidget *parent)
       m_logEdit(nullptr),
       m_logGroup(nullptr),
       m_toggleLogAction(nullptr),
+      m_laserModeAction(nullptr),
       m_showLogButton(nullptr),
       m_workAreaSplitter(nullptr),
       m_mainVSplitter(nullptr),
@@ -154,6 +156,11 @@ MainWindow::MainWindow(QWidget *parent)
       m_junctionDVmax(0.0),
       m_guiUnitsInches(false),
       m_singleMotorBench(false),
+      m_laserMode(false),  // always false — laser mode removed
+      m_rapidMmMinX(6000.0),
+      m_rapidMmMinY(6000.0),
+      m_rapidMmMinZ(3000.0),
+      m_rapidRateFourth(360.0),
       m_programIndex(0),
       m_programRunning(false),
       m_programPaused(false),
@@ -163,6 +170,7 @@ MainWindow::MainWindow(QWidget *parent)
       m_programQueueFullRetries(0),
       m_activeProgramLine(-1),
       m_controllerEnabled(false),
+      m_hwDi6EstopState(-1),
       m_usingEthernet(false),
       m_didWorkAreaInitialSplit(false),
       m_savedLogPaneHeight(320) {
@@ -393,19 +401,15 @@ void MainWindow::BuildUi() {
     m_enableButton = new QPushButton("Enable", controlGroup);
     m_disableButton = new QPushButton("Disable", controlGroup);
     m_stopButton = new QPushButton("Stop", controlGroup);
-    m_estopButton = new QPushButton("E-Stop", controlGroup);
+    m_estopButton = new QPushButton(QStringLiteral("E-Stop"), controlGroup);
     m_absButton = new QPushButton("ABS", controlGroup);
     m_relButton = new QPushButton("REL", controlGroup);
     m_zeroButton = new QPushButton("Zero", controlGroup);
     m_zeroButton->setToolTip("Zero work position (G92 X0 Y0; extended zero can be added later)");
-    m_estopButton->setProperty("role", "danger");
     m_absButton->setObjectName("ClearCncModeAbs");
     m_relButton->setObjectName("ClearCncModeRel");
     m_absButton->setCheckable(true);
     m_relButton->setCheckable(true);
-    m_estopButton->setStyleSheet("QPushButton { background: #9d2f34; color: #fff2f2; border: 1px solid #d15c62; border-radius: 2px; font-weight: 800; }"
-                                 "QPushButton:hover { background: #b53a40; border-color: #e4777c; }"
-                                 "QPushButton:disabled { background: #463236; color: #9c777c; border-color: #61454a; }");
     const int kCtrlBtnH = 30;
     for (auto *b : {m_enableButton, m_disableButton, m_stopButton, m_estopButton, m_absButton, m_relButton,
                     m_zeroButton}) {
@@ -621,7 +625,7 @@ void MainWindow::BuildUi() {
     m_viewportPathTraceCheck->setToolTip(
         "Draw the loaded file as a yellow path in 3D (from parsed G-code). "
         "The tool arrow always follows live DRO / telemetry when connected.");
-    m_viewportPathTraceCheck->setChecked(false);
+    m_viewportPathTraceCheck->setChecked(true);
     m_viewportPathTraceCheck->setEnabled(false);
     pos3dHeader->addWidget(m_viewportPathTraceCheck);
     auto *reset3d = new QPushButton("Reset view", pos3dGroup);
@@ -880,7 +884,11 @@ void MainWindow::SetConnectedUi(bool connected) {
         m_controllerEnabled = false;
     }
     UpdateConnectionWindowTitle(connected);
+    if (!connected) {
+        m_hwDi6EstopState = -1;
+    }
     UpdateControllerEnabledStateUi();
+    UpdateHardwareEstopButtonUi();
 
     if (connected) {
         statusBar()->showMessage("Connected");
@@ -929,6 +937,50 @@ void MainWindow::UpdateControllerEnabledStateUi() {
     } else {
         m_enableButton->setStyleSheet(kIdle);
         m_disableButton->setStyleSheet(kOrange);
+    }
+}
+
+void MainWindow::UpdateHardwareEstopButtonUi() {
+    if (!m_estopButton) {
+        return;
+    }
+    const QString kDisconnected(
+        "QPushButton { background: #3a3f46; color: #dce1e8; border: 1px solid #23272d; border-radius: 2px; font-weight: 600; }"
+        "QPushButton:hover { border-color: #586473; background: #424850; }"
+        "QPushButton:disabled { background: #2d3238; color: #7b8490; border-color: #252a31; }");
+    const QString kHwFault(
+        "QPushButton { background: #b71c1c; color: #ffebee; border: 1px solid #e57373; border-radius: 2px; font-weight: 800; }"
+        "QPushButton:hover { background: #c62828; border-color: #ffcdd2; }"
+        "QPushButton:disabled { background: #5c2626; color: #c9a8a8; border-color: #7a4545; }");
+    const QString kHwOk(
+        "QPushButton { background: #f9a825; color: #3e2723; border: 1px solid #fbc02d; border-radius: 2px; font-weight: 800; }"
+        "QPushButton:hover { background: #ffb300; border-color: #ffca28; }"
+        "QPushButton:disabled { background: #6d5a2a; color: #4a3d1a; border-color: #8a7340; }");
+    const QString kUnknown(
+        "QPushButton { background: #8d6e23; color: #fff8e1; border: 1px solid #bcaaa4; border-radius: 2px; font-weight: 700; }"
+        "QPushButton:hover { background: #a18831; border-color: #d7ccc8; }"
+        "QPushButton:disabled { background: #4a4030; color: #a89880; border-color: #5d5345; }");
+
+    if (!IsControllerConnected()) {
+        m_estopButton->setStyleSheet(kDisconnected);
+        m_estopButton->setToolTip(QStringLiteral("Connect to the controller to use E-Stop and read DI6."));
+        return;
+    }
+    if (m_hwDi6EstopState < 0) {
+        m_estopButton->setStyleSheet(kUnknown);
+        m_estopButton->setToolTip(
+            QStringLiteral("Hardware DI6 estop state not received yet (wait for telemetry or M115). "
+                           "Click: send M200 software estop."));
+        return;
+    }
+    if (m_hwDi6EstopState == 0) {
+        m_estopButton->setStyleSheet(kHwFault);
+        m_estopButton->setToolTip(QStringLiteral("Hardware estop ACTIVE (DI6 reads OFF / State()==0 with default ESTOP_DI6=1). "
+                                                 "Controller should be latched in estop. Click: M200."));
+    } else {
+        m_estopButton->setStyleSheet(kHwOk);
+        m_estopButton->setToolTip(QStringLiteral("Hardware estop OK (DI6 reads ON / State()!=0, default ESTOP_DI6=1). "
+                                                 "Click: send M200 software estop."));
     }
 }
 
@@ -993,6 +1045,33 @@ void MainWindow::LoadMotionSettings() {
     m_decel = settings.value("motion/decelStepsPerSec2", m_decel).toDouble();
     m_singleMotorBench = settings.value("motion/singleMotorBench", false).toBool();
     m_junctionDVmax = settings.value("motion/junctionDVmax", 0.0).toDouble();
+    m_laserMode = false;
+    settings.remove("motion/laserMode");
+
+    auto defaultRapidLinearMmMin = [this](int logicalAxis) -> double {
+        double spu = m_stepsPerUnit;
+        for (const auto &p : m_motorPorts) {
+            if (!p.enabled || p.axis != logicalAxis) {
+                continue;
+            }
+            if (p.axisType == 0) {
+                spu = (p.stepsPerRev * p.gearRatio) / p.linearPitchMm;
+            } else {
+                spu = (p.stepsPerRev * p.gearRatio) / 360.0;
+            }
+            break;
+        }
+        if (spu <= 0.0) {
+            spu = m_stepsPerUnit;
+        }
+        return (m_velocity * 60.0) / spu;
+    };
+    m_rapidMmMinX = settings.value("motion/rapidMmMinX", defaultRapidLinearMmMin(1)).toDouble();
+    m_rapidMmMinY = settings.value("motion/rapidMmMinY", defaultRapidLinearMmMin(2)).toDouble();
+    m_rapidMmMinZ = settings.value("motion/rapidMmMinZ", defaultRapidLinearMmMin(3)).toDouble();
+    const double defFourth = IsLogicalAxisRotary(4) ? 360.0 : defaultRapidLinearMmMin(4);
+    m_rapidRateFourth = settings.value("motion/rapidRateFourth", defFourth).toDouble();
+
     SyncActiveMotionSettingsFromPorts();
 }
 
@@ -1005,6 +1084,10 @@ void MainWindow::SaveMotionSettings() {
     settings.setValue("motion/decelStepsPerSec2", m_decel);
     settings.setValue("motion/singleMotorBench", m_singleMotorBench);
     settings.setValue("motion/junctionDVmax", m_junctionDVmax);
+    settings.setValue("motion/rapidMmMinX", m_rapidMmMinX);
+    settings.setValue("motion/rapidMmMinY", m_rapidMmMinY);
+    settings.setValue("motion/rapidMmMinZ", m_rapidMmMinZ);
+    settings.setValue("motion/rapidRateFourth", m_rapidRateFourth);
 
     for (int i = 0; i < 4; ++i) {
         const auto &port = m_motorPorts[i];
@@ -1149,6 +1232,8 @@ void MainWindow::SendMotionConfigCommand() {
     };
     double spmmX = m_stepsPerUnit;
     double spmmY = m_stepsPerUnit;
+    double spmmZ = m_stepsPerUnit;
+    double spmmA = m_stepsPerUnit;
     for (const auto &port : m_motorPorts) {
         if (!port.enabled) {
             continue;
@@ -1157,10 +1242,24 @@ void MainWindow::SendMotionConfigCommand() {
             spmmX = portStepsPerMm(port);
         } else if (port.axis == 2) {
             spmmY = portStepsPerMm(port);
+        } else if (port.axis == 3) {
+            spmmZ = portStepsPerMm(port);
+        } else if (port.axis == 4) {
+            spmmA = portStepsPerMm(port);
         }
     }
+    const auto toRvelStepsPerSec = [](double ratePerMin, double spmm) -> int {
+        const double sps = ratePerMin * spmm / 60.0;
+        const int v = qRound(sps);
+        return qMax(1, v);
+    };
+    const int rvelX = toRvelStepsPerSec(m_rapidMmMinX, spmmX);
+    const int rvelY = toRvelStepsPerSec(m_rapidMmMinY, spmmY);
+    const int rvelZ = toRvelStepsPerSec(m_rapidMmMinZ, spmmZ);
+    const int rvelA = toRvelStepsPerSec(m_rapidRateFourth, spmmA);
     const QString cmd =
-        QString("CONFIG SPMMX=%1 SPMMY=%2 VEL=%3 ACCEL=%4 DECEL=%5 DVMAX=%6 SINGLE=%7 AX=%8")
+        QString("CONFIG SPMMX=%1 SPMMY=%2 VEL=%3 ACCEL=%4 DECEL=%5 DVMAX=%6 SINGLE=%7 AX=%8 LASER=%9 "
+                "RVELX=%10 RVELY=%11 RVELZ=%12 RVELA=%13")
             .arg(spmmX, 0, 'f', 6)
             .arg(spmmY, 0, 'f', 6)
             .arg(m_velocity, 0, 'f', 0)
@@ -1168,13 +1267,28 @@ void MainWindow::SendMotionConfigCommand() {
             .arg(m_decel, 0, 'f', 0)
             .arg(m_junctionDVmax, 0, 'f', 0)
             .arg(single)
-            .arg(axMask);
+            .arg(axMask)
+            .arg(0)  // LASER always 0 — laser mode removed
+            .arg(rvelX)
+            .arg(rvelY)
+            .arg(rvelZ)
+            .arg(rvelA);
     SendCommand(cmd);
 }
 
 void MainWindow::AppendLog(const QString &line) {
     const QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss");
     m_logEdit->append(QString("[%1] %2").arg(timestamp, line));
+    if (m_logEdit->document()->blockCount() > kMaxLogBlocks) {
+        QTextCursor cursor(m_logEdit->document());
+        cursor.movePosition(QTextCursor::Start);
+        const int toTrim = m_logEdit->document()->blockCount() - kMaxLogBlocks;
+        for (int i = 0; i < toTrim; ++i) {
+            cursor.select(QTextCursor::BlockUnderCursor);
+            cursor.removeSelectedText();
+            cursor.deleteChar();
+        }
+    }
 }
 
 void MainWindow::SendCommand(const QString &command) {
@@ -1237,6 +1351,8 @@ void MainWindow::OnTelemetryReadyRead() {
 }
 
 void MainWindow::OnTelemetryDisconnected() {
+    m_hwDi6EstopState = -1;
+    UpdateHardwareEstopButtonUi();
     if (m_usingEthernet && IsControllerConnected()) {
         AppendLog("Telemetry disconnected; falling back to command-port polling");
         m_pollTimer.start();
@@ -1277,21 +1393,28 @@ void MainWindow::OnUdpReadyRead() {
 void MainWindow::HandleReceivedLine(const QString &line) {
     AppendLog(QString("RX: %1").arg(FormatControlRxForUserLog(line)));
     if (line.compare("DONE", Qt::CaseInsensitive) == 0) {
-        if (m_programRunning &&
-            (m_programIndex >= m_programLines.size() || m_programWaitingForQueueDrain)) {
-            m_programIndex = 0;
-            m_programRunning = false;
-            m_programPaused = false;
-            m_programAwaitingAck = false;
-            m_programWaitingForQueueDrain = false;
-            m_queueDrainStalledPolls = 0;
-            m_activeProgramLine = -1;
-            m_pendingMotionLineIndices.clear();
-            UpdateProgramPreviewHighlight(-1, false);
-            SetProgramUiRunning(false);
-            m_programStatusLabel->setText("Program complete");
-            m_pollTimer.start();
-            SendStatusPoll();
+        if (m_programRunning) {
+            if (m_programWaitingForQueueDrain && m_programIndex < m_programLines.size()) {
+                // DONE means motion is drained. If we were waiting to send a post-motion line
+                // (e.g. M5), send it now instead of incorrectly ending the program early.
+                m_programWaitingForQueueDrain = false;
+                m_queueDrainStalledPolls = 0;
+                SendCurrentProgramLineAfterDrain();
+            } else if (m_programIndex >= m_programLines.size()) {
+                m_programIndex = 0;
+                m_programRunning = false;
+                m_programPaused = false;
+                m_programAwaitingAck = false;
+                m_programWaitingForQueueDrain = false;
+                m_queueDrainStalledPolls = 0;
+                m_activeProgramLine = -1;
+                m_pendingMotionLineIndices.clear();
+                UpdateProgramPreviewHighlight(-1, false);
+                SetProgramUiRunning(false);
+                m_programStatusLabel->setText("Program complete");
+                m_pollTimer.start();
+                SendStatusPoll();
+            }
         }
         return;
     }
@@ -1332,6 +1455,10 @@ void MainWindow::HandleReceivedLine(const QString &line) {
                 m_controllerEnabled = parsed > 0.0;
                 UpdateControllerEnabledStateUi();
             }
+            if (ParseTaggedDouble(line, "HwEstopOk=", parsed)) {
+                m_hwDi6EstopState = parsed > 0.5 ? 1 : 0;
+                UpdateHardwareEstopButtonUi();
+            }
             double queueDepth = 0.0;
             double active = 0.0;
             double activeLine = 0.0;
@@ -1349,44 +1476,11 @@ void MainWindow::HandleReceivedLine(const QString &line) {
                 if (queueKnown && activeKnown && queueDepth <= 0.0 && active <= 0.0) {
                     m_queueDrainStalledPolls = 0;
                     m_programWaitingForQueueDrain = false;
-                    if (m_programRunning &&
-                        (m_programIndex >= m_programLines.size() ||
-                         ProgramLineIsTerminalStop(m_programLines.at(m_programIndex)))) {
-                        m_programRunning = false;
-                        m_programPaused = false;
-                        m_programAwaitingAck = false;
-                        m_programIndex = 0;
-                        m_activeProgramLine = -1;
-                        m_pendingMotionLineIndices.clear();
-                        UpdateProgramPreviewHighlight(-1, false);
-                        SetProgramUiRunning(false);
-                        m_programStatusLabel->setText("Program complete");
-                        SendStatusPoll();
-                    } else if (m_programRunning && m_programIndex < m_programLines.size()) {
-                        m_programAwaitingAck = true;
-                        SendCommand(m_programLines.at(m_programIndex));
-                    } else {
-                        SendNextProgramLine();
-                    }
+                    SendCurrentProgramLineAfterDrain();
                 } else if (queueKnown && activeKnown && queueDepth > 0.0 && active <= 0.0) {
-                    m_queueDrainStalledPolls++;
-                    if (m_queueDrainStalledPolls >= 10) {
-                        m_programRunning = false;
-                        m_programPaused = false;
-                        m_programAwaitingAck = false;
-                        m_programWaitingForQueueDrain = false;
-                        m_activeProgramLine = -1;
-                        m_pendingMotionLineIndices.clear();
-                        UpdateProgramPreviewHighlight(-1, false);
-                        SetProgramUiRunning(false);
-                        m_programStatusLabel->setText("Queue stalled; sent emergency clear");
-                        SendCommand("M200");
-                        QMessageBox::warning(
-                            this,
-                            "Queue Stalled",
-                            "The controller reported queued moves but no active motion while the GUI was waiting for the queue to drain.\n\n"
-                            "An emergency queue clear (M200) was sent. Inspect the mechanism before running again.");
-                    }
+                    // Don't auto-EStop while draining for M5/M30: firmware can legitimately report
+                    // queued>0 with active=0 between planner batches/start delays.
+                    m_queueDrainStalledPolls = 0;
                 } else {
                     m_queueDrainStalledPolls = 0;
                 }
@@ -1405,6 +1499,12 @@ void MainWindow::HandleTelemetryLine(const QString &line) {
     }
 
     UpdateDroFromTelemetry(line);
+
+    double hwEstopOk = 0.0;
+    if (ParseTaggedDouble(line, "HwEstopOk=", hwEstopOk)) {
+        m_hwDi6EstopState = hwEstopOk > 0.5 ? 1 : 0;
+        UpdateHardwareEstopButtonUi();
+    }
 
     double enabled = 0.0;
     if (ParseTaggedDouble(line, "Enabled=", enabled)) {
@@ -1434,40 +1534,7 @@ void MainWindow::HandleTelemetryLine(const QString &line) {
     if (queueDepth <= 0.0 && active <= 0.0) {
         m_queueDrainStalledPolls = 0;
         m_programWaitingForQueueDrain = false;
-        if (m_programRunning &&
-            (m_programIndex >= m_programLines.size() ||
-             ProgramLineIsTerminalStop(m_programLines.at(m_programIndex)))) {
-            m_programRunning = false;
-            m_programPaused = false;
-            m_programAwaitingAck = false;
-            m_programIndex = 0;
-            ResetProgramTrackingState();
-            SetProgramUiRunning(false);
-            m_programStatusLabel->setText("Program complete");
-            m_pollTimer.start();
-        } else if (m_programRunning && m_programIndex < m_programLines.size()) {
-            m_programAwaitingAck = true;
-            SendCommand(m_programLines.at(m_programIndex));
-        } else {
-            SendNextProgramLine();
-        }
-    } else if (queueDepth > 0.0 && active <= 0.0) {
-        m_queueDrainStalledPolls++;
-        if (m_queueDrainStalledPolls >= 10) {
-            m_programRunning = false;
-            m_programPaused = false;
-            m_programAwaitingAck = false;
-            m_programWaitingForQueueDrain = false;
-            ResetProgramTrackingState();
-            SetProgramUiRunning(false);
-            m_programStatusLabel->setText("Queue stalled; sent emergency clear");
-            SendCommand("M200");
-            QMessageBox::warning(
-                this,
-                "Queue Stalled",
-                "The controller reported queued moves but no active motion while the GUI was waiting for the queue to drain.\n\n"
-                "An emergency queue clear (M200) was sent. Inspect the mechanism before running again.");
-        }
+        SendCurrentProgramLineAfterDrain();
     } else {
         m_queueDrainStalledPolls = 0;
     }
@@ -1570,6 +1637,72 @@ void MainWindow::ShowMotionParametersDialog() {
     auto *tabs = new QTabWidget(&dialog);
     layout->addWidget(tabs);
 
+    auto *rapidPage = new QWidget(tabs);
+    auto *rapidVBox = new QVBoxLayout(rapidPage);
+    auto *rapidIntro =
+        new QLabel(QStringLiteral(
+                       "Maximum speed for G0 rapids on each enabled axis, in the GUI length units (mm/min or "
+                       "in/min) except a rotary 4th axis, which uses deg/min. Diagonal rapids are clamped so "
+                       "every moving axis stays within its limit."),
+                   rapidPage);
+    rapidIntro->setWordWrap(true);
+    rapidVBox->addWidget(rapidIntro);
+    auto *rapidForm = new QFormLayout();
+    rapidVBox->addLayout(rapidForm);
+
+    QDoubleSpinBox *rapidSpinX = nullptr;
+    QDoubleSpinBox *rapidSpinY = nullptr;
+    QDoubleSpinBox *rapidSpinZ = nullptr;
+    QDoubleSpinBox *rapidSpinA = nullptr;
+
+    auto addLinearRapidSpin = [&](int axisNum, QDoubleSpinBox **slot, double mmMinInternal) {
+        if (!IsLogicalAxisEnabled(axisNum)) {
+            return;
+        }
+        auto *sp = new QDoubleSpinBox(rapidPage);
+        sp->setRange(0.001, 1.0e7);
+        sp->setDecimals(3);
+        const QString suf = m_guiUnitsInches ? QStringLiteral(" in/min") : QStringLiteral(" mm/min");
+        sp->setSuffix(suf);
+        double disp = mmMinInternal;
+        if (m_guiUnitsInches) {
+            disp /= 25.4;
+        }
+        sp->setValue(disp);
+        const QString letter = axisNum == 1   ? QStringLiteral("X")
+                               : axisNum == 2 ? QStringLiteral("Y")
+                                              : QStringLiteral("Z");
+        rapidForm->addRow(QStringLiteral("Max rapid %1:").arg(letter), sp);
+        *slot = sp;
+    };
+
+    addLinearRapidSpin(1, &rapidSpinX, m_rapidMmMinX);
+    addLinearRapidSpin(2, &rapidSpinY, m_rapidMmMinY);
+    addLinearRapidSpin(3, &rapidSpinZ, m_rapidMmMinZ);
+
+    if (IsLogicalAxisEnabled(4)) {
+        auto *spA = new QDoubleSpinBox(rapidPage);
+        spA->setRange(0.001, 1.0e7);
+        spA->setDecimals(3);
+        if (IsLogicalAxisRotary(4)) {
+            spA->setSuffix(QStringLiteral(" deg/min"));
+            spA->setValue(m_rapidRateFourth);
+        } else {
+            const QString suf = m_guiUnitsInches ? QStringLiteral(" in/min") : QStringLiteral(" mm/min");
+            spA->setSuffix(suf);
+            double d = m_rapidRateFourth;
+            if (m_guiUnitsInches) {
+                d /= 25.4;
+            }
+            spA->setValue(d);
+        }
+        rapidForm->addRow(QStringLiteral("Max rapid A:"), spA);
+        rapidSpinA = spA;
+    }
+
+    rapidVBox->addStretch();
+    tabs->addTab(rapidPage, QStringLiteral("Rapids"));
+
     for (int i = 0; i < 4; ++i) {
         auto *page = new QWidget(tabs);
         auto *form = new QFormLayout(page);
@@ -1671,6 +1804,40 @@ void MainWindow::ShowMotionParametersDialog() {
     m_guiUnitsInches = units->currentIndex() == 1;
     m_singleMotorBench = singleMotor->isChecked();
     m_junctionDVmax = dvmaxSpin->value();
+
+    if (rapidSpinX) {
+        double v = rapidSpinX->value();
+        if (m_guiUnitsInches) {
+            v *= 25.4;
+        }
+        m_rapidMmMinX = v;
+    }
+    if (rapidSpinY) {
+        double v = rapidSpinY->value();
+        if (m_guiUnitsInches) {
+            v *= 25.4;
+        }
+        m_rapidMmMinY = v;
+    }
+    if (rapidSpinZ) {
+        double v = rapidSpinZ->value();
+        if (m_guiUnitsInches) {
+            v *= 25.4;
+        }
+        m_rapidMmMinZ = v;
+    }
+    if (rapidSpinA) {
+        double v = rapidSpinA->value();
+        if (IsLogicalAxisRotary(4)) {
+            m_rapidRateFourth = v;
+        } else {
+            if (m_guiUnitsInches) {
+                v *= 25.4;
+            }
+            m_rapidRateFourth = v;
+        }
+    }
+
     for (int i = 0; i < 4; ++i) {
         auto &port = m_motorPorts[i];
         const auto &w = widgets[i];
@@ -1829,6 +1996,14 @@ QString MainWindow::CleanGCodeLine(const QString &line) const {
 
 bool MainWindow::ProgramLineRequiresQueueDrain(const QString &line) const {
     const QString upper = line.trimmed().toUpper();
+    // Spindle stop / program end / sync must not run while motion is still queued — otherwise M5
+    // fires before the last G0/G1 finishes and the stream can outrun the planner (spindle "blips").
+    if (upper == "M5" || upper == "M05") {
+        return true;
+    }
+    if (upper.startsWith("M5 ") || upper.startsWith("M05 ")) {
+        return true;
+    }
     return upper == "M0" || upper == "M00" ||
            upper == "M1" || upper == "M01" ||
            upper == "M2" || upper == "M02" ||
@@ -1846,6 +2021,12 @@ bool MainWindow::ProgramLineIsTerminalStop(const QString &line) const {
 
 bool MainWindow::ProgramLineQueuesMotion(const QString &line) const {
     const QString upper = line.trimmed().toUpper();
+    // Dwell blocks (Fanuc G4 / G04) are not queued motion; match word boundaries so G40 is not G4.
+    static const QRegularExpression kG4DwellWord(QStringLiteral(R"(\bG04\b|\bG4\b)"),
+                                               QRegularExpression::CaseInsensitiveOption);
+    if (kG4DwellWord.match(upper).hasMatch()) {
+        return false;
+    }
     return upper.startsWith("G0 ") || upper == "G0" ||
            upper.startsWith("G00 ") || upper == "G00" ||
            upper.startsWith("G1 ") || upper == "G1" ||
@@ -1855,6 +2036,7 @@ bool MainWindow::ProgramLineQueuesMotion(const QString &line) const {
            upper.startsWith("G3 ") || upper == "G3" ||
            upper.startsWith("G03 ") || upper == "G03";
 }
+
 
 void MainWindow::UpdateProgramPreviewHighlight(int lineIndex, bool autoScroll) {
     QList<QTextEdit::ExtraSelection> selections;
@@ -2043,6 +2225,30 @@ void MainWindow::SetProgramUiRunning(bool running) {
     m_pauseProgramButton->setText("Pause");
 }
 
+// Send whatever line m_programIndex currently points at, bypassing the queue-drain gate.
+// Used after a drain completes so we don't immediately re-arm the drain and loop forever.
+void MainWindow::SendCurrentProgramLineAfterDrain() {
+    if (!m_programRunning || m_programPaused) {
+        return;
+    }
+    if (m_programIndex >= m_programLines.size()) {
+        m_programRunning = false;
+        m_programPaused = false;
+        m_programAwaitingAck = false;
+        ResetProgramTrackingState();
+        SetProgramUiRunning(false);
+        m_programStatusLabel->setText("Program complete");
+        m_pollTimer.start();
+        return;
+    }
+    const QString &line = m_programLines.at(m_programIndex);
+    m_programStatusLabel->setText(QString("Running line %1 of %2")
+                                      .arg(m_programIndex + 1)
+                                      .arg(m_programLines.size()));
+    m_programAwaitingAck = true;
+    SendCommand(line);
+}
+
 void MainWindow::SendNextProgramLine() {
     if (!m_programRunning || m_programPaused || m_programAwaitingAck ||
         m_programWaitingForQueueDrain) {
@@ -2085,12 +2291,31 @@ void MainWindow::HandleProgramResponse(const QString &line) {
     if (line.compare("ok", Qt::CaseInsensitive) == 0) {
         m_programQueueFullRetries = 0;
         m_programAwaitingAck = false;
+        const bool completedByTerminalStop =
+            (m_programIndex >= 0 && m_programIndex < m_programLines.size() &&
+             ProgramLineIsTerminalStop(m_programLines.at(m_programIndex)));
         if (m_programIndex >= 0 && m_programIndex < m_programLines.size() &&
             ProgramLineQueuesMotion(m_programLines.at(m_programIndex))) {
             m_pendingMotionLineIndices.append(m_programIndex);
         }
         m_programIndex++;
         UpdateToolVizForViewport();
+        if (completedByTerminalStop) {
+            m_programIndex = 0;
+            m_programRunning = false;
+            m_programPaused = false;
+            m_programAwaitingAck = false;
+            m_programWaitingForQueueDrain = false;
+            m_queueDrainStalledPolls = 0;
+            m_activeProgramLine = -1;
+            m_pendingMotionLineIndices.clear();
+            UpdateProgramPreviewHighlight(-1, false);
+            SetProgramUiRunning(false);
+            m_programStatusLabel->setText("Program complete");
+            m_pollTimer.start();
+            SendStatusPoll();
+            return;
+        }
         SendNextProgramLine();
         return;
     }
@@ -2160,6 +2385,18 @@ bool MainWindow::IsLogicalAxisEnabled(int axis) const {
     for (const auto &port : m_motorPorts) {
         if (port.enabled && port.axis == axis) {
             return true;
+        }
+    }
+    return false;
+}
+
+bool MainWindow::IsLogicalAxisRotary(int axis1Based) const {
+    if (axis1Based < 1 || axis1Based > 4) {
+        return false;
+    }
+    for (const auto &port : m_motorPorts) {
+        if (port.enabled && port.axis == axis1Based) {
+            return port.axisType == 1;
         }
     }
     return false;

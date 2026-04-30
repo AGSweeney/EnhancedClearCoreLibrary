@@ -19,9 +19,23 @@
  *   SYNCREF X=.. Y=.. Z=.. A=..  (DISABLE motors; set pulse refs to match ClearPath MSP counts after homing)
  *   POS | M114
  *   STATUS | M115
- *   MOVE X<num> Y<num> [F<num>] | G00/G0 (rapid, CONFIG Vel) | G01 X<num> Y<num> [F<num>]
+ *   MOVE X<num> Y<num> [F<num>] | G00/G0 (rapid; CONFIG RVELX/Y/Z/A per-axis steps/sec caps) | G01 ...
  *   G02/G2 | G03/G3 X<num> Y<num> I<num> J<num> [F<num>]  (XY arc, center = start + I,J in active units)
  *   JOG X<num> Y<num> [F<num>] | G91 G01 X<num> Y<num> [F<num>]
+ *   G4 / G04 dwell (Fanuc-style): P = milliseconds (integer); X or U = seconds (float). If P is present it wins over X/U.
+ *   Dwell blocks the command parser; during the wait the firmware polls DI-6 and reads USB/TCP control, but only
+ *   M200/ESTOP/M203/DISABLE/M5/M2/M30 run immediately — other lines are deferred until after G4 so program order is preserved.
+ *
+ * Spindle (ClearCore IO mapping):
+ *   M3 / M03 = spindle CW on IO-1; if IO-2 (M4) was on, it is turned off first.
+ *   M4 / M04 = spindle CCW on IO-2; if IO-1 (M3) was on, it is turned off first.
+ *   M5 / M05 = spindle stop: IO-0 current loop to SPINDLE_MIN_UA (default 4 mA), IO-1 and IO-2 low.
+ *   S#### = spindle speed on IO-0 as 4–20 mA by default (OutputCurrent µA; CONFIG SPINDLE_SMAX, SPINDLE_MIN_UA, SPINDLE_MAX_UA).
+ *   CONFIG LASER is accepted for compatibility but rapid gating is disabled in firmware; G0 never
+ *   forces spindle direction outputs low.
+ *   M2 / M02 / M30 = program end for host; firmware also stops spindle outputs (IO-0..2).
+ *   DI-6 optional hardware estop (CONFIG ESTOP_DI6): same read as ReadDigitalInput example — State() non-zero = ON
+ *   (estop OK by default); zero = OFF (estop active). Tripped runs M200-equivalent.
  *
  * G01/G02/G03 in the X/Y plane: if CONFIG SINGLE=0 (default from host) uses CoordinatedMotionController
  * (vector feed / MoveArc). CONFIG SINGLE=1 = single-motor / independent M0 and M1 — G2/G3 are rejected.
@@ -40,6 +54,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
 #define SerialPort ConnectorUsb
@@ -47,7 +62,8 @@
 #define motorY ConnectorM1
 
 #define SERIAL_BAUD_RATE 115200
-#define MAX_LINE_LENGTH 128
+// Long enough for CONFIG with SPMMX/Y, VEL, ACCEL/DECEL, DVMAX, SINGLE, AX, LASER, RVELX/Y/Z/A (~160+ chars).
+#define MAX_LINE_LENGTH 256
 
 #define MOTOR_X_STEPS_PER_REV 800
 #define MOTOR_X_PITCH_MM 5.0
@@ -74,6 +90,10 @@
 #define TELEMETRY_INTERVAL_MS 50
 #define DISCOVERY_PORT 10040
 #define DISCOVERY_REQUEST "CLEARCNC_DISCOVER?"
+// Fanuc G4 P is ms; cap blocking dwell to avoid locking the link indefinitely.
+#define G4_DWELL_MS_MAX 600000u
+// ClearCore OutputCurrent() accepts 0..20000 µA (0..20 mA) per library.
+#define SPINDLE_OUTPUT_MAX_UA 20000u
 
 enum CoordinateMode {
     MODE_ABS,
@@ -110,6 +130,7 @@ enum MotionBlockKind : uint8_t {
 
 struct MotionBlock {
     bool valid;
+    bool isRapidMove;
     uint8_t axisMask;
     int32_t programLine;
     MotionBlockKind kind;
@@ -144,6 +165,8 @@ static double feedRate = DEFAULT_FEED_MM_PER_MIN;
 static double stepsPerMmX = (double)MOTOR_X_STEPS_PER_REV / MOTOR_X_PITCH_MM;
 static double stepsPerMmY = (double)MOTOR_Y_STEPS_PER_REV / MOTOR_Y_PITCH_MM;
 static uint32_t velocityMaxStepsPerSec = DEFAULT_VELOCITY_STEPS_PER_SEC;
+// Per-axis G0 rapid cap (steps/sec on that axis). Vector rapids are clamped so each moving axis stays within its cap.
+static uint32_t rapidVelocityMaxStepsPerSec[AXIS_COUNT];
 static uint32_t accelMaxStepsPerSec2 = DEFAULT_ACCEL_STEPS_PER_SEC2;
 static uint32_t stopDecelStepsPerSec2 = DEFAULT_STOP_DECEL_STEPS_PER_SEC2;
 // dVmax: per-axis max velocity delta at junctions (Centroid-style corner speed cap).
@@ -175,6 +198,8 @@ static int32_t activeProgramLine = 0;
 static uint32_t lastTelemetryTime = 0;
 // Host: CONFIG SINGLE=0 → coordinated G01 in XY. CONFIG SINGLE=1 → independent M0/M1 (e.g. one motor on X).
 static bool g_xyCoordinated = false;
+// Modal motion state used when lines omit explicit G0/G1 (e.g. "X.. Y..").
+static bool g_modalMotionRapid = false;
 // True for the in-flight block when XY was started with MoveLinear (not per-axis Move on M0/M1).
 static bool s_blockUsedCoordinatedXy = false;
 // Firmware blocks consumed in one StartMotionBlock (coordinated arc chains pop >1).
@@ -194,6 +219,22 @@ static int32_t s_coordArcCy = 0;
 static int32_t s_coordArcR = 0;
 static bool s_coordArcCw = false;
 static uint32_t s_coordArcNominal = 0;
+
+enum SpindleDirection : uint8_t {
+    SPINDLE_DIR_OFF = 0,
+    SPINDLE_DIR_CW = 1,
+    SPINDLE_DIR_CCW = 2,
+};
+static SpindleDirection spindleDir = SPINDLE_DIR_OFF;
+static double spindleCommandedS = 0.0;
+static double spindleSMax = 24000.0;
+static uint32_t spindleMinMicroamps = 4000u;
+static uint32_t spindleMaxMicroamps = 20000u;
+static bool g_spindleLaserRapidGate = false;
+// 0 = DI-6 estop disabled (telemetry HwEstopOk=1).
+// 1 = default: estop OK when DI6.State() != 0 (ON); estop active when State()==0 (OFF) — Teknic ReadDigitalInput semantics.
+// 2 = inverted: OK when DI6 reads 0 (OFF); fault when non-zero (NC-to-GND + pull-up chain often reads LOW when safe).
+static uint8_t estopDi6Mode = 1;
 
 static void InvalidateCoordinatedArcStream() {
     s_coordArcStreamOpen = false;
@@ -225,6 +266,13 @@ static uint16_t lineIndex = 0;
 static char tcpLineBuffer[MAX_LINE_LENGTH];
 static uint16_t tcpLineIndex = 0;
 
+// Commands read while G4 blocks must not reorder the host stream: only estop/spindle-stop/program-end
+// run immediately; everything else waits here until the main loop drains after dwell returns.
+#define DEFERRED_CMD_QUEUE_DEPTH 16
+static char s_deferredCmd[DEFERRED_CMD_QUEUE_DEPTH][MAX_LINE_LENGTH];
+static uint8_t s_deferredCmdHead = 0;
+static uint8_t s_deferredCmdCount = 0;
+
 static MotorDriver *MotorForPort(uint8_t port) {
     switch (port) {
         case 0: return &ConnectorM0;
@@ -252,26 +300,71 @@ static void SendTelemetryLine(const char *msg) {
 
 static bool ParseValue(const char *line, char key, double &value) {
     const char keyUpper = (char)toupper((unsigned char)key);
-    for (const char *p = line; *p != '\0'; p++) {
+    const char *p = line;
+    for (;;) {
+        while (*p == ' ' || *p == '\t') {
+            p++;
+        }
+        if (*p == '\0' || *p == ';') {
+            return false;
+        }
+        if (*p == '(') {
+            p++;
+            while (*p != '\0' && *p != ')') {
+                p++;
+            }
+            if (*p == ')') {
+                p++;
+            }
+            continue;
+        }
         if (toupper((unsigned char)*p) == keyUpper) {
-            if (sscanf(p + 1, "%lf", &value) == 1) {
+            const char *v = p + 1;
+            while (*v == ' ' || *v == '\t') {
+                v++;
+            }
+            char *end = nullptr;
+            const double parsed = strtod(v, &end);
+            if (end != v) {
+                value = parsed;
                 return true;
             }
         }
+        while (*p != '\0' && !isspace((unsigned char)*p) && *p != ';') {
+            p++;
+        }
+    }
+}
+
+static bool ParseNamedValue(const char *lineUpper, const char *name, double &value) {
+    const size_t nameLen = strlen(name);
+    const char *p = lineUpper;
+    while ((p = strstr(p, name)) != nullptr) {
+        const bool leftBoundary = (p == lineUpper) || isspace((unsigned char)p[-1]);
+        const char after = p[nameLen];
+        const bool rightBoundary = (after == '\0') || (after == '=') || isspace((unsigned char)after);
+        if (leftBoundary && rightBoundary) {
+            const char *v = p + nameLen;
+            while (*v == ' ' || *v == '\t') {
+                v++;
+            }
+            if (*v == '=') {
+                v++;
+            }
+            while (*v == ' ' || *v == '\t') {
+                v++;
+            }
+            return sscanf(v, "%lf", &value) == 1;
+        }
+        p += nameLen;
     }
     return false;
 }
 
-static bool ParseNamedValue(const char *lineUpper, const char *name, double &value) {
-    const char *p = strstr(lineUpper, name);
-    if (!p) {
-        return false;
-    }
-    p += strlen(name);
-    if (*p == '=') {
-        p++;
-    }
-    return sscanf(p, "%lf", &value) == 1;
+static bool LineHasAnyAxisWord(const char *line) {
+    double v = 0.0;
+    return ParseValue(line, 'X', v) || ParseValue(line, 'Y', v) ||
+           ParseValue(line, 'Z', v) || ParseValue(line, 'A', v);
 }
 
 static void PublishTelemetry(bool force);
@@ -410,6 +503,8 @@ static void SyncPlannerPositionFromMotors() {
     }
 }
 
+static void SpindleApplyDirectionPins(void);
+
 static void ClearMotionQueueEx(bool syncPlannerFromMotors) {
     s_blockUsedCoordinatedXy = false;
     InvalidateCoordinatedArcStream();
@@ -431,13 +526,24 @@ static void ClearMotionQueueEx(bool syncPlannerFromMotors) {
     if (syncPlannerFromMotors) {
         SyncPlannerPositionFromMotors();
     }
+    g_spindleLaserRapidGate = false;
+    SpindleApplyDirectionPins();
 }
 
 static void ClearMotionQueue() {
     ClearMotionQueueEx(false);
 }
 
+static void SpindleStopOutputs();
+
+static void ClearDeferredDuringDwellQueue() {
+    s_deferredCmdHead = 0;
+    s_deferredCmdCount = 0;
+}
+
 static void DisableMotorsAbrupt() {
+    ClearDeferredDuringDwellQueue();
+    SpindleStopOutputs();
     ClearMotionQueue();
     for (uint8_t axis = 0; axis < AXIS_COUNT; axis++) {
         if (MotorDriver *motor = MotorForPort(axisConfig[axis].port)) {
@@ -447,6 +553,605 @@ static void DisableMotorsAbrupt() {
     }
     motorsEnabled = false;
     PublishTelemetry(true);
+}
+
+static void SpindleClampMicroampRange() {
+    if (spindleMaxMicroamps > SPINDLE_OUTPUT_MAX_UA) {
+        spindleMaxMicroamps = SPINDLE_OUTPUT_MAX_UA;
+    }
+    if (spindleMinMicroamps >= spindleMaxMicroamps) {
+        spindleMinMicroamps = 4000u;
+        spindleMaxMicroamps = 20000u;
+    }
+}
+
+static void SpindleHardwareInit() {
+    ConnectorIO1.Mode(Connector::OUTPUT_DIGITAL);
+    ConnectorIO2.Mode(Connector::OUTPUT_DIGITAL);
+    ConnectorIO1.State(false);
+    ConnectorIO2.State(false);
+    SpindleClampMicroampRange();
+    if (ConnectorIO0.Mode(Connector::OUTPUT_ANALOG)) {
+        ConnectorIO0.OutputCurrent((uint16_t)spindleMinMicroamps);
+    }
+    spindleDir = SPINDLE_DIR_OFF;
+}
+
+static void SpindleStopOutputs() {
+    g_spindleLaserRapidGate = false;
+    spindleDir = SPINDLE_DIR_OFF;
+    ConnectorIO1.State(false);
+    ConnectorIO2.State(false);
+    if (ConnectorIO0.Mode() == Connector::OUTPUT_ANALOG) {
+        SpindleClampMicroampRange();
+        ConnectorIO0.OutputCurrent((uint16_t)spindleMinMicroamps);
+    }
+}
+
+static uint16_t SpindleSpeedToMicroamps(double sValue) {
+    SpindleClampMicroampRange();
+    const uint32_t span = spindleMaxMicroamps - spindleMinMicroamps;
+    if (spindleSMax <= 0.0 || span == 0u) {
+        return (uint16_t)spindleMinMicroamps;
+    }
+    double t = sValue / spindleSMax;
+    if (t < 0.0) {
+        t = 0.0;
+    }
+    if (t > 1.0) {
+        t = 1.0;
+    }
+    const double ua = (double)spindleMinMicroamps + t * (double)span;
+    uint32_t out = (uint32_t)(ua + 0.5);
+    if (out < spindleMinMicroamps) {
+        out = spindleMinMicroamps;
+    }
+    if (out > spindleMaxMicroamps) {
+        out = spindleMaxMicroamps;
+    }
+    return (uint16_t)out;
+}
+
+static void SpindleRefreshAnalogFromCommandedS() {
+    if (ConnectorIO0.Mode() != Connector::OUTPUT_ANALOG) {
+        return;
+    }
+    SpindleClampMicroampRange();
+    if (spindleDir == SPINDLE_DIR_OFF) {
+        ConnectorIO0.OutputCurrent((uint16_t)spindleMinMicroamps);
+        return;
+    }
+    ConnectorIO0.OutputCurrent(SpindleSpeedToMicroamps(spindleCommandedS));
+}
+
+static void SpindleApplyDirectionPins() {
+    if (spindleDir == SPINDLE_DIR_OFF) {
+        ConnectorIO1.State(false);
+        ConnectorIO2.State(false);
+        return;
+    }
+    if (spindleDir == SPINDLE_DIR_CW) {
+        ConnectorIO2.State(false);
+        ConnectorIO1.State(true);
+    } else {
+        ConnectorIO1.State(false);
+        ConnectorIO2.State(true);
+    }
+}
+
+static void SpindleLaserSetRapidMotionPhase(bool rapidPhase) {
+    (void)rapidPhase;
+    // Laser rapid gating disabled: G0 must never alter spindle direction outputs.
+    if (g_spindleLaserRapidGate) {
+        g_spindleLaserRapidGate = false;
+    }
+}
+
+static void SpindleSetCw() {
+    spindleDir = SPINDLE_DIR_CW;
+    SpindleRefreshAnalogFromCommandedS();
+    SpindleApplyDirectionPins();
+}
+
+static void SpindleSetCcw() {
+    spindleDir = SPINDLE_DIR_CCW;
+    SpindleRefreshAnalogFromCommandedS();
+    SpindleApplyDirectionPins();
+}
+
+static const char *SpindleSkipWhitespaceOrComment(const char *p) {
+    while (*p == ' ' || *p == '\t') {
+        p++;
+    }
+    if (*p == ';') {
+        while (*p != '\0') {
+            p++;
+        }
+        return p;
+    }
+    if (*p == '(') {
+        p++;
+        while (*p != '\0' && *p != ')') {
+            p++;
+        }
+        if (*p == ')') {
+            p++;
+        }
+        return SpindleSkipWhitespaceOrComment(p);
+    }
+    return p;
+}
+
+static const char *SpindleSkipNword(const char *p) {
+    if (toupper((unsigned char)*p) != 'N' || !isdigit((unsigned char)p[1])) {
+        return p;
+    }
+    p++;
+    while (isdigit((unsigned char)*p)) {
+        p++;
+    }
+    return p;
+}
+
+// Skip a non-spindle word on mixed lines (e.g. CONFIG, ENABLE, G01 X1).
+static const char *SpindleSkipUnknownToken(const char *p) {
+    while (*p != '\0' && !isspace((unsigned char)*p) && *p != '*') {
+        p++;
+    }
+    return p;
+}
+
+static bool LineIsSpindleExclusive(const char *lineUpper) {
+    const char *p = lineUpper;
+    for (;;) {
+        p = SpindleSkipWhitespaceOrComment(p);
+        p = SpindleSkipNword(p);
+        p = SpindleSkipWhitespaceOrComment(p);
+        if (*p == '\0') {
+            return true;
+        }
+        if (*p == '*') {
+            return true;
+        }
+        const char c = (char)toupper((unsigned char)*p);
+        if (c == 'S') {
+            const char *const afterS = p + 1;
+            if (!isdigit((unsigned char)*afterS) && *afterS != '.' && *afterS != '-' && *afterS != '+') {
+                return false;
+            }
+            char *end = nullptr;
+            (void)strtod(afterS, &end);
+            if (end == afterS) {
+                return false;
+            }
+            p = end;
+            continue;
+        }
+        if (c == 'M') {
+            if (!isdigit((unsigned char)p[1])) {
+                return false;
+            }
+            const int m = atoi(p + 1);
+            if (m != 2 && m != 3 && m != 4 && m != 5 && m != 30) {
+                return false;
+            }
+            p++;
+            while (isdigit((unsigned char)*p)) {
+                p++;
+            }
+            continue;
+        }
+        return false;
+    }
+}
+
+static void SpindleApplyTokensFromLine(const char *lineUpper) {
+    const char *p = lineUpper;
+    for (;;) {
+        p = SpindleSkipWhitespaceOrComment(p);
+        p = SpindleSkipNword(p);
+        p = SpindleSkipWhitespaceOrComment(p);
+        if (*p == '\0' || *p == '*') {
+            break;
+        }
+        const char c = (char)toupper((unsigned char)*p);
+        if (c == 'S') {
+            const char *const afterS = p + 1;
+            if (!isdigit((unsigned char)*afterS) && *afterS != '.' && *afterS != '-' && *afterS != '+') {
+                p = SpindleSkipUnknownToken(p);
+                continue;
+            }
+            char *end = nullptr;
+            const double sv = strtod(afterS, &end);
+            if (end != afterS) {
+                spindleCommandedS = sv;
+                if (spindleCommandedS < 0.0) {
+                    spindleCommandedS = 0.0;
+                }
+                SpindleRefreshAnalogFromCommandedS();
+                p = end;
+            } else {
+                p = SpindleSkipUnknownToken(p);
+            }
+            continue;
+        }
+        if (c == 'M' && isdigit((unsigned char)p[1])) {
+            const int m = atoi(p + 1);
+            p++;
+            while (isdigit((unsigned char)*p)) {
+                p++;
+            }
+            if (m == 5 || m == 2 || m == 30) {
+                SpindleStopOutputs();
+            } else if (m == 3) {
+                SpindleSetCw();
+            } else if (m == 4) {
+                SpindleSetCcw();
+            }
+            continue;
+        }
+        p = SpindleSkipUnknownToken(p);
+    }
+}
+
+static bool MatchG4DwellWord(const char *p) {
+    if (!p || p[0] != 'G') {
+        return false;
+    }
+    if (p[1] == '0' && p[2] == '4') {
+        const char c = p[3];
+        return c == '\0' || isspace((unsigned char)c) || c == '.';
+    }
+    if (p[1] == '4' && !isdigit((unsigned char)p[2])) {
+        return true;
+    }
+    return false;
+}
+
+static bool LineUpperContainsG4DwellCommand(const char *lineUpper) {
+    const char *p = lineUpper;
+    for (;;) {
+        p = SpindleSkipWhitespaceOrComment(p);
+        p = SpindleSkipNword(p);
+        p = SpindleSkipWhitespaceOrComment(p);
+        if (*p == '\0' || *p == '*') {
+            return false;
+        }
+        if (MatchG4DwellWord(p)) {
+            return true;
+        }
+        p = SpindleSkipUnknownToken(p);
+    }
+}
+
+static bool MotionTokenConflictsWithG4Dwell(const char *p) {
+    if (strncmp(p, "MOVE", 4) == 0) {
+        return true;
+    }
+    if (strncmp(p, "JOG", 3) == 0) {
+        return true;
+    }
+    if (p[0] != 'G') {
+        return false;
+    }
+    if (p[1] == '0') {
+        if (p[2] == '0' && (p[3] == '\0' || isspace((unsigned char)p[3]) || p[3] == '.')) {
+            return true;
+        }
+        if (!isdigit((unsigned char)p[2])) {
+            return true;
+        }
+    }
+    if (p[1] == '1') {
+        if (p[2] == '0' && (p[3] == '\0' || isspace((unsigned char)p[3]) || p[3] == '.')) {
+            return true;
+        }
+        if (!isdigit((unsigned char)p[2])) {
+            return true;
+        }
+    }
+    if (p[1] == '0' && p[2] == '2' && (p[3] == '\0' || isspace((unsigned char)p[3]) || p[3] == '.')) {
+        return true;
+    }
+    if (p[1] == '0' && p[2] == '3' && (p[3] == '\0' || isspace((unsigned char)p[3]) || p[3] == '.')) {
+        return true;
+    }
+    if (p[1] == '2' && !isdigit((unsigned char)p[2])) {
+        return true;
+    }
+    if (p[1] == '3' && !isdigit((unsigned char)p[2])) {
+        return true;
+    }
+    return false;
+}
+
+static bool LineUpperBlocksG4WithMotion(const char *lineUpper) {
+    const char *p = lineUpper;
+    for (;;) {
+        p = SpindleSkipWhitespaceOrComment(p);
+        p = SpindleSkipNword(p);
+        p = SpindleSkipWhitespaceOrComment(p);
+        if (*p == '\0' || *p == '*') {
+            return false;
+        }
+        if (MotionTokenConflictsWithG4Dwell(p)) {
+            return true;
+        }
+        p = SpindleSkipUnknownToken(p);
+    }
+}
+
+// Fanuc: P = integer ms; X or U = seconds. P takes precedence when any P word sets a time > 0.
+static bool ParseFanucG4DwellMs(const char *lineUpper, uint32_t *outMs) {
+    bool haveP = false;
+    uint32_t pMs = 0;
+    bool haveX = false;
+    double xSec = 0.0;
+    bool haveU = false;
+    double uSec = 0.0;
+
+    const char *p = lineUpper;
+    for (;;) {
+        p = SpindleSkipWhitespaceOrComment(p);
+        p = SpindleSkipNword(p);
+        p = SpindleSkipWhitespaceOrComment(p);
+        if (*p == '\0' || *p == '*') {
+            break;
+        }
+        const char c = (char)toupper((unsigned char)*p);
+        if (c == 'P' &&
+            (isdigit((unsigned char)p[1]) || p[1] == '-' || p[1] == '+')) {
+            char *end = nullptr;
+            const unsigned long v = strtoul(p + 1, &end, 10);
+            if (end != p + 1) {
+                haveP = true;
+                pMs = (uint32_t)v;
+                p = end;
+            } else {
+                p = SpindleSkipUnknownToken(p);
+            }
+            continue;
+        }
+        if (c == 'X' &&
+            (isdigit((unsigned char)p[1]) || p[1] == '.' || p[1] == '-' || p[1] == '+')) {
+            char *end = nullptr;
+            const double v = strtod(p + 1, &end);
+            if (end != p + 1) {
+                haveX = true;
+                xSec = v;
+                p = end;
+            } else {
+                p = SpindleSkipUnknownToken(p);
+            }
+            continue;
+        }
+        if (c == 'U' &&
+            (isdigit((unsigned char)p[1]) || p[1] == '.' || p[1] == '-' || p[1] == '+')) {
+            char *end = nullptr;
+            const double v = strtod(p + 1, &end);
+            if (end != p + 1) {
+                haveU = true;
+                uSec = v;
+                p = end;
+            } else {
+                p = SpindleSkipUnknownToken(p);
+            }
+            continue;
+        }
+        p = SpindleSkipUnknownToken(p);
+    }
+
+    if (haveP) {
+        *outMs = pMs;
+        return true;
+    }
+    if (haveX) {
+        if (xSec <= 0.0) {
+            return false;
+        }
+        const double ms = xSec * 1000.0;
+        if (ms > (double)UINT32_MAX) {
+            *outMs = UINT32_MAX;
+        } else {
+            *outMs = (uint32_t)(ms + 0.5);
+        }
+        return true;
+    }
+    if (haveU) {
+        if (uSec <= 0.0) {
+            return false;
+        }
+        const double ms = uSec * 1000.0;
+        if (ms > (double)UINT32_MAX) {
+            *outMs = UINT32_MAX;
+        } else {
+            *outMs = (uint32_t)(ms + 0.5);
+        }
+        return true;
+    }
+    (void)outMs;
+    return false;
+}
+
+// True when DI6 wiring indicates an estop / chain-open fault (should run M200-equivalent).
+// DigitalIn::State() is int16_t; non-zero matches ReadDigitalInput.cpp "ON", zero matches "OFF".
+static bool HardwareEstopDiFault() {
+    if (estopDi6Mode == 0) {
+        return false;
+    }
+    const bool diOn = (ConnectorDI6.State() != 0);
+    if (estopDi6Mode == 1) {
+        return !diOn;
+    }
+    if (estopDi6Mode == 2) {
+        return diOn;
+    }
+    return false;
+}
+
+static bool HardwareDi6EstopChainOk() {
+    if (estopDi6Mode == 0) {
+        return true;
+    }
+    return !HardwareEstopDiFault();
+}
+
+static void HardwareEstopPoll() {
+    if (!HardwareEstopDiFault()) {
+        return;
+    }
+    DisableMotorsAbrupt();
+}
+
+static bool ReadLine(char *outLine, uint16_t maxLen);
+static bool ReadTcpLine(char *outLine, uint16_t maxLen);
+static void ProcessCommand(char *lineRaw);
+
+static bool LeadingTokenIsMcode(const char *s, int wantM) {
+    if (*s != 'M' || !isdigit((unsigned char)s[1])) {
+        return false;
+    }
+    const int m = atoi(s + 1);
+    if (m != wantM) {
+        return false;
+    }
+    const char *p = s + 1;
+    while (isdigit((unsigned char)*p)) {
+        p++;
+    }
+    const char c = *p;
+    return c == '\0' || isspace((unsigned char)c) || c == ';' || c == '(';
+}
+
+// Lines handled immediately while G4 is blocking (must not reorder buffered program stream).
+static bool LineRawIsEmergencyControl(const char *lineRaw) {
+    char u[MAX_LINE_LENGTH];
+    strncpy(u, lineRaw, sizeof(u) - 1);
+    u[sizeof(u) - 1] = '\0';
+    ToUpperInPlace(u);
+    const char *s = u;
+    while (*s == ' ' || *s == '\t') {
+        s++;
+    }
+    if (*s == '\0') {
+        return false;
+    }
+    if (strncmp(s, "ESTOP", 5) == 0) {
+        const char c = s[5];
+        return c == '\0' || isspace((unsigned char)c) || c == ';' || c == '(';
+    }
+    if (strncmp(s, "DISABLE", 7) == 0) {
+        const char c = s[7];
+        return c == '\0' || isspace((unsigned char)c) || c == ';' || c == '(';
+    }
+    return LeadingTokenIsMcode(s, 200) || LeadingTokenIsMcode(s, 203) || LeadingTokenIsMcode(s, 5) ||
+           LeadingTokenIsMcode(s, 30) || LeadingTokenIsMcode(s, 2);
+}
+
+static bool EnqueueDeferredCommand(const char *lineRaw) {
+    if (s_deferredCmdCount >= DEFERRED_CMD_QUEUE_DEPTH) {
+        SendLine("error: too many non-emergency lines during G4 dwell; line dropped");
+        return false;
+    }
+    const uint8_t slot = (uint8_t)((s_deferredCmdHead + s_deferredCmdCount) % DEFERRED_CMD_QUEUE_DEPTH);
+    strncpy(s_deferredCmd[slot], lineRaw, MAX_LINE_LENGTH - 1);
+    s_deferredCmd[slot][MAX_LINE_LENGTH - 1] = '\0';
+    s_deferredCmdCount++;
+    return true;
+}
+
+static bool DequeueDeferredCommand(char *out, uint16_t maxLen) {
+    if (s_deferredCmdCount == 0) {
+        return false;
+    }
+    strncpy(out, s_deferredCmd[s_deferredCmdHead], maxLen - 1);
+    out[maxLen - 1] = '\0';
+    s_deferredCmdHead = (uint8_t)((s_deferredCmdHead + 1) % DEFERRED_CMD_QUEUE_DEPTH);
+    s_deferredCmdCount--;
+    return true;
+}
+
+static void DrainDeferredCommandsForMainLoop() {
+    char line[MAX_LINE_LENGTH];
+    while (DequeueDeferredCommand(line, sizeof(line))) {
+        ProcessCommand(line);
+    }
+}
+
+// While G4 blocks ProcessCommand, the main loop does not run — read USB + TCP control here.
+// Only emergency lines run immediately; other lines are deferred so e.g. M4 after G4 is not executed early.
+static void PollControlStreamsDuringBlockingDwell() {
+    char line[MAX_LINE_LENGTH];
+    while (ReadLine(line, sizeof(line))) {
+        if (LineRawIsEmergencyControl(line)) {
+            ProcessCommand(line);
+        } else {
+            EnqueueDeferredCommand(line);
+        }
+    }
+    while (ReadTcpLine(line, sizeof(line))) {
+        if (LineRawIsEmergencyControl(line)) {
+            ProcessCommand(line);
+        } else {
+            EnqueueDeferredCommand(line);
+        }
+    }
+}
+
+// Returns false if dwell ended early (hardware DI6 fault, host estop/disable, or spindle off).
+static bool ExecuteFanucG4DwellMs(uint32_t dwellMs) {
+    if (dwellMs == 0) {
+        return true;
+    }
+    const bool hadMotorsEnabledAtStart = motorsEnabled;
+    const bool spindleOutputsActiveAtStart = (spindleDir != SPINDLE_DIR_OFF);
+    const uint32_t start = Milliseconds();
+    while (Milliseconds() - start < dwellMs) {
+        HardwareEstopPoll();
+        if (HardwareEstopDiFault()) {
+            return false;
+        }
+        PollControlStreamsDuringBlockingDwell();
+        if (hadMotorsEnabledAtStart && !motorsEnabled) {
+            return false;
+        }
+        if (spindleOutputsActiveAtStart && spindleDir == SPINDLE_DIR_OFF) {
+            return false;
+        }
+        Delay_ms(1);
+    }
+    return true;
+}
+
+static bool HandleFanucG4DwellLine(const char *lineUpper) {
+    if (!LineUpperContainsG4DwellCommand(lineUpper)) {
+        return false;
+    }
+    if (LineUpperBlocksG4WithMotion(lineUpper)) {
+        SendLine("error: G4/G04 cannot be combined with G0/G1/G2/G3, MOVE, or JOG in the same block");
+        return true;
+    }
+    uint32_t ms = 0;
+    if (!ParseFanucG4DwellMs(lineUpper, &ms)) {
+        SendLine("error: G4 dwell requires P (milliseconds) or X/U (seconds), Fanuc-style");
+        return true;
+    }
+    if (ms == 0) {
+        SendLine("error: G4 dwell time must be greater than zero");
+        return true;
+    }
+    if (ms > G4_DWELL_MS_MAX) {
+        SendLine("error: G4 dwell exceeds maximum (600000 ms)");
+        return true;
+    }
+    const bool dwellCompleted = ExecuteFanucG4DwellMs(ms);
+    PublishTelemetry(true);
+    if (dwellCompleted) {
+        SendLine("ok");
+    } else {
+        SendLine("ok: G4 dwell interrupted (estop, disable, spindle off, or control command)");
+    }
+    return true;
 }
 
 static bool MotionQueueFull() {
@@ -612,14 +1317,19 @@ static void ReportPosition() {
 }
 
 static void ReportStatus() {
-    char msg[320];
+    char msg[400];
     const char *mode = (coordinateMode == MODE_ABS) ? "ABS" : "REL";
     const char *units = (unitMode == UNITS_MM) ? "MM" : "IN";
-    sprintf(msg, "STATUS Active=%d ActiveLine=%ld Queue=%u Mode=%s Units=%s Enabled=%d Feed=%.3f FeedSteps=%lu StepsPerMmX=%.6f Vel=%lu Accel=%lu Decel=%lu X=%.3f Y=%.3f Z=%.3f A=%.3f",
+    sprintf(msg,
+            "STATUS Active=%d ActiveLine=%ld Queue=%u Mode=%s Units=%s Enabled=%d Feed=%.3f FeedSteps=%lu "
+            "StepsPerMmX=%.6f Vel=%lu Accel=%lu Decel=%lu X=%.3f Y=%.3f Z=%.3f A=%.3f HwEstopOk=%d Di6=%d "
+            "Di6Mode=%u",
             motionRunning ? 1 : 0,
             (long)activeProgramLine,
             queueCount,
-            mode, units, motorsEnabled ? 1 : 0,
+            mode,
+            units,
+            motorsEnabled ? 1 : 0,
             feedRate,
             (unsigned long)FeedRateToStepsPerSec(feedRate),
             axisConfig[AXIS_X].stepsPerUnit,
@@ -629,16 +1339,20 @@ static void ReportStatus() {
             CurrentXInActiveUnits(),
             CurrentYInActiveUnits(),
             AxisStepsToDisplay(AXIS_Z, AxisCurrentSteps(AXIS_Z) - wcsOriginSteps[AXIS_Z]),
-            AxisStepsToDisplay(AXIS_A, AxisCurrentSteps(AXIS_A) - wcsOriginSteps[AXIS_A]));
+            AxisStepsToDisplay(AXIS_A, AxisCurrentSteps(AXIS_A) - wcsOriginSteps[AXIS_A]),
+            HardwareDi6EstopChainOk() ? 1 : 0,
+            ConnectorDI6.State() ? 1 : 0,
+            (unsigned)estopDi6Mode);
     SendLine(msg);
 }
 
 static void FormatTelemetry(char *msg, size_t msgSize) {
     const char *mode = (coordinateMode == MODE_ABS) ? "ABS" : "REL";
     const char *units = (unitMode == UNITS_MM) ? "MM" : "IN";
-    snprintf(msg, msgSize,
+    snprintf(msg,
+             msgSize,
              "TEL Active=%d Hold=%d ActiveLine=%ld Queue=%u Mode=%s Units=%s Enabled=%d "
-             "             Feed=%.3f X=%.3f Y=%.3f Z=%.3f A=%.3f",
+             "             Feed=%.3f X=%.3f Y=%.3f Z=%.3f A=%.3f HwEstopOk=%d Di6=%d Di6Mode=%u",
              motionRunning ? 1 : 0,
              motionHold ? 1 : 0,
              (long)activeProgramLine,
@@ -650,7 +1364,10 @@ static void FormatTelemetry(char *msg, size_t msgSize) {
              CurrentXInActiveUnits(),
              CurrentYInActiveUnits(),
              AxisStepsToDisplay(AXIS_Z, AxisCurrentSteps(AXIS_Z) - wcsOriginSteps[AXIS_Z]),
-             AxisStepsToDisplay(AXIS_A, AxisCurrentSteps(AXIS_A) - wcsOriginSteps[AXIS_A]));
+             AxisStepsToDisplay(AXIS_A, AxisCurrentSteps(AXIS_A) - wcsOriginSteps[AXIS_A]),
+             HardwareDi6EstopChainOk() ? 1 : 0,
+             ConnectorDI6.State() ? 1 : 0,
+             (unsigned)estopDi6Mode);
 }
 
 static void PublishTelemetry(bool force = false) {
@@ -663,7 +1380,7 @@ static void PublishTelemetry(bool force = false) {
     }
     lastTelemetryTime = now;
 
-    char msg[240];
+    char msg[300];
     FormatTelemetry(msg, sizeof(msg));
     SendTelemetryLine(msg);
 }
@@ -685,13 +1402,14 @@ static void SetPositionActiveUnits(double x, double y) {
 }
 
 static bool QueueMotionBlock(const int32_t target[AXIS_COUNT], uint8_t axisMask,
-                             uint32_t nominalSpeed, int32_t programLine) {
+                             uint32_t nominalSpeed, int32_t programLine, bool rapidMove) {
     MotionBlock *block = QueueTailBlock();
     if (!block || axisMask == 0) {
         return false;
     }
 
     memset(block, 0, sizeof(MotionBlock));
+    block->isRapidMove = rapidMove;
     block->kind = MOTION_BLOCK_LINEAR;
     block->axisMask = axisMask;
     block->programLine = programLine;
@@ -733,6 +1451,7 @@ static bool QueueArcXYBlock(const int32_t target[AXIS_COUNT], uint8_t axisMask,
     }
 
     memset(block, 0, sizeof(MotionBlock));
+    block->isRapidMove = false;
     block->kind = MOTION_BLOCK_ARC_XY;
     block->axisMask = axisMask;
     block->programLine = programLine;
@@ -771,6 +1490,18 @@ static bool QueueArcXYBlock(const int32_t target[AXIS_COUNT], uint8_t axisMask,
 
 static MotionBlock BuildMergedHeadBlock() {
     return motionQueue[queueHead];
+}
+
+static bool MotionBlockHasAnyAxisMovementFromCurrent(const MotionBlock &b) {
+    for (uint8_t axis = 0; axis < AXIS_COUNT; axis++) {
+        if (!(b.axisMask & (1u << axis))) {
+            continue;
+        }
+        if (b.target[axis] != currentSteps[axis]) {
+            return true;
+        }
+    }
+    return false;
 }
 
 
@@ -834,6 +1565,10 @@ static uint8_t CountConsecutiveXyPlannerChainAtHead() {
             break;
         }
         if (!MotionBlocksContiguousXY(prev, cur)) {
+            break;
+        }
+        if (prev.kind == MOTION_BLOCK_LINEAR && cur.kind == MOTION_BLOCK_LINEAR &&
+            prev.isRapidMove != cur.isRapidMove) {
             break;
         }
         if (cur.kind == MOTION_BLOCK_LINEAR) {
@@ -921,6 +1656,10 @@ static bool StartMotionBlock(const MotionBlock &block) {
     activeAxisMask = 0;
     s_blockUsedCoordinatedXy = false;
     s_mergedBlocksToPop = 1;
+    SpindleLaserSetRapidMotionPhase(block.isRapidMove);
+    // Keep G0 and G1 on the same coordinated XY execution path when coordinated mode is enabled.
+    // Mixing coordinated G1 with per-axis G0 changed long-standing behavior and can create
+    // stop-at-rapid transitions on machines tuned for planner-driven X/Y motion.
     if (g_xyCoordinated) {
         uint8_t xyChain = CountConsecutiveXyPlannerChainAtHead();
         // Never submit more segments than the planner queue can hold in one batch.
@@ -1010,7 +1749,39 @@ static bool StartMotionBlock(const MotionBlock &block) {
         motor->AccelMax(axisConfig[axis].accelMax);
         motor->EStopDecelMax(axisConfig[axis].decelMax);
         if (!motor->Move(delta)) {
-            return false;
+            // Some drives can reject an immediate rapid start (especially after a coordinated
+            // segment boundary). Retry once at a conservative speed instead of silently clearing
+            // the entire queue, which appears as "stops at G0".
+            bool moved = false;
+            if (block.isRapidMove) {
+                uint32_t fallbackSpeed = FeedRateToStepsPerSec(feedRate);
+                if (fallbackSpeed < 1) {
+                    fallbackSpeed = 1;
+                }
+                if (fallbackSpeed > axisConfig[axis].velocityMax) {
+                    fallbackSpeed = axisConfig[axis].velocityMax;
+                }
+                if (fallbackSpeed < axisSpeed) {
+                    motor->VelMax(fallbackSpeed);
+                    moved = motor->Move(delta);
+                }
+            }
+            if (!moved) {
+                const bool alert = motor->StatusReg().bit.AlertsPresent;
+                const bool enabled = motor->StatusReg().bit.Enabled;
+                char emsg[160];
+                sprintf(emsg,
+                        "error: %s start failed on axis %c (d=%ld v=%lu%s en=%u alert=%u)",
+                        block.isRapidMove ? "rapid" : "feed",
+                        (axis == AXIS_X) ? 'X' : (axis == AXIS_Y) ? 'Y' : (axis == AXIS_Z) ? 'Z' : 'A',
+                        (long)delta,
+                        (unsigned long)axisSpeed,
+                        (block.isRapidMove && axisSpeed > 0) ? " -> fallback tried" : "",
+                        enabled ? 1u : 0u,
+                        alert ? 1u : 0u);
+                SendLine(emsg);
+                return false;
+            }
         }
         activeTargetSteps[axis] = block.target[axis];
         activeAxisMask |= (1u << axis);
@@ -1030,18 +1801,22 @@ static bool StartMotionBlock(const MotionBlock &block) {
 
 static bool ActiveMotionComplete() {
     if (s_blockUsedCoordinatedXy) {
-        if (MotorDriver *m = MotorForPort(axisConfig[AXIS_X].port)) {
-            if (m->StatusReg().bit.AlertsPresent) {
-                SendLine("error: motor alert on X (e.g. tracking), queue cleared");
-                ClearMotionQueueEx(true);
-                return true;
+        if ((activeAxisMask & (1u << AXIS_X)) != 0u) {
+            if (MotorDriver *m = MotorForPort(axisConfig[AXIS_X].port)) {
+                if (m->StatusReg().bit.AlertsPresent) {
+                    SendLine("error: motor alert on X (e.g. tracking), queue cleared");
+                    ClearMotionQueueEx(true);
+                    return true;
+                }
             }
         }
-        if (MotorDriver *m = MotorForPort(axisConfig[AXIS_Y].port)) {
-            if (m->StatusReg().bit.AlertsPresent) {
-                SendLine("error: motor alert on Y (e.g. tracking), queue cleared");
-                ClearMotionQueueEx(true);
-                return true;
+        if ((activeAxisMask & (1u << AXIS_Y)) != 0u) {
+            if (MotorDriver *m = MotorForPort(axisConfig[AXIS_Y].port)) {
+                if (m->StatusReg().bit.AlertsPresent) {
+                    SendLine("error: motor alert on Y (e.g. tracking), queue cleared");
+                    ClearMotionQueueEx(true);
+                    return true;
+                }
             }
         }
         if (motionController.IsActive() || motionController.MotionQueueCount() > 0) {
@@ -1049,11 +1824,18 @@ static bool ActiveMotionComplete() {
         }
     }
     for (uint8_t axis = 0; axis < AXIS_COUNT; axis++) {
+        if ((activeAxisMask & (1u << axis)) == 0u) {
+            continue;
+        }
         if (s_blockUsedCoordinatedXy && (axis == AXIS_X || axis == AXIS_Y)) {
             continue;
         }
         MotorDriver *motor = MotorForPort(axisConfig[axis].port);
         if (motor && axisConfig[axis].enabled && motor->StatusReg().bit.AlertsPresent) {
+            char msg[96];
+            sprintf(msg, "error: motor alert on %c, queue cleared",
+                    (axis == AXIS_X) ? 'X' : (axis == AXIS_Y) ? 'Y' : (axis == AXIS_Z) ? 'Z' : 'A');
+            SendLine(msg);
             ClearMotionQueueEx(true);
             return true;
         }
@@ -1083,6 +1865,9 @@ static void TryExtendCoordinatedBatch() {
         }
         const MotionBlock &next = motionQueue[queueHead];
         if (!next.valid) {
+            break;
+        }
+        if (next.isRapidMove) {
             break;
         }
         // Check that this block starts where the previous submission ended.
@@ -1154,6 +1939,7 @@ static void UpdateMotionExecutor() {
         activeAxisMask = 0;
         activeProgramLine = 0;
         motionRunning = false;
+        SpindleLaserSetRapidMotionPhase(false);
     }
 
     if (MotionQueueEmpty()) {
@@ -1177,7 +1963,14 @@ static void UpdateMotionExecutor() {
         PopMergedBlocks(block);
         motionRunning = true;
     } else {
-        ClearMotionQueue();
+        if (!MotionBlockHasAnyAxisMovementFromCurrent(block)) {
+            // Legal no-op (e.g. modal absolute line repeats current position). Skip it instead
+            // of treating it as a fatal start failure that clears queued motion.
+            PopMergedBlocks(block);
+        } else {
+            SendLine("error: motion start failed, queue cleared");
+            ClearMotionQueue();
+        }
     }
 }
 
@@ -1479,6 +2272,45 @@ static void HandleArcCommand(bool inlineRelative, int arcDir, const char *line, 
     SendLine("ok");
 }
 
+static uint32_t ComputeRapidNominalSpeedStepsPerSec(uint8_t axisMask, const int32_t target[AXIS_COUNT],
+                                                    const int32_t fromSteps[AXIS_COUNT]) {
+    double lengthSqr = 0.0;
+    double delta[AXIS_COUNT];
+    for (uint8_t axis = 0; axis < AXIS_COUNT; axis++) {
+        delta[axis] = 0.0;
+        if (axisMask & (1u << axis)) {
+            delta[axis] = (double)(target[axis] - fromSteps[axis]);
+            lengthSqr += delta[axis] * delta[axis];
+        }
+    }
+    if (lengthSqr <= 0.0) {
+        return 1;
+    }
+    const double length = sqrt(lengthSqr);
+    double limit = (double)UINT32_MAX;
+    for (uint8_t axis = 0; axis < AXIS_COUNT; axis++) {
+        if (!(axisMask & (1u << axis))) {
+            continue;
+        }
+        const double ad = fabs(delta[axis]);
+        if (ad < 1e-9) {
+            continue;
+        }
+        const double ud = ad / length;
+        const double cap = (double)rapidVelocityMaxStepsPerSec[axis] / ud;
+        if (cap < limit) {
+            limit = cap;
+        }
+    }
+    if (limit > (double)UINT32_MAX) {
+        limit = (double)UINT32_MAX;
+    }
+    if (limit < 1.0) {
+        return 1;
+    }
+    return (uint32_t)(limit + 0.5);
+}
+
 static void HandleMotionCommand(bool jog, bool rapid, const char *line, const char *lineUpper) {
     if (!motorsInitialized || !motorsEnabled) {
         SendLine("error: motors not enabled");
@@ -1606,8 +2438,9 @@ static void HandleMotionCommand(bool jog, bool rapid, const char *line, const ch
     }
 
     const uint32_t nominalSpeed =
-        rapid ? velocityMaxStepsPerSec : FeedRateToStepsPerSec(feedRate);
-    if (!QueueMotionBlock(targets, axisMask, nominalSpeed, programLine)) {
+        rapid ? ComputeRapidNominalSpeedStepsPerSec(axisMask, targets, commandedSteps)
+              : FeedRateToStepsPerSec(feedRate);
+    if (!QueueMotionBlock(targets, axisMask, nominalSpeed, programLine, rapid)) {
         SendLine("busy: queue full");
         return;
     }
@@ -1615,14 +2448,15 @@ static void HandleMotionCommand(bool jog, bool rapid, const char *line, const ch
 }
 
 static void ReportConfig() {
-    char msg[220];
+    char msg[512];
     // SINGLE=1: one-motor / independent M0+M1. SINGLE=0: coordinated G01 in XY.
     const int singleReport = g_xyCoordinated ? 0 : 1;
     const int axMask = (axisConfig[AXIS_X].enabled ? 1 : 0) | (axisConfig[AXIS_Y].enabled ? 2 : 0) |
                        (axisConfig[AXIS_Z].enabled ? 4 : 0) | (axisConfig[AXIS_A].enabled ? 8 : 0);
     sprintf(msg,
             "CONFIG StepsPerMmX=%.6f StepsPerMmY=%.6f Vel=%lu Accel=%lu Decel=%lu"
-            " DVmax=%lu SINGLE=%d AX=%d",
+            " DVmax=%lu SINGLE=%d AX=%d SPINDLE_SMAX=%.0f SPINDLE_MIN_UA=%lu SPINDLE_MAX_UA=%lu ESTOP_DI6=%u"
+            " LASER=%d RVELX=%lu RVELY=%lu RVELZ=%lu RVELA=%lu",
             stepsPerMmX,
             stepsPerMmY,
             (unsigned long)velocityMaxStepsPerSec,
@@ -1630,12 +2464,22 @@ static void ReportConfig() {
             (unsigned long)stopDecelStepsPerSec2,
             (unsigned long)junctionDVmaxStepsPerSec,
             singleReport,
-            axMask);
+            axMask,
+            spindleSMax,
+            (unsigned long)spindleMinMicroamps,
+            (unsigned long)spindleMaxMicroamps,
+            (unsigned)estopDi6Mode,
+            0,
+            (unsigned long)rapidVelocityMaxStepsPerSec[AXIS_X],
+            (unsigned long)rapidVelocityMaxStepsPerSec[AXIS_Y],
+            (unsigned long)rapidVelocityMaxStepsPerSec[AXIS_Z],
+            (unsigned long)rapidVelocityMaxStepsPerSec[AXIS_A]);
     SendLine(msg);
 }
 
 static void HandleConfigCommand(const char *lineUpper) {
     double value = 0.0;
+    bool velChanged = false;
     if (ParseNamedValue(lineUpper, "SPMMX", value) ||
         ParseNamedValue(lineUpper, "STEPSPERMMX", value)) {
         if (value > 0.0) {
@@ -1652,6 +2496,7 @@ static void HandleConfigCommand(const char *lineUpper) {
         ParseNamedValue(lineUpper, "VELOCITY", value)) {
         if (value > 0.0) {
             velocityMaxStepsPerSec = (uint32_t)(value + 0.5);
+            velChanged = true;
         }
     }
     if (ParseNamedValue(lineUpper, "ACCEL", value)) {
@@ -1672,14 +2517,70 @@ static void HandleConfigCommand(const char *lineUpper) {
             motionController.JunctionDVmax(junctionDVmaxStepsPerSec);
         }
     }
+    if (ParseNamedValue(lineUpper, "SPINDLE_SMAX", value)) {
+        if (value > 1.0) {
+            spindleSMax = value;
+        }
+    }
+    if (ParseNamedValue(lineUpper, "SPINDLE_MIN_UA", value)) {
+        if (value >= 0.0 && value <= (double)SPINDLE_OUTPUT_MAX_UA) {
+            spindleMinMicroamps = (uint32_t)(value + 0.5);
+        }
+    }
+    if (ParseNamedValue(lineUpper, "SPINDLE_MAX_UA", value)) {
+        if (value > 0.0 && value <= (double)SPINDLE_OUTPUT_MAX_UA) {
+            spindleMaxMicroamps = (uint32_t)(value + 0.5);
+        }
+    }
+    SpindleClampMicroampRange();
+    // ESTOP_DI6: 0=disabled. 1=default: OK when State()!=0 (ON), fault when 0 (OFF). 2=inverted OK when OFF.
+    if (ParseNamedValue(lineUpper, "ESTOP_DI6", value)) {
+        int ev = (int)(value + 0.5);
+        if (ev < 0) {
+            ev = 0;
+        }
+        if (ev > 2) {
+            ev = 2;
+        }
+        estopDi6Mode = (uint8_t)ev;
+    }
+    if (ParseNamedValue(lineUpper, "LASER", value)) {
+        (void)value;
+        g_spindleLaserRapidGate = false;
+        SpindleApplyDirectionPins();
+    }
+    if (velChanged) {
+        for (uint8_t ax = 0; ax < AXIS_COUNT; ax++) {
+            rapidVelocityMaxStepsPerSec[ax] = velocityMaxStepsPerSec;
+        }
+    }
+    if (ParseNamedValue(lineUpper, "RVELX", value)) {
+        if (value >= 1.0) {
+            rapidVelocityMaxStepsPerSec[AXIS_X] = (uint32_t)(value + 0.5);
+        }
+    }
+    if (ParseNamedValue(lineUpper, "RVELY", value)) {
+        if (value >= 1.0) {
+            rapidVelocityMaxStepsPerSec[AXIS_Y] = (uint32_t)(value + 0.5);
+        }
+    }
+    if (ParseNamedValue(lineUpper, "RVELZ", value)) {
+        if (value >= 1.0) {
+            rapidVelocityMaxStepsPerSec[AXIS_Z] = (uint32_t)(value + 0.5);
+        }
+    }
+    if (ParseNamedValue(lineUpper, "RVELA", value)) {
+        if (value >= 1.0) {
+            rapidVelocityMaxStepsPerSec[AXIS_A] = (uint32_t)(value + 0.5);
+        }
+    }
     axisConfig[AXIS_X].stepsPerUnit = stepsPerMmX;
     axisConfig[AXIS_Y].stepsPerUnit = stepsPerMmY;
-    axisConfig[AXIS_X].velocityMax = velocityMaxStepsPerSec;
-    axisConfig[AXIS_X].accelMax = accelMaxStepsPerSec2;
-    axisConfig[AXIS_X].decelMax = stopDecelStepsPerSec2;
-    axisConfig[AXIS_Y].velocityMax = velocityMaxStepsPerSec;
-    axisConfig[AXIS_Y].accelMax = accelMaxStepsPerSec2;
-    axisConfig[AXIS_Y].decelMax = stopDecelStepsPerSec2;
+    for (uint8_t ax = 0; ax < AXIS_COUNT; ax++) {
+        axisConfig[ax].velocityMax = velocityMaxStepsPerSec;
+        axisConfig[ax].accelMax = accelMaxStepsPerSec2;
+        axisConfig[ax].decelMax = stopDecelStepsPerSec2;
+    }
     {
         double singleIn = -1.0;
         if (ParseNamedValue(lineUpper, "SINGLE", singleIn)) {
@@ -1711,6 +2612,7 @@ static void HandleConfigCommand(const char *lineUpper) {
         axisConfig[AXIS_A].enabled = (m & 8) != 0;
     }
     ApplyFeedRate();
+    SpindleRefreshAnalogFromCommandedS();
     ReportConfig();
 }
 
@@ -1721,8 +2623,14 @@ static void ProcessCommand(char *lineRaw) {
     lineUpper[sizeof(lineUpper) - 1] = '\0';
     ToUpperInPlace(lineUpper);
 
+    if (LineIsSpindleExclusive(lineUpper)) {
+        SpindleApplyTokensFromLine(lineUpper);
+        SendLine("ok");
+        return;
+    }
+
     if (strcmp(lineUpper, "HELP") == 0) {
-        SendLine("ok: CONFIG (SPMMX,SPMMY,VEL,ACCEL,DECEL,DVMAX,SINGLE,AX) GETCFG M202 M203 M201 M200 G90 G91 G92 M114 M115 G17 G0 G01 G2 G3 JOG");
+        SendLine("ok: CONFIG (SPMMX,SPMMY,VEL,ACCEL,DECEL,DVMAX,SINGLE,AX,SPINDLE_SMAX,SPINDLE_MIN_UA,SPINDLE_MAX_UA,ESTOP_DI6,LASER,RVELX,RVELY,RVELZ,RVELA) GETCFG M202 M203 M201 M200 G90 G91 G92 M114 M115 G17 G0 G01 G2 G3 G4 JOG M3 M4 M5 S M2 M30");
     } else if (strcmp(lineUpper, "ENABLE") == 0 || strcmp(lineUpper, "M202") == 0) {
         for (uint8_t axis = 0; axis < AXIS_COUNT; axis++) {
             if (axisConfig[axis].enabled) {
@@ -1794,6 +2702,8 @@ static void ProcessCommand(char *lineRaw) {
         ReportConfig();
     } else if (strncmp(lineUpper, "CONFIG", 6) == 0) {
         HandleConfigCommand(lineUpper);
+    } else if (HandleFanucG4DwellLine(lineUpper)) {
+        return;
     } else if (LeadingPlaneSelectFromLine(lineUpper) != 0) {
         // G17/G18/G19: no-op (motion is XY only); must precede loose G1 match.
         SendLine("ok");
@@ -1808,11 +2718,17 @@ static void ProcessCommand(char *lineRaw) {
                strstr(lineUpper, " G1 ") != nullptr) {
         const bool inlineRelative = (strstr(lineUpper, "G91") != nullptr);
         const bool rapid = MotionLineIsRapidG0(lineUpper);
+        g_modalMotionRapid = rapid;
         HandleMotionCommand(inlineRelative, rapid, lineRaw, lineUpper);
     } else if (strncmp(lineUpper, "JOG", 3) == 0) {
         HandleMotionCommand(true, false, lineRaw, lineUpper);
-    } else if (strcmp(lineUpper, "M30") == 0 || strcmp(lineUpper, "M02") == 0) {
-        // Program end: acknowledge so the host G-code runner can finish (no special motion here).
+    } else if (LineHasAnyAxisWord(lineRaw)) {
+        // Modal continuation line with omitted motion word (e.g. "X... Y...").
+        const bool inlineRelative = (strstr(lineUpper, "G91") != nullptr);
+        HandleMotionCommand(inlineRelative, g_modalMotionRapid, lineRaw, lineUpper);
+    } else if (strcmp(lineUpper, "M30") == 0 || strcmp(lineUpper, "M02") == 0 ||
+               strcmp(lineUpper, "M2") == 0) {
+        // Program end: spindle outputs already updated in SpindleApplyTokensFromLine; motion unchanged.
         SendLine("ok");
     } else {
         SendLine("error: unknown command");
@@ -2036,9 +2952,10 @@ static void InitializeController() {
         axisConfig[axis].axis = axis;
         axisConfig[axis].rotary = axis == AXIS_A;
         axisConfig[axis].stepsPerUnit = (axis == AXIS_Y) ? stepsPerMmY : stepsPerMmX;
-        axisConfig[axis].velocityMax = velocityMaxStepsPerSec;
-        axisConfig[axis].accelMax = accelMaxStepsPerSec2;
-        axisConfig[axis].decelMax = stopDecelStepsPerSec2;
+        axisConfig[axis].velocityMax = DEFAULT_VELOCITY_STEPS_PER_SEC;
+        axisConfig[axis].accelMax = DEFAULT_ACCEL_STEPS_PER_SEC2;
+        axisConfig[axis].decelMax = DEFAULT_STOP_DECEL_STEPS_PER_SEC2;
+        rapidVelocityMaxStepsPerSec[axis] = DEFAULT_VELOCITY_STEPS_PER_SEC;
     }
     axisConfig[AXIS_X].enabled = true;
 
@@ -2068,13 +2985,20 @@ static void InitializeController() {
     unitMode = UNITS_MM;
     coordinateMode = MODE_ABS;
     for (uint8_t axis = 0; axis < AXIS_COUNT; axis++) {
+        axisConfig[axis].velocityMax = velocityMaxStepsPerSec;
+        axisConfig[axis].accelMax = accelMaxStepsPerSec2;
+        axisConfig[axis].decelMax = stopDecelStepsPerSec2;
+        rapidVelocityMaxStepsPerSec[axis] = velocityMaxStepsPerSec;
         currentSteps[axis] = 0;
         commandedSteps[axis] = 0;
         activeTargetSteps[axis] = 0;
     }
     activeAxisMask = 0;
+    ClearDeferredDuringDwellQueue();
     ClearMotionQueue();
     ApplyFeedRate();
+    ConnectorDI6.Mode(Connector::INPUT_DIGITAL);
+    SpindleHardwareInit();
     motorsInitialized = true;
 }
 
@@ -2105,6 +3029,7 @@ int main() {
         }
         PollDiscovery();
         PollTelemetryClient();
+        DrainDeferredCommandsForMainLoop();
         if (ReadLine(lineBuffer, MAX_LINE_LENGTH)) {
             ProcessCommand(lineBuffer);
         }
@@ -2112,6 +3037,7 @@ int main() {
             ProcessCommand(tcpLineBuffer);
         }
         UpdateMotionExecutor();
+        HardwareEstopPoll();
         PublishTelemetry();
         Delay_ms(1);
     }
