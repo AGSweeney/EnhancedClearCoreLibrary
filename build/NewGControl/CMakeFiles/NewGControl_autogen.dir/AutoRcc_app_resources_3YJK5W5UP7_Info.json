@@ -1,0 +1,27 @@
+{
+	"BUILD_DIR" : "Z:/EnhancedClearCoreLibrary/build/NewGControl/NewGControl_autogen",
+	"CMAKE_BINARY_DIR" : "Z:/EnhancedClearCoreLibrary/build/NewGControl",
+	"CMAKE_CURRENT_BINARY_DIR" : "Z:/EnhancedClearCoreLibrary/build/NewGControl",
+	"CMAKE_CURRENT_SOURCE_DIR" : "Z:/EnhancedClearCoreLibrary/NewGControl",
+	"CMAKE_SOURCE_DIR" : "Z:/EnhancedClearCoreLibrary/NewGControl",
+	"CROSS_CONFIG" : false,
+	"GENERATOR" : "Ninja",
+	"INCLUDE_DIR" : "Z:/EnhancedClearCoreLibrary/build/NewGControl/NewGControl_autogen/include",
+	"INPUTS" : 
+	[
+		"Z:/EnhancedClearCoreLibrary/NewGControl/resources/icons/spin-up.svg",
+		"Z:/EnhancedClearCoreLibrary/NewGControl/resources/icons/clearcnc_app_icon.svg",
+		"Z:/EnhancedClearCoreLibrary/NewGControl/resources/icons/combo-down.svg"
+	],
+	"LOCK_FILE" : "Z:/EnhancedClearCoreLibrary/build/NewGControl/CMakeFiles/NewGControl_autogen.dir/AutoRcc_app_resources_3YJK5W5UP7_Lock.lock",
+	"MULTI_CONFIG" : false,
+	"OPTIONS" : [ "-name", "app_resources" ],
+	"OUTPUT_CHECKSUM" : "3YJK5W5UP7",
+	"OUTPUT_NAME" : "qrc_app_resources.cpp",
+	"RCC_EXECUTABLE" : "C:/Users/agswe/vcpkg/installed/x64-windows/tools/Qt6/bin/rcc.exe",
+	"RCC_LIST_OPTIONS" : [ "--list" ],
+	"SETTINGS_FILE" : "Z:/EnhancedClearCoreLibrary/build/NewGControl/CMakeFiles/NewGControl_autogen.dir/AutoRcc_app_resources_3YJK5W5UP7_Used.txt",
+	"SOURCE" : "Z:/EnhancedClearCoreLibrary/NewGControl/resources/app_resources.qrc",
+	"USE_BETTER_GRAPH" : true,
+	"VERBOSITY" : 0
+}

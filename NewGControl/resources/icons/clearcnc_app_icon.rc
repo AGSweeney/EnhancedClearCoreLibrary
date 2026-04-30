@@ -1,0 +1,3 @@
+// Embedded application icon (Explorer, taskbar, pin). The .ico lives alongside this .rc.
+// Do not use CMake RC_ICORS alone on MSVC; pin often still showed the generic Windows icon.
+1 ICON "clearcnc_app_icon.ico"

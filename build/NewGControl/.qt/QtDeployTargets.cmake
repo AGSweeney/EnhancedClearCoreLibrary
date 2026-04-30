@@ -1,0 +1,3 @@
+set(__QT_DEPLOY_TARGET_NewGControl_FILE Z:/EnhancedClearCoreLibrary/build/NewGControl/NewGControl.exe)
+set(__QT_DEPLOY_TARGET_NewGControl_TYPE EXECUTABLE)
+set(__QT_DEPLOY_TARGET_NewGControl_RUNTIME_DLLS C:/Users/agswe/vcpkg/installed/x64-windows/bin/Qt6OpenGLWidgets.dll;C:/Users/agswe/vcpkg/installed/x64-windows/bin/Qt6OpenGL.dll;C:/Users/agswe/vcpkg/installed/x64-windows/bin/Qt6Widgets.dll;C:/Users/agswe/vcpkg/installed/x64-windows/bin/Qt6Svg.dll;C:/Users/agswe/vcpkg/installed/x64-windows/bin/Qt6SerialPort.dll;C:/Users/agswe/vcpkg/installed/x64-windows/bin/Qt6Network.dll;C:/Users/agswe/vcpkg/installed/x64-windows/bin/Qt6Gui.dll;C:/Users/agswe/vcpkg/installed/x64-windows/bin/Qt6Core.dll)
