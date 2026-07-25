@@ -38,8 +38,9 @@ namespace ClearCore {
         // Set the M-2 and M-3 motor connectors into step and direction mode.
         MotorMgr.MotorModeSet(MotorManager::MOTOR_M2M3, Connector::CPM_MODE_STEP_AND_DIR);
         \endcode
-    - There are four controller modes that correspond to various ClearPath operating modes:
+    - There are five controller modes that correspond to various ClearPath operating modes:
         - \ref Connector#CPM_MODE_STEP_AND_DIR "CPM_MODE_STEP_AND_DIR" - For generic stepper motor drives or a ClearPath in Step & Direction mode
+        - \ref Connector#CPM_MODE_QUAD_AB "CPM_MODE_QUAD_AB" - For ClearPath SD Quadrature Input mode (or compatible drives); the StepGenerator emits a two-channel quadrature stream on Inputs A and B
         - \ref Connector#CPM_MODE_A_DIRECT_B_DIRECT "CPM_MODE_A_DIRECT_B_DIRECT" - Compatible with ClearPath modes that require direct control of the A and B motor input signals (e.g., Incremental \n
         Distance).
         - \ref Connector#CPM_MODE_A_DIRECT_B_PWM "CPM_MODE_A_DIRECT_B_PWM" - Compatible with operational modes where motor input A is controlled by the user directly and motor input B is controlled \n

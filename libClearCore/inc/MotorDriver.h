@@ -1147,7 +1147,8 @@ public:
         }
         \endcode
 
-        \note This inversion function is only usable in Step & Direction mode.
+        \note This inversion function is only usable in Step & Direction or
+        Quadrature AB mode.
 
         \param[in] invert If true, signal inversion will be turned on
     **/
@@ -1162,7 +1163,8 @@ public:
         }
         \endcode
 
-        \note This inversion function is only usable in Step & Direction mode.
+        \note This inversion function is only usable in Step & Direction or
+        Quadrature AB mode. In QUAD_AB it swaps which channel leads.
 
         \param[in] invert If true, signal inversion will be turned on
     **/
@@ -1177,7 +1179,8 @@ public:
         }
         \endcode
 
-        \note This inversion function is only usable in Step & Direction mode.
+        \note This inversion function is only usable in Step & Direction or
+        Quadrature AB mode.
 
         \param[in] invert If true, signal inversion will be turned on
     **/
@@ -1629,6 +1632,11 @@ public:
 #ifndef HIDE_FROM_DOXYGEN
 
     virtual void OutputDirection() override {
+        // In QUAD_AB mode A and B are quadrature channels; direction is
+        // encoded by which channel leads, so leave the pins alone here.
+        if (m_mode == Connector::CPM_MODE_QUAD_AB) {
+            return;
+        }
         if (m_mode == Connector::CPM_MODE_STEP_AND_DIR &&
                 m_polarityInversions.bit.directionInverted) {
             DATA_OUTPUT_STATE(m_aInfo->gpioPort, m_aDataMask, Direction());
@@ -1756,6 +1764,9 @@ protected:
     uint16_t m_aDutyCnt;
     uint16_t m_bDutyCnt;
 
+    // Current 2-bit Gray-code phase for CPM_MODE_QUAD_AB (0..3).
+    uint8_t m_quadPhase;
+
     bool m_inFault;
 
     // Coordinated motion support
@@ -1832,6 +1843,14 @@ private:
     void UpdateBDuty();
 
     /**
+        Emit \a steps quadrature counts on Inputs A and B for
+        Connector#CPM_MODE_QUAD_AB. Advances the Gray-code phase once per
+        step; A leads B for positive motion (unless direction polarity is
+        inverted).
+    **/
+    void OutputQuadratureSteps(uint16_t steps);
+
+    /**
           Refresh the Motor on the SysTick time.
     **/
     void RefreshSlow();
@@ -1856,6 +1875,7 @@ private:
         \param[in] newMode The new operational mode to be set.
         The valid modes for this connector type are:
         - Connector#CPM_MODE_STEP_AND_DIR
+        - Connector#CPM_MODE_QUAD_AB
         - Connector#CPM_MODE_A_DIRECT_B_DIRECT
         - Connector#CPM_MODE_A_DIRECT_B_PWM
         - Connector#CPM_MODE_A_PWM_B_PWM.

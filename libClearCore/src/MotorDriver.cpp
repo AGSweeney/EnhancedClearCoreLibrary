@@ -38,6 +38,12 @@
  *   - Implementation of all unit-based Move methods (MoveInches, MoveMM, etc.)
  *   - Implementation of all unit-based FeedRate methods
  *   - Implementation of all unit-based Position query methods
+ *
+ * Added CPM_MODE_QUAD_AB motion mode:
+ *   - Mode() case configures A/B as GPIO Gray-code outputs
+ *   - OutputQuadratureSteps() emits one quadrature count per step
+ *   - UpdateFast() / SetCoordinatedSteps() route QUAD_AB like step-and-dir
+ *   - Enable/polarity/HLFB/input-mirroring guards include QUAD_AB
  */
 
 /**
@@ -148,6 +154,7 @@ MotorDriver::MotorDriver(ShiftRegister::Masks enableMask,
       m_enableTriggerPulseLenMs(25),
       m_aDutyCnt(0),
       m_bDutyCnt(0),
+      m_quadPhase(0),
       m_inFault(false),
       m_coordinatedMode(false),
       m_coordinatedController(nullptr),
@@ -205,7 +212,8 @@ void MotorDriver::Refresh() {
     TcCount16 *tcCount = &tc_modules[m_hlfbTcNum]->COUNT16;
     uint8_t intFlagReg = tcCount->INTFLAG.reg;
 
-    bool invert = (m_mode == CPM_MODE_STEP_AND_DIR) &&
+    bool invert = (m_mode == CPM_MODE_STEP_AND_DIR ||
+                   m_mode == CPM_MODE_QUAD_AB) &&
                   m_polarityInversions.bit.hlfbInverted;
 
     // Process the HLFB information
@@ -306,7 +314,9 @@ void MotorDriver::Refresh() {
             EnableRequest(enableIn->DigitalIn::State());
         }
     }
-    if (m_inputAConnector != CLEARCORE_PIN_INVALID && m_mode != CPM_MODE_STEP_AND_DIR) {
+    if (m_inputAConnector != CLEARCORE_PIN_INVALID &&
+            m_mode != CPM_MODE_STEP_AND_DIR &&
+            m_mode != CPM_MODE_QUAD_AB) {
         // Update the Input A state with the value on the Input A connector.
         Connector *input= SysMgr.ConnectorByIndex(m_inputAConnector);
         if (input->Type() == ClearCore::Connector::CCIO_DIGITAL_IN_OUT_TYPE) {
@@ -317,7 +327,9 @@ void MotorDriver::Refresh() {
             MotorInAState(inputA->DigitalIn::State());
         }
     }
-    if (m_inputBConnector != CLEARCORE_PIN_INVALID && m_mode != CPM_MODE_STEP_AND_DIR) {
+    if (m_inputBConnector != CLEARCORE_PIN_INVALID &&
+            m_mode != CPM_MODE_STEP_AND_DIR &&
+            m_mode != CPM_MODE_QUAD_AB) {
         // Update the Input B state with the value on the Input B connector.
         Connector *input= SysMgr.ConnectorByIndex(m_inputBConnector);
         if (input->Type() == ClearCore::Connector::CCIO_DIGITAL_IN_OUT_TYPE) {
@@ -467,8 +479,9 @@ void MotorDriver::Refresh() {
 
     m_statusRegMotorLast.reg = m_statusRegMotor.reg;
 
-    // Calculate the next S&D output step count
-    if (Connector::m_mode == Connector::CPM_MODE_STEP_AND_DIR) {
+    // Calculate the next motion-output step count (S&D or Quad AB)
+    if (Connector::m_mode == Connector::CPM_MODE_STEP_AND_DIR ||
+            Connector::m_mode == Connector::CPM_MODE_QUAD_AB) {
         // Coordinated connectors stay in CoordinatedMotionMode(true) even when CONFIG SINGLE=0,
         // but we must only consume UpdateFast/SetCoordinatedSteps while the planner is driving.
         // Otherwise StepGenerator::Move() never runs StepsCalculated() on M0/M1 and bench-style
@@ -487,9 +500,15 @@ void MotorDriver::Refresh() {
             // Check the status of the limits
             StepGenerator::CheckTravelLimits();
 
-            m_bDutyCnt = StepGenerator::m_stepsPrevious;
-            // Queue up the steps by writing the B duty value
-            UpdateBDuty();
+            if (Connector::m_mode == Connector::CPM_MODE_QUAD_AB) {
+                OutputQuadratureSteps(
+                    static_cast<uint16_t>(StepGenerator::m_stepsPrevious));
+            }
+            else {
+                m_bDutyCnt = StepGenerator::m_stepsPrevious;
+                // Queue up the steps by writing the B duty value
+                UpdateBDuty();
+            }
         }
     }
 }
@@ -583,7 +602,9 @@ bool MotorDriver::CoordinatedMotionMode(bool enable, CoordinatedMotionController
 }
 
 void MotorDriver::SetCoordinatedSteps(int32_t steps) {
-    if (!m_coordinatedMode || Connector::m_mode != Connector::CPM_MODE_STEP_AND_DIR) {
+    if (!m_coordinatedMode ||
+            (Connector::m_mode != Connector::CPM_MODE_STEP_AND_DIR &&
+             Connector::m_mode != Connector::CPM_MODE_QUAD_AB)) {
         return;
     }
     
@@ -606,15 +627,19 @@ void MotorDriver::SetCoordinatedSteps(int32_t steps) {
     if (steps > (int32_t)maxSteps) {
         steps = maxSteps;
     }
-    
-    m_bDutyCnt = (uint16_t)steps;
+
+    if (Connector::m_mode == Connector::CPM_MODE_QUAD_AB) {
+        OutputQuadratureSteps(static_cast<uint16_t>(steps));
+    }
+    else {
+        m_bDutyCnt = (uint16_t)steps;
+        // Queue up the steps
+        UpdateBDuty();
+    }
     
     // Update position tracking
     int32_t stepDelta = negDir ? -steps : steps;
     StepGenerator::m_posnAbsolute += stepDelta;
-    
-    // Queue up the steps
-    UpdateBDuty();
     
     // Update status
     if (steps > 0) {
@@ -634,7 +659,8 @@ MotorDriver::StatusRegMotor MotorDriver::StatusRegFallen() {
 
 bool MotorDriver::MotorInAState() {
     bool retVal = !(PORT->Group[m_aInfo->gpioPort].OUT.reg & m_aDataMask);
-    if (Connector::m_mode == Connector::CPM_MODE_STEP_AND_DIR &&
+    if ((Connector::m_mode == Connector::CPM_MODE_STEP_AND_DIR ||
+            Connector::m_mode == Connector::CPM_MODE_QUAD_AB) &&
             m_polarityInversions.bit.directionInverted) {
         retVal = !retVal;
     }
@@ -656,6 +682,7 @@ bool MotorDriver::MotorInAState(bool value) {
             //MotorInACount(value ? m_stepsPerSampleMax : 0);
             //return true;
         case Connector::CPM_MODE_STEP_AND_DIR:
+        case Connector::CPM_MODE_QUAD_AB:
         default:
             return false;
     }
@@ -671,6 +698,7 @@ bool MotorDriver::MotorInBState(bool value) {
             //MotorInBCount(value ? m_stepsPerSampleMax : 0);
             //return true;
         case Connector::CPM_MODE_STEP_AND_DIR:
+        case Connector::CPM_MODE_QUAD_AB:
         default:
             return false;
     }
@@ -771,7 +799,8 @@ void MotorDriver::EnableRequest(bool value) {
     __enable_irq();
 
     // Invert the logic if necessary.
-    if (m_mode == Connector::CPM_MODE_STEP_AND_DIR) {
+    if (m_mode == Connector::CPM_MODE_STEP_AND_DIR ||
+            m_mode == Connector::CPM_MODE_QUAD_AB) {
         if (!value && m_statusRegMotor.bit.StepsActive) {
             m_alertRegMotor.bit.MotionCanceledMotorDisabled = 1;
             MoveStopAbrupt();
@@ -794,7 +823,8 @@ void MotorDriver::ToggleEnable() {
 }
 
 bool MotorDriver::PolarityInvertSDEnable(bool invert) {
-    if (m_mode == Connector::CPM_MODE_STEP_AND_DIR) {
+    if (m_mode == Connector::CPM_MODE_STEP_AND_DIR ||
+            m_mode == Connector::CPM_MODE_QUAD_AB) {
         m_polarityInversions.bit.enableInverted = invert ? 1 : 0;
         EnableRequest(m_enableRequestedState);
         return true;
@@ -805,7 +835,8 @@ bool MotorDriver::PolarityInvertSDEnable(bool invert) {
 }
 
 bool MotorDriver::PolarityInvertSDDirection(bool invert) {
-    if (m_mode == Connector::CPM_MODE_STEP_AND_DIR) {
+    if (m_mode == Connector::CPM_MODE_STEP_AND_DIR ||
+            m_mode == Connector::CPM_MODE_QUAD_AB) {
         m_polarityInversions.bit.directionInverted = invert ? 1 : 0;
         return true;
     }
@@ -815,7 +846,8 @@ bool MotorDriver::PolarityInvertSDDirection(bool invert) {
 }
 
 bool MotorDriver::PolarityInvertSDHlfb(bool invert) {
-    if (m_mode == Connector::CPM_MODE_STEP_AND_DIR) {
+    if (m_mode == Connector::CPM_MODE_STEP_AND_DIR ||
+            m_mode == Connector::CPM_MODE_QUAD_AB) {
         m_polarityInversions.bit.hlfbInverted = invert ? 1 : 0;
         // Force the HLFB filtering to re-evaluate by setting TicksLeft
         m_filterTicksLeft = 1;
@@ -1020,6 +1052,25 @@ bool MotorDriver::Mode(ConnectorModes newMode) {
             m_mode = newMode;
             __enable_irq();
             break;
+        case CPM_MODE_QUAD_AB:
+            // Stop any active motion command
+            MoveStopAbrupt();
+            __disable_irq();
+            m_aDutyCnt = 0;
+            UpdateADuty();
+            m_bDutyCnt = 0;
+            UpdateBDuty();
+            // Drive A and B as GPIO Gray-code outputs (one count per step).
+            // TCC mux stays disabled so PORT owns the pins.
+            PMUX_DISABLE(m_aInfo->gpioPort, m_aInfo->gpioPin);
+            PMUX_DISABLE(m_bInfo->gpioPort, m_bInfo->gpioPin);
+            m_quadPhase = 0;
+            // Idle both channels (active-low outputs: true = inactive)
+            DATA_OUTPUT_STATE(m_aInfo->gpioPort, m_aDataMask, true);
+            DATA_OUTPUT_STATE(m_bInfo->gpioPort, m_bDataMask, true);
+            m_mode = newMode;
+            __enable_irq();
+            break;
         case CPM_MODE_A_DIRECT_B_DIRECT:
             // Stop any active S&D command
             MoveStopAbrupt();
@@ -1033,6 +1084,46 @@ bool MotorDriver::Mode(ConnectorModes newMode) {
     }
 
     return true;
+}
+
+void MotorDriver::OutputQuadratureSteps(uint16_t steps) {
+    if (Connector::m_mode != Connector::CPM_MODE_QUAD_AB) {
+        return;
+    }
+
+    // Positive motion: A leads B. Direction polarity invert swaps lead sense.
+    bool forward = !StepGenerator::m_direction;
+    if (m_polarityInversions.bit.directionInverted) {
+        forward = !forward;
+    }
+
+    // ~1 us edge dwell satisfies ClearPath minimum pulse timing (>= 750 ns).
+    // Prefer MotorManager::CLOCK_RATE_NORMAL (or LOW) with QUAD_AB so the
+    // per-sample burst fits in the sample period (ClearPath also discourages
+    // CLOCK_RATE_HIGH).
+    const uint32_t edgeDelayCycles = CYCLES_PER_MICROSECOND;
+
+    for (uint16_t i = 0; i < steps; i++) {
+        if (forward) {
+            m_quadPhase = static_cast<uint8_t>((m_quadPhase + 1) & 0x3);
+        }
+        else {
+            m_quadPhase = static_cast<uint8_t>((m_quadPhase - 1) & 0x3);
+        }
+
+        // Gray-code AB states:
+        //   0: A=0 B=0
+        //   1: A=1 B=0  (A rose — A leads when advancing)
+        //   2: A=1 B=1
+        //   3: A=0 B=1
+        const bool aHigh = (m_quadPhase == 1) || (m_quadPhase == 2);
+        const bool bHigh = (m_quadPhase == 2) || (m_quadPhase == 3);
+        // Motor connector outputs are active-low at the PORT bit.
+        DATA_OUTPUT_STATE(m_aInfo->gpioPort, m_aDataMask, !aHigh);
+        DATA_OUTPUT_STATE(m_bInfo->gpioPort, m_bDataMask, !bHigh);
+
+        Delay_cycles(edgeDelayCycles);
+    }
 }
 
 void MotorDriver::UpdateADuty() {

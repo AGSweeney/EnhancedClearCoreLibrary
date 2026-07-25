@@ -134,6 +134,7 @@ public:
         \param[in] newMode Connector modes to be set.
         The valid modes for the MotorDriver connectors are:
         - Connector#CPM_MODE_STEP_AND_DIR
+        - Connector#CPM_MODE_QUAD_AB
         - Connector#CPM_MODE_A_DIRECT_B_DIRECT
         - Connector#CPM_MODE_A_DIRECT_B_PWM
         - Connector#CPM_MODE_A_PWM_B_PWM.

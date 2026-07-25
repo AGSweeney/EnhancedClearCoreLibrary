@@ -11,12 +11,13 @@ namespace ClearCore {
 <h2> Wiring and Initialization </h2>
     - Before beginning to use the ClearCore, set up and connect a ClearPath motor to a host PC. Then, using Teknic's MSP software, configure and tune the ClearPath to the desired specifications. For \n
     more information on these steps refer to the manual for your ClearPath motor found <a href="https://www.teknic.com/downloads/" >here</a>.
-    - Using MSP, set the ClearPath's mode to Step and Direction. The StepGenerator will not function correctly if the ClearPath is in another operational mode.
+    - Using MSP, set the ClearPath's mode to Step and Direction (or Quadrature Input when using Connector#CPM_MODE_QUAD_AB). The StepGenerator will not function correctly if the ClearPath is in another operational mode.
     - Attach the ClearPath to a motor connector, M-0, M-1, M-2, or M-3, on the ClearCore using the blue 8-pin data cable (Teknic P/N CPM-CABLE-CTRL-MM660).
         - Any of the four connectors may be used in any order. For example, M-2 may be used without occupying M-0 and M-1. 
-    - Using the ClearCore's MotorManager, set the motor connector into Connector#CPM_MODE_STEP_AND_DIR mode using the MotorManager#MotorModeSet() function. The StepGenerator will not function if the \n
+    - Using the ClearCore's MotorManager, set the motor connector into Connector#CPM_MODE_STEP_AND_DIR or Connector#CPM_MODE_QUAD_AB mode using the MotorManager#MotorModeSet() function. The StepGenerator will not function if the \n
     connector is in another mode.
         - The MotorModeSet() function sets a pair of motor connectors into the specified mode. Choose the pair that includes the connector you'd like to use. The pairs are M-0/M-1 and M-2/M-3.
+        - In \c CPM_MODE_QUAD_AB, each commanded step is emitted as one Gray-code quadrature count on Inputs A and B (A leads B for positive motion). Configure the ClearPath Input Format to "Quadrature". Prefer MotorManager#CLOCK_RATE_NORMAL.
 
 <h2> Motion Parameters </h2>
     The StepGenerator generates a move profile using pre-defined motion parameters set by the user. These parameters may be changed "on the fly"; newly commanded moves will immediately interrupt any currently active move.

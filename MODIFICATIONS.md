@@ -125,14 +125,29 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 - Lines ~20-28: Modification notice header
 - Lines ~43-44: New header includes
 
+### 4. `CPM_MODE_QUAD_AB` Motion Mode
+
+**Files**:
+- `libClearCore/inc/Connector.h` — added `CPM_MODE_QUAD_AB` ([18]) at end of `ConnectorModes`
+- `libClearCore/inc/MotorDriver.h` / `libClearCore/src/MotorDriver.cpp` — mode setup, `OutputQuadratureSteps()`, `UpdateFast()` / `SetCoordinatedSteps()` routing, polarity/enable/HLFB guards
+- `libClearCore/inc/MotorManager.h` / `libClearCore/src/MotorManager.cpp` — `MotorModeSet()` whitelist and carrier-pin enable for QUAD_AB
+- `libClearCore/inc-doc/MotorDriver.dox`, `libClearCore/inc-doc/MoveGen.dox` — documentation
+- `Microchip_Examples/ClearPathModeExamples/ClearPath-SD_Series/MoveQuadrature/` — example sketch
+
+**Behavior**:
+- Same `Move()` / `MoveVelocity()` / coordinated APIs as step-and-dir
+- Emits one Gray-code quadrature count per commanded step on Inputs A and B (A leads B for positive motion)
+- Prefer `MotorManager::CLOCK_RATE_NORMAL` for ClearPath Quadrature Input timing
+
 ## Summary
 
-**Total Modified Files**: 3
+**Total Modified Files**: 3 (+ QUAD_AB additions across Connector/MotorDriver/MotorManager/docs/example)
 
 **Modification Types**:
 1. **Coordinated Motion Integration**: Added support for coordinated motion between two motors
 2. **Unit Conversion Support**: Added physical unit conversion (inches, mm, degrees, etc.)
 3. **Header Includes**: Added includes for new feature headers
+4. **Quadrature AB Motion Mode**: Added `CPM_MODE_QUAD_AB` StepGenerator output mode
 
 **All Modifications Preserve**:
 - Original Teknic copyright and license

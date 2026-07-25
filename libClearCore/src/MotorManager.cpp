@@ -149,11 +149,16 @@ bool MotorManager::MotorModeSet(MotorPair motorPair,
         case Connector::CPM_MODE_STEP_AND_DIR:
         case Connector::CPM_MODE_A_DIRECT_B_PWM:
         case Connector::CPM_MODE_A_PWM_B_PWM:
+        case Connector::CPM_MODE_QUAD_AB:
             m_motorModes[motorPair] = newMode;
             MotorConnectors[motorPair * 2]->Mode(newMode);
             MotorConnectors[motorPair * 2 + 1]->Mode(newMode);
 
-            if (newMode == Connector::CPM_MODE_STEP_AND_DIR) {
+            // Step & Direction uses the GCLK carrier to gate step pulses on B.
+            // Quadrature AB drives A/B as GPIO Gray-code; the carrier pin is
+            // left enabled so the pair stays in the motion-clock domain.
+            if (newMode == Connector::CPM_MODE_STEP_AND_DIR ||
+                    newMode == Connector::CPM_MODE_QUAD_AB) {
                 PMUX_ENABLE(m_stepPorts[motorPair],
                             m_stepDataBits[motorPair]);
             }
@@ -196,9 +201,10 @@ void MotorManager::PinMuxSet() {
         MotorConnectors[iMotor]->Mode(m_motorModes[iMotor / 2]);
     }
 
-    // Turn on the carrier signals for S&D if needed
+    // Turn on the carrier signals for S&D / Quad AB if needed
     for (uint8_t iMotorPair = 0; iMotorPair < NUM_MOTOR_PAIRS; iMotorPair++) {
-        if (m_motorModes[iMotorPair] == Connector::CPM_MODE_STEP_AND_DIR) {
+        if (m_motorModes[iMotorPair] == Connector::CPM_MODE_STEP_AND_DIR ||
+                m_motorModes[iMotorPair] == Connector::CPM_MODE_QUAD_AB) {
             PMUX_ENABLE(m_stepPorts[iMotorPair], m_stepDataBits[iMotorPair]);
         }
         else {
