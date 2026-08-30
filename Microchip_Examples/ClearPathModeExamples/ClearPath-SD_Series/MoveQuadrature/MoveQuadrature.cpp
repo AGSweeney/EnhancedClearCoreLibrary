@@ -7,8 +7,9 @@
  *
  * Description:
  *    This example enables a ClearPath then commands a series of repeating
- *    absolute position moves. Each commanded step is emitted as one Gray-code
- *    quadrature count on motor Inputs A and B (A leads B for positive motion).
+ *    absolute position moves. Each commanded step is one full ABAB (forward)
+ *    or BABA (reverse) cycle on Inputs A and B, returning to idle (ClearPath
+ *    ManualVelocity-style quadrature).
  *
  * Requirements:
  * 1. A ClearPath motor must be connected to Connector M-0.

@@ -30,6 +30,7 @@
 #include "MotorDriver.h"
 #include "ShiftRegister.h"
 #include "SysConnectors.h"
+#include "SysTiming.h"
 #include "SysUtils.h"
 
 namespace ClearCore {
@@ -123,9 +124,17 @@ bool MotorManager::MotorInputClocking(MotorClockRates newRate) {
     TCC0->PER.reg = newPeriod - 1;
     TCC1->PER.reg = newPeriod - 1;
 
-    // Notify the StepGenerators of the new maximum rate
+    // Notify the StepGenerators of the new maximum rate.
+    // QUAD_AB bit-bangs 4 edges/count; keep the burst inside one sample.
     for (uint8_t iMotor = 0; iMotor < MOTOR_CON_CNT; iMotor++) {
-        MotorConnectors[iMotor]->StepsPerSampleMaxSet(newPeriod);
+        uint32_t maxSteps = static_cast<uint32_t>(newPeriod);
+        if (MotorConnectors[iMotor]->Mode() == Connector::CPM_MODE_QUAD_AB) {
+            uint32_t quadMax = MotorDriver::QuadAbMaxStepsPerSample();
+            if (quadMax < maxSteps) {
+                maxSteps = quadMax;
+            }
+        }
+        MotorConnectors[iMotor]->StepsPerSampleMaxSet(maxSteps);
     }
 
     TCC0->CTRLA.bit.ENABLE = 1; // Enable TCC0
@@ -155,8 +164,8 @@ bool MotorManager::MotorModeSet(MotorPair motorPair,
             MotorConnectors[motorPair * 2 + 1]->Mode(newMode);
 
             // Step & Direction uses the GCLK carrier to gate step pulses on B.
-            // Quadrature AB drives A/B as GPIO Gray-code; the carrier pin is
-            // left enabled so the pair stays in the motion-clock domain.
+            // Quadrature AB drives A/B as GPIO; the carrier pin is left enabled
+            // so the pair stays in the motion-clock domain.
             if (newMode == Connector::CPM_MODE_STEP_AND_DIR ||
                     newMode == Connector::CPM_MODE_QUAD_AB) {
                 PMUX_ENABLE(m_stepPorts[motorPair],
@@ -165,6 +174,13 @@ bool MotorManager::MotorModeSet(MotorPair motorPair,
             else {
                 PMUX_DISABLE(m_stepPorts[motorPair],
                              m_stepDataBits[motorPair]);
+            }
+
+            // QUAD_AB bit-bangs 4 edges/count; cap burst to one sample window.
+            if (newMode == Connector::CPM_MODE_QUAD_AB) {
+                uint32_t quadMax = MotorDriver::QuadAbMaxStepsPerSample();
+                MotorConnectors[motorPair * 2]->StepsPerSampleMaxSet(quadMax);
+                MotorConnectors[motorPair * 2 + 1]->StepsPerSampleMaxSet(quadMax);
             }
             break;
         default:

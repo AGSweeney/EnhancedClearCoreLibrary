@@ -495,6 +495,22 @@ public:
     **/
     void SetCoordinatedSteps(int32_t steps);
 
+    /**
+        \brief True when CPM_MODE_QUAD_AB has no counts/edges left to emit.
+
+        StepsComplete() can return true while the last ABAB/BABA cycle is still
+        draining one edge per sample — wait on this before starting another move
+        or changing mode.
+    **/
+    bool QuadratureOutputIdle() const {
+        return m_quadCountsPending == 0 && m_quadPhase == 0;
+    }
+
+    /**
+        \brief Stop motion and discard any pending QUAD_AB edges (pins idle).
+    **/
+    void MoveStopAbrupt();
+
     // ========== Unit Conversion Support ==========
     
     /**
@@ -1764,8 +1780,10 @@ protected:
     uint16_t m_aDutyCnt;
     uint16_t m_bDutyCnt;
 
-    // Current 2-bit Gray-code phase for CPM_MODE_QUAD_AB (0..3).
-    uint8_t m_quadPhase;
+    // QUAD_AB edge state machine (one edge per sample — no ISR busy-wait).
+    uint8_t m_quadPhase;           // next edge index within ABAB/BABA (0..3)
+    uint16_t m_quadCountsPending;  // full counts still to emit
+    bool m_quadDirForward;         // A-leads (true) vs B-leads (false)
 
     bool m_inFault;
 
@@ -1843,12 +1861,23 @@ private:
     void UpdateBDuty();
 
     /**
-        Emit \a steps quadrature counts on Inputs A and B for
-        Connector#CPM_MODE_QUAD_AB. Advances the Gray-code phase once per
-        step; A leads B for positive motion (unless direction polarity is
-        inverted).
+        Queue \a steps quadrature counts for CPM_MODE_QUAD_AB. Each count is
+        a full ABAB (forward) or BABA (reverse) cycle. Edges are emitted one
+        per sample (~200 us apart at 5 kHz) by ServiceQuadratureOutput().
     **/
     void OutputQuadratureSteps(uint16_t steps);
+
+    /**
+        Emit the next queued quadrature edge (call once per sample in QUAD_AB).
+    **/
+    void ServiceQuadratureOutput();
+
+    /**
+        Max StepGenerator counts accepted per sample for QUAD_AB pacing.
+    **/
+    static uint32_t QuadAbMaxStepsPerSample();
+
+    void QuadOutputReset();
 
     /**
           Refresh the Motor on the SysTick time.

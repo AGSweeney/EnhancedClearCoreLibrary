@@ -17,7 +17,7 @@ namespace ClearCore {
     - Using the ClearCore's MotorManager, set the motor connector into Connector#CPM_MODE_STEP_AND_DIR or Connector#CPM_MODE_QUAD_AB mode using the MotorManager#MotorModeSet() function. The StepGenerator will not function if the \n
     connector is in another mode.
         - The MotorModeSet() function sets a pair of motor connectors into the specified mode. Choose the pair that includes the connector you'd like to use. The pairs are M-0/M-1 and M-2/M-3.
-        - In \c CPM_MODE_QUAD_AB, each commanded step is emitted as one Gray-code quadrature count on Inputs A and B (A leads B for positive motion). Configure the ClearPath Input Format to "Quadrature". Prefer MotorManager#CLOCK_RATE_NORMAL.
+        - In \c CPM_MODE_QUAD_AB, each commanded step is emitted as one full ABAB (forward) or BABA (reverse) cycle on Inputs A and B (ClearPath ManualVelocity-style; returns to idle). Configure the ClearPath Input Format to "Quadrature". Prefer MotorManager#CLOCK_RATE_NORMAL.
 
 <h2> Motion Parameters </h2>
     The StepGenerator generates a move profile using pre-defined motion parameters set by the user. These parameters may be changed "on the fly"; newly commanded moves will immediately interrupt any currently active move.

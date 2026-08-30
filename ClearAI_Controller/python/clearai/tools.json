@@ -1,0 +1,244 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "get_capabilities",
+      "description": "Return ClearAI protocol version, enabled axes, units, mode, and the list of allowed primitive methods. Call this first.",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_status",
+      "description": "Return enable/moving/HLFB/estop/alert flags, queue depth, and work pose.",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_pose",
+      "description": "Return work coordinates x,y,z,a in the active units (A is always degrees).",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "enable",
+      "description": "Enable ClearPath motors on the configured axis mask. Required before motion.",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "disable",
+      "description": "Abruptly stop and disable all motors.",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "clear_alerts",
+      "description": "Clear motor alert flags after a fault.",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "stop",
+      "description": "Decelerate and stop motion. Motors stay enabled.",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "estop",
+      "description": "Immediate stop and disable. Use for safety. Accepted during wait_idle and dwell.",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "wait_idle",
+      "description": "Block until queued motion finishes or timeout_ms elapses. Always call after move_linear, move_arc, or jog.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "timeout_ms": { "type": "integer", "description": "Milliseconds to wait (default 60000)" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "configure",
+      "description": "Set mechanical parameters and axis mask. Motors must be disabled first, except test_mode which may be changed while enabled.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "steps_per_rev_x": { "type": "integer" },
+          "steps_per_rev_y": { "type": "integer" },
+          "steps_per_rev_z": { "type": "integer" },
+          "steps_per_rev_a": { "type": "integer" },
+          "pitch_x": { "type": "number", "description": "Lead pitch in mm" },
+          "pitch_y": { "type": "number" },
+          "pitch_z": { "type": "number" },
+          "gear_x": { "type": "number" },
+          "gear_y": { "type": "number" },
+          "gear_z": { "type": "number" },
+          "gear_a": { "type": "number" },
+          "vel": { "type": "integer", "description": "Max velocity steps/s" },
+          "accel": { "type": "integer", "description": "Acceleration steps/s^2" },
+          "decel": { "type": "integer" },
+          "axis_mask": { "type": "integer", "description": "Bit0=X bit1=Y bit2=Z bit3=A" },
+          "estop_di6": { "type": "integer", "description": "0=off 1=default 2=inverted" },
+          "test_mode": { "type": "boolean", "description": "Bench: bypass hardware estop, enable, HLFB, and alert gates" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "set_test_mode",
+      "description": "Bench test mode: bypass hardware estop (DI-6), HLFB, alert, and enable gates so motion can be commanded without interlocks. Software stop/estop/disable still halt. Default enabled=true if omitted. Not for production.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean", "description": "true = bypass hardware safety gates" },
+          "test_mode": { "type": "boolean", "description": "Alias for enabled" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "set_units",
+      "description": "Set linear units to mm or inch. Axis A remains degrees.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "units": { "type": "string", "enum": ["mm", "inch"] }
+        },
+        "required": ["units"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "set_mode",
+      "description": "Set absolute or relative coordinate mode for move_linear and move_arc.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mode": { "type": "string", "enum": ["abs", "rel"] }
+        },
+        "required": ["mode"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "set_work_origin",
+      "description": "G92-style work offset. Empty object zeros all axes at the current machine pose.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "z": { "type": "number" },
+          "a": { "type": "number" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "move_linear",
+      "description": "Queue a coordinated XY linear move (optional Z/A). Non-blocking; follow with wait_idle. Requires enable.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "z": { "type": "number" },
+          "a": { "type": "number" },
+          "feed": { "type": "number", "description": "Feed in current units per minute" },
+          "rapid": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "move_arc",
+      "description": "Queue an XY arc. i,j are center offsets from the start (G-code I/J). No Z/A on the same call.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "i": { "type": "number" },
+          "j": { "type": "number" },
+          "clockwise": { "type": "boolean" },
+          "feed": { "type": "number" }
+        },
+        "required": ["i", "j"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "jog",
+      "description": "Relative jog; ignores abs/rel mode.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "z": { "type": "number" },
+          "a": { "type": "number" },
+          "feed": { "type": "number" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "dwell",
+      "description": "Wait seconds (max 600). Interruptible by estop.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "seconds": { "type": "number" }
+        },
+        "required": ["seconds"],
+        "additionalProperties": false
+      }
+    }
+  }
+]

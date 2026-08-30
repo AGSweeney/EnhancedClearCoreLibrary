@@ -1,0 +1,19 @@
+[project]
+name = "clearai"
+version = "1.0.0"
+description = "Host client for ClearAI JSON-RPC gantry firmware"
+requires-python = ">=3.8"
+dependencies = ["pyserial>=3.5"]
+
+[project.scripts]
+clearai = "clearai.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+clearai = ["tools.json"]

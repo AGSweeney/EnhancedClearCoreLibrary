@@ -40,8 +40,9 @@
  *   - Implementation of all unit-based Position query methods
  *
  * Added CPM_MODE_QUAD_AB motion mode:
- *   - Mode() case configures A/B as GPIO Gray-code outputs
- *   - OutputQuadratureSteps() emits one quadrature count per step
+ *   - Mode() case configures A/B as GPIO for quadrature output
+ *   - OutputQuadratureSteps() queues ABAB/BABA counts; ServiceQuadratureOutput()
+ *     emits one edge per sample (~200 us) — no ISR busy-wait bursts
  *   - UpdateFast() / SetCoordinatedSteps() route QUAD_AB like step-and-dir
  *   - Enable/polarity/HLFB/input-mirroring guards include QUAD_AB
  */
@@ -76,6 +77,12 @@
 #define HARD_STOP_MOVE_SAMPLES (MS_TO_SAMPLES * HARD_STOP_MOVE_MS)
 
 namespace ClearCore {
+
+uint32_t MotorDriver::QuadAbMaxStepsPerSample() {
+    // One StepGenerator count per sample; the ABAB's 4 edges span 4 samples
+    // (~200 us edge spacing at 5 kHz). Max count rate ≈ sampleRate / 4.
+    return 1;
+}
 
 extern MotorManager &MotorMgr;
 extern SysManager SysMgr;
@@ -155,6 +162,8 @@ MotorDriver::MotorDriver(ShiftRegister::Masks enableMask,
       m_aDutyCnt(0),
       m_bDutyCnt(0),
       m_quadPhase(0),
+      m_quadCountsPending(0),
+      m_quadDirForward(true),
       m_inFault(false),
       m_coordinatedMode(false),
       m_coordinatedController(nullptr),
@@ -509,6 +518,12 @@ void MotorDriver::Refresh() {
                 // Queue up the steps by writing the B duty value
                 UpdateBDuty();
             }
+        }
+
+        // Always service queued QUAD edges once per sample (including when
+        // StepGenerator requested 0 this tick — finish an in-progress ABAB).
+        if (Connector::m_mode == Connector::CPM_MODE_QUAD_AB) {
+            ServiceQuadratureOutput();
         }
     }
 }
@@ -1060,15 +1075,12 @@ bool MotorDriver::Mode(ConnectorModes newMode) {
             UpdateADuty();
             m_bDutyCnt = 0;
             UpdateBDuty();
-            // Drive A and B as GPIO Gray-code outputs (one count per step).
+            // Drive A and B as GPIO (full ABAB/BABA cycles per count).
             // TCC mux stays disabled so PORT owns the pins.
             PMUX_DISABLE(m_aInfo->gpioPort, m_aInfo->gpioPin);
             PMUX_DISABLE(m_bInfo->gpioPort, m_bInfo->gpioPin);
-            m_quadPhase = 0;
-            // Idle both channels (active-low outputs: true = inactive)
-            DATA_OUTPUT_STATE(m_aInfo->gpioPort, m_aDataMask, true);
-            DATA_OUTPUT_STATE(m_bInfo->gpioPort, m_bDataMask, true);
             m_mode = newMode;
+            QuadOutputReset();
             __enable_irq();
             break;
         case CPM_MODE_A_DIRECT_B_DIRECT:
@@ -1086,43 +1098,99 @@ bool MotorDriver::Mode(ConnectorModes newMode) {
     return true;
 }
 
+void MotorDriver::MoveStopAbrupt() {
+    StepGenerator::MoveStopAbrupt();
+    if (Connector::m_mode == Connector::CPM_MODE_QUAD_AB) {
+        QuadOutputReset();
+    }
+}
+
+void MotorDriver::QuadOutputReset() {
+    m_quadPhase = 0;
+    m_quadCountsPending = 0;
+    m_quadDirForward = true;
+    // Idle both channels (active-low outputs: true = inactive)
+    DATA_OUTPUT_STATE(m_aInfo->gpioPort, m_aDataMask, true);
+    DATA_OUTPUT_STATE(m_bInfo->gpioPort, m_bDataMask, true);
+}
+
 void MotorDriver::OutputQuadratureSteps(uint16_t steps) {
-    if (Connector::m_mode != Connector::CPM_MODE_QUAD_AB) {
+    if (Connector::m_mode != Connector::CPM_MODE_QUAD_AB || steps == 0) {
         return;
     }
 
-    // Positive motion: A leads B. Direction polarity invert swaps lead sense.
+    // Queue counts only — edges are paced by ServiceQuadratureOutput() at one
+    // edge per sample so the train is uniform (~200 us) with no ISR busy-wait.
     bool forward = !StepGenerator::m_direction;
     if (m_polarityInversions.bit.directionInverted) {
         forward = !forward;
     }
+    if (m_quadCountsPending == 0 && m_quadPhase == 0) {
+        m_quadDirForward = forward;
+    }
+    uint32_t next = static_cast<uint32_t>(m_quadCountsPending) + steps;
+    if (next > UINT16_MAX) {
+        next = UINT16_MAX;
+    }
+    m_quadCountsPending = static_cast<uint16_t>(next);
+}
 
-    // ~1 us edge dwell satisfies ClearPath minimum pulse timing (>= 750 ns).
-    // Prefer MotorManager::CLOCK_RATE_NORMAL (or LOW) with QUAD_AB so the
-    // per-sample burst fits in the sample period (ClearPath also discourages
-    // CLOCK_RATE_HIGH).
-    const uint32_t edgeDelayCycles = CYCLES_PER_MICROSECOND;
+void MotorDriver::ServiceQuadratureOutput() {
+    if (Connector::m_mode != Connector::CPM_MODE_QUAD_AB) {
+        return;
+    }
+    if (m_quadCountsPending == 0) {
+        return;
+    }
 
-    for (uint16_t i = 0; i < steps; i++) {
-        if (forward) {
-            m_quadPhase = static_cast<uint8_t>((m_quadPhase + 1) & 0x3);
+    // Latch direction at the start of each count.
+    if (m_quadPhase == 0) {
+        bool forward = !StepGenerator::m_direction;
+        if (m_polarityInversions.bit.directionInverted) {
+            forward = !forward;
         }
-        else {
-            m_quadPhase = static_cast<uint8_t>((m_quadPhase - 1) & 0x3);
+        m_quadDirForward = forward;
+    }
+
+    // Active-low PORT: false = asserted (MSP ON).
+    // Forward ABAB: A on, B on, A off, B off
+    // Reverse BABA: B on, A on, B off, A off
+    if (m_quadDirForward) {
+        switch (m_quadPhase) {
+            case 0:
+                DATA_OUTPUT_STATE(m_aInfo->gpioPort, m_aDataMask, false);
+                break;
+            case 1:
+                DATA_OUTPUT_STATE(m_bInfo->gpioPort, m_bDataMask, false);
+                break;
+            case 2:
+                DATA_OUTPUT_STATE(m_aInfo->gpioPort, m_aDataMask, true);
+                break;
+            default:
+                DATA_OUTPUT_STATE(m_bInfo->gpioPort, m_bDataMask, true);
+                break;
         }
+    }
+    else {
+        switch (m_quadPhase) {
+            case 0:
+                DATA_OUTPUT_STATE(m_bInfo->gpioPort, m_bDataMask, false);
+                break;
+            case 1:
+                DATA_OUTPUT_STATE(m_aInfo->gpioPort, m_aDataMask, false);
+                break;
+            case 2:
+                DATA_OUTPUT_STATE(m_bInfo->gpioPort, m_bDataMask, true);
+                break;
+            default:
+                DATA_OUTPUT_STATE(m_aInfo->gpioPort, m_aDataMask, true);
+                break;
+        }
+    }
 
-        // Gray-code AB states:
-        //   0: A=0 B=0
-        //   1: A=1 B=0  (A rose — A leads when advancing)
-        //   2: A=1 B=1
-        //   3: A=0 B=1
-        const bool aHigh = (m_quadPhase == 1) || (m_quadPhase == 2);
-        const bool bHigh = (m_quadPhase == 2) || (m_quadPhase == 3);
-        // Motor connector outputs are active-low at the PORT bit.
-        DATA_OUTPUT_STATE(m_aInfo->gpioPort, m_aDataMask, !aHigh);
-        DATA_OUTPUT_STATE(m_bInfo->gpioPort, m_bDataMask, !bHigh);
-
-        Delay_cycles(edgeDelayCycles);
+    m_quadPhase = static_cast<uint8_t>((m_quadPhase + 1) & 0x3);
+    if (m_quadPhase == 0 && m_quadCountsPending > 0) {
+        m_quadCountsPending--;
     }
 }
 

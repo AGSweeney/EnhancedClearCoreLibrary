@@ -53,6 +53,7 @@ Ethernet support uses the LwIP stack. Use the ethernet API from libClearCore for
 | **MotionStreamingExample** | Stream G-code over serial (USB CDC) or Ethernet TCP. Supports G01, G02/G03 (I,J or R), G20/G21, G90/G91, G92, G4, M200–M203, M114, M115, M500, M501. See `MotionStreamingExample/README.md` and `MotionStreamingExample/STREAMING_GUIDE.md`. |
 | **GRBLCompatibleExample** | GRBL-style firmware: G0/G1/G2/G03, $ commands, jogging ($J=), homing ($H), gSender-friendly. Serial only. See `GRBLCompatibleExample/README.md`. |
 | **ProjectTemplate** | Minimal Microchip Studio template. Put your code in `main.cpp`. |
+| **ClearAI_Controller** | JSON-RPC Lines firmware so an LLM can command an XY gantry (Code as Policies primitives), plus ClearAI/LocoRix MCP servers. See `ClearAI_Controller/README.md` and `ClearAI_Controller/docs/`. |
 
 Open the matching `.atsln`, set the project as **Startup Project**, then **Start Without Debugging (Ctrl+Alt+F5)** to build, flash, and run.
 
@@ -82,6 +83,7 @@ Windows tools for flashing firmware via USB (see `Tools/README.md`):
 
 - **API reference**: https://teknic-inc.github.io/ClearCore-library/
 - **ClearCNC Controller** (Qt host + ClearCore firmware): `ClearCNC_Controller/README.md` — protocol, spindle, estop, dwell
+- **ClearAI Controller** (LLM gantry primitives + MCP): `ClearAI_Controller/README.md`, `ClearAI_Controller/docs/`, `ClearAI_Controller/PROTOCOL.md`
 - **Coordinated motion**: `docs/CoordinatedArcMotion/README.md` — theory, usage, API
 - **Motion streaming**: `MotionStreamingExample/README.md`, `MotionStreamingExample/STREAMING_GUIDE.md`
 - **GRBL-compatible example**: `GRBLCompatibleExample/README.md`

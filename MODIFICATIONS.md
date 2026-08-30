@@ -136,8 +136,9 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 
 **Behavior**:
 - Same `Move()` / `MoveVelocity()` / coordinated APIs as step-and-dir
-- Emits one Gray-code quadrature count per commanded step on Inputs A and B (A leads B for positive motion)
-- Prefer `MotorManager::CLOCK_RATE_NORMAL` for ClearPath Quadrature Input timing
+- Each commanded step emits one full **ABAB** (forward) or **BABA** (reverse) cycle, returning to idle
+- Edges are paced by a state machine: **one edge per sample** (~200 µs at 5 kHz), no ISR busy-wait — avoids burst/gap trains that trip ClearPath "Step input timing error"
+- Prefer `MotorManager::CLOCK_RATE_NORMAL`; practical max QUAD rate ≈ sample rate / 4 (~1250 counts/s). Wait on `QuadratureOutputIdle()` after `StepsComplete()`.
 
 ## Summary
 

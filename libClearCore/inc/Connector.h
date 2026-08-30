@@ -164,11 +164,9 @@ public:
         USB_CDC,
         /**
             [18] ClearPath&trade; motor controller mode, compatible with
-            Quadrature Input operational modes where Inputs A and B carry
-            a two-channel quadrature command stream. The StepGenerator
-            (and coordinated motion) emit one quadrature count per
-            commanded step; A leads B for positive motion and B leads A
-            for negative motion.
+            Quadrature Input. Each commanded step emits one full ABAB
+            (forward) or BABA (reverse) cycle on Inputs A and B, returning
+            to idle — matching ClearPath ManualVelocity quadrature timing.
         **/
         CPM_MODE_QUAD_AB
     } ConnectorModes;

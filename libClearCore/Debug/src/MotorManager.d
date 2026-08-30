@@ -110,7 +110,8 @@ src/MotorManager.d src/MotorManager.o: ../src/MotorManager.cpp \
  ../inc/StatusManager.h ../inc/StepGenerator.h ../inc/SysUtils.h \
  ../inc/SysManager.h ../inc/UnitConverter.h ../inc/AdcManager.h \
  ../inc/IirFilter.h ../inc/SysTiming.h ../inc/MotorDriver.h \
- ../inc/ShiftRegister.h ../inc/SysConnectors.h ../inc/SysUtils.h
+ ../inc/ShiftRegister.h ../inc/SysConnectors.h ../inc/SysTiming.h \
+ ../inc/SysUtils.h
 
 ../inc/MotorManager.h:
 
@@ -363,5 +364,7 @@ C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include
 ../inc/ShiftRegister.h:
 
 ../inc/SysConnectors.h:
+
+../inc/SysTiming.h:
 
 ../inc/SysUtils.h:
