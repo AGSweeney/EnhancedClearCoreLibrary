@@ -1,0 +1,17 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Atmel Studio / ClearCore firmware build outputs (keep Makefile + makedep.mk)
+ClearAI_Controller/ClearCoreFirmware/Debug/*.o
+ClearAI_Controller/ClearCoreFirmware/Debug/*.d
+ClearAI_Controller/ClearCoreFirmware/Debug/*.bin
+ClearAI_Controller/ClearCoreFirmware/Debug/*.elf
+ClearAI_Controller/ClearCoreFirmware/Debug/*.hex
+ClearAI_Controller/ClearCoreFirmware/Debug/*.lss
+ClearAI_Controller/ClearCoreFirmware/Debug/*.map
+ClearAI_Controller/ClearCoreFirmware/Debug/*.srec
+ClearAI_Controller/ClearCoreFirmware/Debug/*.eep
+ClearAI_Controller/ClearCoreFirmware/Debug/*.uf2
+ClearAI_Controller/ClearCoreFirmware/Debug/Device_Startup/*.o
+ClearAI_Controller/ClearCoreFirmware/Debug/Device_Startup/*.d

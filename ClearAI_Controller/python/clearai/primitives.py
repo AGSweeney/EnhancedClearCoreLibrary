@@ -240,3 +240,38 @@ def probe(
         params["timeout_ms"] = timeout_ms
     timeout = max(1.0, (timeout_ms or 30000) / 1000.0 + 2.0)
     return _c().call("probe", params, timeout=timeout)
+
+
+def keepalive() -> Any:
+    """Reset the host watchdog timer and clear any watchdog trip latch."""
+    return _c().call("keepalive", {}, timeout=5.0)
+
+
+def configure_safety(
+    watchdog_ms: Optional[int] = None,
+    vel_x: Optional[int] = None,
+    vel_y: Optional[int] = None,
+    vel_z: Optional[int] = None,
+    vel_a: Optional[int] = None,
+    accel_x: Optional[int] = None,
+    accel_y: Optional[int] = None,
+    accel_z: Optional[int] = None,
+    accel_a: Optional[int] = None,
+    decel_x: Optional[int] = None,
+    decel_y: Optional[int] = None,
+    decel_z: Optional[int] = None,
+    decel_a: Optional[int] = None,
+) -> Any:
+    """Configure safety/dynamics overrides. Per-axis values of 0 inherit the
+    global vel/accel/decel. watchdog_ms of 0 disables the watchdog."""
+    params: dict[str, Any] = {}
+    if watchdog_ms is not None:
+        params["watchdog_ms"] = watchdog_ms
+    for name, val in (
+        ("vel_x", vel_x), ("vel_y", vel_y), ("vel_z", vel_z), ("vel_a", vel_a),
+        ("accel_x", accel_x), ("accel_y", accel_y), ("accel_z", accel_z), ("accel_a", accel_a),
+        ("decel_x", decel_x), ("decel_y", decel_y), ("decel_z", decel_z), ("decel_a", decel_a),
+    ):
+        if val is not None:
+            params[name] = val
+    return _c().call("configure", params, timeout=10.0)

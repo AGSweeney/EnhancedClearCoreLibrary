@@ -55,7 +55,8 @@ static bool IsSafetyMethod(const char *method) {
     return strcmp(method, "estop") == 0 ||
            strcmp(method, "stop") == 0 ||
            strcmp(method, "disable") == 0 ||
-           strcmp(method, "queue_clear") == 0;
+           strcmp(method, "queue_clear") == 0 ||
+           strcmp(method, "keepalive") == 0;
 }
 
 static void DispatchParsed(const RpcRequest *req) {
@@ -276,6 +277,11 @@ static void DispatchParsed(const RpcRequest *req) {
         } else {
             ReplyResult(id, body);
         }
+        return;
+    }
+    if (strcmp(method, "keepalive") == 0) {
+        MotionKeepalive();
+        ReplyOk(id);
         return;
     }
 

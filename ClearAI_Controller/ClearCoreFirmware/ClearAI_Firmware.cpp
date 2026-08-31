@@ -64,6 +64,7 @@ int main(void) {
         TransportPollDiscovery();
         TransportPollTelemetry();
         MotionPollEstop();
+        MotionPollWatchdog();
         if (TransportReadLine(line, sizeof(line))) {
             PrimitivesDispatchLine(line);
         }

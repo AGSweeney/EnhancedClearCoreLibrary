@@ -164,7 +164,20 @@
           "pos_lim_z": { "type": "integer" },
           "neg_lim_z": { "type": "integer" },
           "pos_lim_a": { "type": "integer" },
-          "neg_lim_a": { "type": "integer" }
+          "neg_lim_a": { "type": "integer" },
+          "watchdog_ms": { "type": "integer", "description": "Host keepalive timeout in ms; if no keepalive/enable/configure arrives within this window the board decelerates to a stop and latches watchdog_tripped. 0 disables (default)." },
+          "vel_x": { "type": "integer", "description": "Per-axis velocity cap steps/s; 0 inherits global vel" },
+          "vel_y": { "type": "integer" },
+          "vel_z": { "type": "integer" },
+          "vel_a": { "type": "integer" },
+          "accel_x": { "type": "integer", "description": "Per-axis accel cap steps/s^2; 0 inherits global accel" },
+          "accel_y": { "type": "integer" },
+          "accel_z": { "type": "integer" },
+          "accel_a": { "type": "integer" },
+          "decel_x": { "type": "integer", "description": "Per-axis decel cap steps/s^2; 0 inherits global decel" },
+          "decel_y": { "type": "integer" },
+          "decel_z": { "type": "integer" },
+          "decel_a": { "type": "integer" }
         },
         "additionalProperties": false
       }
@@ -383,6 +396,15 @@
           "timeout_ms": { "type": "integer", "description": "Overall timeout (default 30000)" }
         },
         "required": ["axis", "dir", "pin"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "keepalive",
+      "description": "Reset the host watchdog timer and clear any watchdog trip latch. Call periodically (faster than the configured watchdog_ms) while a session is active; also re-arms on enable and configure.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
         "additionalProperties": false
       }
     }

@@ -29,6 +29,8 @@ from .primitives import (
     queue_clear,
     home,
     probe,
+    keepalive,
+    configure_safety,
 )
 
 __all__ = [
@@ -61,4 +63,6 @@ __all__ = [
     "queue_clear",
     "home",
     "probe",
+    "keepalive",
+    "configure_safety",
 ]

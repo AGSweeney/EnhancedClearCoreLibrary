@@ -57,6 +57,10 @@ struct RpcParams {
     bool hasPosLimZ, hasNegLimZ, hasPosLimA, hasNegLimA;
     bool hasPin, hasIoState;
     bool hasAxis, hasDir, hasSeek, hasBackoff, hasZero, hasActive;
+    bool hasVelX, hasVelY, hasVelZ, hasVelA;
+    bool hasAccelX, hasAccelY, hasAccelZ, hasAccelA;
+    bool hasDecelX, hasDecelY, hasDecelZ, hasDecelA;
+    bool hasWatchdogMs;
     double x, y, z, a;
     double i, j, feed, seconds;
     uint32_t timeoutMs;
@@ -85,6 +89,10 @@ struct RpcParams {
     double backoff;
     bool zero;
     char active[8];
+    uint32_t velX, velY, velZ, velA;
+    uint32_t accelX, accelY, accelZ, accelA;
+    uint32_t decelX, decelY, decelZ, decelA;
+    uint32_t watchdogMs;
 };
 
 struct RpcRequest {

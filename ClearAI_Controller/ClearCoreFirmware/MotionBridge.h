@@ -48,6 +48,11 @@ struct MotionStatus {
     uint32_t accel;
     float hlfbPercent[CLEARAI_AXIS_COUNT]; /* -100..100, or HLFB_DUTY_UNKNOWN */
     bool queueActive;
+    uint32_t watchdogMs;
+    bool watchdogTripped;
+    bool limitTripped;
+    uint8_t limitTrippedAxis; /* 0xff = none */
+    bool limitTrippedPos;
 };
 
 bool MotionInit();
@@ -56,6 +61,8 @@ bool MotionIsEnabled();
 bool MotionIsMoving();
 bool MotionInterrupted();
 void MotionClearInterrupt();
+void MotionKeepalive();
+void MotionPollWatchdog();
 
 const char *MotionEnable();
 const char *MotionDisable();

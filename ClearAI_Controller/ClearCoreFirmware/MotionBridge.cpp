@@ -38,10 +38,11 @@ static NvmManager &Nvm() {
 
 /* User-page blob at NVM_LOC_USER_START (416 bytes available before Teknic reserved). */
 static const uint32_t CLEARAI_NVM_MAGIC = 0x43414943u; /* 'CAIC' */
-static const uint16_t CLEARAI_NVM_VERSION = 4;
+static const uint16_t CLEARAI_NVM_VERSION = 5;
 static const uint16_t CLEARAI_NVM_VERSION_V1 = 1;
 static const uint16_t CLEARAI_NVM_VERSION_V2 = 2;
 static const uint16_t CLEARAI_NVM_VERSION_V3 = 3;
+static const uint16_t CLEARAI_NVM_VERSION_V4 = 4;
 
 #pragma pack(push, 1)
 struct ClearAiNvmConfigV1 {
@@ -108,6 +109,32 @@ struct ClearAiNvmConfigV3 {
     uint8_t negLimDi[CLEARAI_AXIS_COUNT];
 };
 
+struct ClearAiNvmConfigV4 {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t size;
+    uint32_t axisMask;
+    uint8_t testMode;
+    uint8_t units;
+    uint8_t mode;
+    uint8_t estopDi6;
+    uint32_t stepsPerRev[CLEARAI_AXIS_COUNT];
+    float pitchMm[CLEARAI_AXIS_COUNT];
+    float gear[CLEARAI_AXIS_COUNT];
+    uint32_t vel;
+    uint32_t accel;
+    uint32_t decel;
+    float feedMmPerMin;
+    uint8_t limitFlags;
+    uint8_t limitPad[3];
+    float limitMin[CLEARAI_AXIS_COUNT];
+    float limitMax[CLEARAI_AXIS_COUNT];
+    uint8_t posLimDi[CLEARAI_AXIS_COUNT];
+    uint8_t negLimDi[CLEARAI_AXIS_COUNT];
+    uint8_t unitsA;
+    uint8_t nvmPad[3];
+};
+
 struct ClearAiNvmConfig {
     uint32_t magic;
     uint16_t version;
@@ -132,6 +159,11 @@ struct ClearAiNvmConfig {
     uint8_t negLimDi[CLEARAI_AXIS_COUNT];
     uint8_t unitsA;
     uint8_t nvmPad[3];
+    uint32_t velAxis[CLEARAI_AXIS_COUNT];
+    uint32_t accelAxis[CLEARAI_AXIS_COUNT];
+    uint32_t decelAxis[CLEARAI_AXIS_COUNT];
+    uint32_t watchdogMs;
+    uint8_t nvmPad2[4];
 };
 #pragma pack(pop)
 
@@ -166,6 +198,14 @@ static double g_limitMax[CLEARAI_AXIS_COUNT];
 static uint8_t g_posLimDi[CLEARAI_AXIS_COUNT];
 static uint8_t g_negLimDi[CLEARAI_AXIS_COUNT];
 static char g_limitErrBuf[32];
+static uint32_t g_velAxis[CLEARAI_AXIS_COUNT];     /* 0 = inherit g_vel */
+static uint32_t g_accelAxis[CLEARAI_AXIS_COUNT];  /* 0 = inherit g_accel */
+static uint32_t g_decelAxis[CLEARAI_AXIS_COUNT];  /* 0 = inherit g_decel */
+static uint32_t g_watchdogMs = 0;               /* 0 = disabled */
+static uint32_t g_lastKeepaliveMs = 0;
+static bool g_watchdogTripped = false;
+static uint8_t g_limitTrippedAxis = 0xff;       /* 0xff = none */
+static bool g_limitTrippedPos = false;
 
 static void ApplyLimits();
 
@@ -298,6 +338,16 @@ static void ConfigFillFromLive(ClearAiNvmConfig *cfg) {
     cfg->nvmPad[0] = 0;
     cfg->nvmPad[1] = 0;
     cfg->nvmPad[2] = 0;
+    for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+        cfg->velAxis[a] = g_velAxis[a];
+        cfg->accelAxis[a] = g_accelAxis[a];
+        cfg->decelAxis[a] = g_decelAxis[a];
+    }
+    cfg->watchdogMs = g_watchdogMs;
+    cfg->nvmPad2[0] = 0;
+    cfg->nvmPad2[1] = 0;
+    cfg->nvmPad2[2] = 0;
+    cfg->nvmPad2[3] = 0;
 }
 
 static bool ConfigApplyCommon(const ClearAiNvmConfigV1 *cfg) {
@@ -413,6 +463,15 @@ static bool HwLimitActive(uint8_t axis, bool positive) {
     return HwLimitSwitchActive(di);
 }
 
+static void ResetPerAxisDynamics() {
+    for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+        g_velAxis[a] = 0;
+        g_accelAxis[a] = 0;
+        g_decelAxis[a] = 0;
+    }
+    g_watchdogMs = 0;
+}
+
 static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
     if (cfg->magic != CLEARAI_NVM_MAGIC) {
         return false;
@@ -426,6 +485,7 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         }
         LimitClearAll();
         HwLimClearAll();
+        ResetPerAxisDynamics();
         return true;
     }
     if (cfg->version == CLEARAI_NVM_VERSION_V2) {
@@ -443,6 +503,7 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         }
         HwLimClearAll();
         g_unitsA = CLEARAI_UNITS_A_DEG;
+        ResetPerAxisDynamics();
         return true;
     }
     if (cfg->version == CLEARAI_NVM_VERSION_V3) {
@@ -461,6 +522,26 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
             g_negLimDi[a] = v3->negLimDi[a];
         }
         g_unitsA = CLEARAI_UNITS_A_DEG;
+        ResetPerAxisDynamics();
+        return true;
+    }
+    if (cfg->version == CLEARAI_NVM_VERSION_V4) {
+        if (cfg->size < sizeof(ClearAiNvmConfigV4)) {
+            return false;
+        }
+        const ClearAiNvmConfigV4 *v4 = (const ClearAiNvmConfigV4 *)cfg;
+        if (!ConfigApplyCommon((const ClearAiNvmConfigV1 *)v4)) {
+            return false;
+        }
+        g_limitFlags = v4->limitFlags;
+        for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+            g_limitMin[a] = (double)v4->limitMin[a];
+            g_limitMax[a] = (double)v4->limitMax[a];
+            g_posLimDi[a] = v4->posLimDi[a];
+            g_negLimDi[a] = v4->negLimDi[a];
+        }
+        g_unitsA = (v4->unitsA == (uint8_t)CLEARAI_UNITS_A_REV) ? CLEARAI_UNITS_A_REV : CLEARAI_UNITS_A_DEG;
+        ResetPerAxisDynamics();
         return true;
     }
     if (cfg->version != CLEARAI_NVM_VERSION) {
@@ -480,6 +561,13 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         g_negLimDi[a] = cfg->negLimDi[a];
     }
     g_unitsA = (cfg->unitsA == (uint8_t)CLEARAI_UNITS_A_REV) ? CLEARAI_UNITS_A_REV : CLEARAI_UNITS_A_DEG;
+    for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+        g_velAxis[a] = cfg->velAxis[a];
+        g_accelAxis[a] = cfg->accelAxis[a];
+        g_decelAxis[a] = cfg->decelAxis[a];
+    }
+    g_watchdogMs = cfg->watchdogMs;
+    g_lastKeepaliveMs = Milliseconds();
     return true;
 }
 
@@ -560,24 +648,19 @@ static double WorkInternal(uint8_t axis) {
     return MachineInternal(axis) - g_workOrigin[axis];
 }
 
-static double WorkFromSteps(uint8_t axis, int32_t steps) {
-    const double spu = g_stepsPerMm[axis];
-    if (spu == 0.0) {
-        return 0.0;
-    }
-    return (double)steps / spu - g_workOrigin[axis];
-}
-
 static const char *ValidateTargetSteps(uint8_t axis, int32_t steps, bool moving) {
     if (!moving || !AxisOn(axis) || g_limitFlags == 0) {
         return nullptr;
     }
-    const double work = WorkFromSteps(axis, steps);
-    if (LimitMinEn(axis) && work < g_limitMin[axis] - 1e-6) {
+    /* Soft limits are in machine (absolute) coordinates: they bound the
+     * physical travel envelope and do NOT move with set_work_origin. */
+    const double spu = g_stepsPerMm[axis];
+    const double machine = (spu > 0.0) ? (double)steps / spu : 0.0;
+    if (LimitMinEn(axis) && machine < g_limitMin[axis] - 1e-6) {
         snprintf(g_limitErrBuf, sizeof(g_limitErrBuf), "%s below min limit", AxisName(axis));
         return g_limitErrBuf;
     }
-    if (LimitMaxEn(axis) && work > g_limitMax[axis] + 1e-6) {
+    if (LimitMaxEn(axis) && machine > g_limitMax[axis] + 1e-6) {
         snprintf(g_limitErrBuf, sizeof(g_limitErrBuf), "%s above max limit", AxisName(axis));
         return g_limitErrBuf;
     }
@@ -748,6 +831,18 @@ static bool MotorsIdle() {
     return true;
 }
 
+static uint32_t AxisVelCap(uint8_t a) {
+    return g_velAxis[a] ? g_velAxis[a] : g_vel;
+}
+
+static uint32_t AxisAccelCap(uint8_t a) {
+    return g_accelAxis[a] ? g_accelAxis[a] : g_accel;
+}
+
+static uint32_t AxisDecelCap(uint8_t a) {
+    return g_decelAxis[a] ? g_decelAxis[a] : g_decel;
+}
+
 static void ApplyLimits() {
     for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
         MotorDriver *m = MotorForAxis(a);
@@ -756,15 +851,18 @@ static void ApplyLimits() {
         }
         m->HlfbMode(MotorDriver::HLFB_MODE_HAS_BIPOLAR_PWM);
         m->HlfbCarrier(MotorDriver::HLFB_CARRIER_482_HZ);
-        m->VelMax(g_vel);
-        m->AccelMax(g_accel);
-        m->EStopDecelMax(g_decel);
+        m->VelMax(AxisVelCap(a));
+        m->AccelMax(AxisAccelCap(a));
+        m->EStopDecelMax(AxisDecelCap(a));
     }
     g_xy.ArcVelMax(g_vel);
     g_xy.ArcAccelMax(g_accel);
 }
 
 static const char *GateMotion() {
+    if (g_watchdogTripped) {
+        return "watchdog tripped; call keepalive";
+    }
     if (g_testMode) {
         if (g_interrupted) {
             return "estop active";
@@ -828,6 +926,10 @@ void MotionPollEstop() {
                         mb->MoveStopDecel(g_decel);
                     }
                 }
+                /* Latch a limit-tripped fault for host diagnostics. Cleared by
+                 * clear_alerts. */
+                g_limitTrippedAxis = a;
+                g_limitTrippedPos = posDir;
                 return;
             }
         }
@@ -841,6 +943,28 @@ bool MotionInterrupted() {
 void MotionClearInterrupt() {
     if (!HardwareEstopFault()) {
         g_interrupted = false;
+    }
+}
+
+void MotionKeepalive() {
+    g_lastKeepaliveMs = Milliseconds();
+    g_watchdogTripped = false;
+}
+
+void MotionPollWatchdog() {
+    if (g_watchdogMs == 0 || g_watchdogTripped) {
+        return;
+    }
+    if ((Milliseconds() - g_lastKeepaliveMs) >= g_watchdogMs) {
+        /* Host went silent mid-session: decelerate to a stop and latch. */
+        g_xy.StopDecel();
+        for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+            MotorDriver *m = MotorForAxis(a);
+            if (m) {
+                m->MoveStopDecel(g_decel);
+            }
+        }
+        g_watchdogTripped = true;
     }
 }
 
@@ -872,6 +996,10 @@ bool MotionInit() {
     g_enabled = false;
     g_interrupted = false;
     g_nvmLoaded = false;
+    ResetPerAxisDynamics();
+    g_watchdogTripped = false;
+    g_limitTrippedAxis = 0xff;
+    g_limitTrippedPos = false;
     LimitClearAll();
     HwLimClearAll();
     (void)ConfigLoadNvm();
@@ -907,6 +1035,7 @@ const char *MotionEnable() {
         g_interrupted = true;
         return "hardware estop";
     }
+    MotionKeepalive();
     for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
         if (!AxisOn(a)) {
             continue;
@@ -942,6 +1071,8 @@ const char *MotionClearAlerts() {
         }
     }
     MotionClearInterrupt();
+    g_limitTrippedAxis = 0xff;
+    g_limitTrippedPos = false;
     return nullptr;
 }
 
@@ -988,24 +1119,32 @@ const char *MotionConfigure(const RpcParams *p) {
     const bool mechChange = p->hasStepsX || p->hasStepsY || p->hasStepsZ || p->hasStepsA ||
         p->hasPitchX || p->hasPitchY || p->hasPitchZ || p->hasPitchA ||
         p->hasGearX || p->hasGearY || p->hasGearZ || p->hasGearA ||
-        p->hasVel || p->hasAccel || p->hasDecel || p->hasAxisMask || p->hasEstopDi6;
+        p->hasVel || p->hasAccel || p->hasDecel || p->hasAxisMask || p->hasEstopDi6 ||
+        p->hasVelX || p->hasVelY || p->hasVelZ || p->hasVelA ||
+        p->hasAccelX || p->hasAccelY || p->hasAccelZ || p->hasAccelA ||
+        p->hasDecelX || p->hasDecelY || p->hasDecelZ || p->hasDecelA;
     const bool limitChange = p->hasMinX || p->hasMaxX || p->hasMinY || p->hasMaxY ||
         p->hasMinZ || p->hasMaxZ || p->hasMinA || p->hasMaxA || p->hasClearLimits ||
         p->hasClearMinX || p->hasClearMaxX || p->hasClearMinY || p->hasClearMaxY ||
         p->hasClearMinZ || p->hasClearMaxZ || p->hasClearMinA || p->hasClearMaxA ||
         p->hasPosLimX || p->hasNegLimX || p->hasPosLimY || p->hasNegLimY ||
         p->hasPosLimZ || p->hasNegLimZ || p->hasPosLimA || p->hasNegLimA;
-    const bool testOnly = p->hasTestMode && !mechChange && !limitChange;
+    const bool safetyChange = p->hasWatchdogMs;
+    const bool testOnly = p->hasTestMode && !mechChange && !limitChange && !safetyChange;
 
     if (mechChange && g_enabled) {
         return "disable before configure";
     }
-    if (g_enabled && !testOnly && !limitChange) {
+    if (g_enabled && !testOnly && !limitChange && !safetyChange) {
         return "disable before configure";
     }
     if (testOnly) {
         ConfigSaveNvm();
         return nullptr;
+    }
+    if (p->hasWatchdogMs) {
+        g_watchdogMs = p->watchdogMs;
+        MotionKeepalive();  /* re-arm timer and clear any trip on change */
     }
 
     if (p->hasClearLimits && p->clearLimits) {
@@ -1116,7 +1255,7 @@ const char *MotionConfigure(const RpcParams *p) {
         }
     }
 
-    if (!mechChange && limitChange) {
+    if (!mechChange && (limitChange || safetyChange)) {
         ConfigSaveNvm();
         return nullptr;
     }
@@ -1168,6 +1307,18 @@ const char *MotionConfigure(const RpcParams *p) {
     if (p->hasDecel) {
         g_decel = p->decel;
     }
+    if (p->hasVelX) { g_velAxis[0] = p->velX; }
+    if (p->hasVelY) { g_velAxis[1] = p->velY; }
+    if (p->hasVelZ) { g_velAxis[2] = p->velZ; }
+    if (p->hasVelA) { g_velAxis[3] = p->velA; }
+    if (p->hasAccelX) { g_accelAxis[0] = p->accelX; }
+    if (p->hasAccelY) { g_accelAxis[1] = p->accelY; }
+    if (p->hasAccelZ) { g_accelAxis[2] = p->accelZ; }
+    if (p->hasAccelA) { g_accelAxis[3] = p->accelA; }
+    if (p->hasDecelX) { g_decelAxis[0] = p->decelX; }
+    if (p->hasDecelY) { g_decelAxis[1] = p->decelY; }
+    if (p->hasDecelZ) { g_decelAxis[2] = p->decelZ; }
+    if (p->hasDecelA) { g_decelAxis[3] = p->decelA; }
     if (p->hasAxisMask) {
         uint32_t m = p->axisMask;
         if (m > 15u) {
@@ -1260,6 +1411,10 @@ const char *MotionResetConfig() {
     g_feedMmPerMin = CLEARAI_DEFAULT_FEED_MM_PER_MIN;
     g_estopDi6 = 1;
     g_testMode = (CLEARAI_TEST_MODE_DEFAULT != 0);
+    ResetPerAxisDynamics();
+    g_watchdogTripped = false;
+    g_limitTrippedAxis = 0xff;
+    g_limitTrippedPos = false;
     LimitClearAll();
     HwLimClearAll();
     ApplyMechanicalParams();
@@ -1317,19 +1472,28 @@ static void ApplyFeed(bool rapid, bool hasFeed, double feedUser) {
     if (rapid) {
         g_xy.ArcVelMax(g_vel);
         g_xy.FeedRateMMPerMin((double)g_vel / (g_stepsPerMm[0] > 0.0 ? g_stepsPerMm[0] : 1.0) * 60.0);
+        for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+            MotorDriver *m = MotorForAxis(a);
+            if (m) {
+                m->VelMax(AxisVelCap(a));
+            }
+        }
         return;
     }
     g_xy.FeedRateMMPerMin(feedMm);
-    const double stepsPerSec = (feedMm / 60.0) * g_stepsPerMm[0];
-    uint32_t vel = (stepsPerSec < 1.0) ? 1u : (uint32_t)stepsPerSec;
-    if (vel > g_vel) {
-        vel = g_vel;
-    }
     for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
         MotorDriver *m = MotorForAxis(a);
-        if (m) {
-            m->VelMax(vel);
+        if (!m) {
+            continue;
         }
+        const double spu = g_stepsPerMm[a] > 0.0 ? g_stepsPerMm[a] : 1.0;
+        const double stepsPerSec = (feedMm / 60.0) * spu;
+        uint32_t vel = (stepsPerSec < 1.0) ? 1u : (uint32_t)stepsPerSec;
+        uint32_t cap = AxisVelCap(a);
+        if (vel > cap) {
+            vel = cap;
+        }
+        m->VelMax(vel);
     }
 }
 
@@ -1554,6 +1718,11 @@ void MotionGetStatus(MotionStatus *out) {
     out->axisMask = g_axisMask;
     out->vel = g_vel;
     out->accel = g_accel;
+    out->watchdogMs = g_watchdogMs;
+    out->watchdogTripped = g_watchdogTripped;
+    out->limitTripped = (g_limitTrippedAxis != 0xff);
+    out->limitTrippedAxis = g_limitTrippedAxis;
+    out->limitTrippedPos = g_limitTrippedPos;
     for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
         MotorDriver *m = MotorForAxis(a);
         if (m) {
@@ -1934,7 +2103,7 @@ void MotionFillCapabilitiesJson(char *buf, uint16_t bufLen) {
              "\"configure\",\"reset_config\",\"set_test_mode\",\"set_units\",\"set_units_a\",\"set_mode\","
              "\"set_work_origin\",\"move_linear\",\"move_arc\",\"jog\",\"dwell\","
              "\"read_inputs\",\"write_output\",\"queue_status\",\"queue_clear\","
-             "\"home\",\"probe\"],"
+             "\"home\",\"probe\",\"keepalive\"],"
              "\"tcp\":%u,\"tel\":%u,\"discover\":%u}",
              CLEARAI_PROTOCOL_VERSION,
              (unsigned long)g_axisMask,
@@ -1954,6 +2123,7 @@ void MotionFillConfigJson(char *buf, uint16_t bufLen) {
     Nvm().BlockRead(NvmManager::NVM_LOC_USER_START, (int)sizeof(stored), (uint8_t *)&stored);
     storedOk = (stored.magic == CLEARAI_NVM_MAGIC &&
                 (stored.version == CLEARAI_NVM_VERSION ||
+                 stored.version == CLEARAI_NVM_VERSION_V4 ||
                  stored.version == CLEARAI_NVM_VERSION_V3 ||
                  stored.version == CLEARAI_NVM_VERSION_V2 ||
                  stored.version == CLEARAI_NVM_VERSION_V1) &&
@@ -1981,7 +2151,11 @@ void MotionFillConfigJson(char *buf, uint16_t bufLen) {
              "\"limits_min\":[%.4f,%.4f,%.4f,%.4f],"
              "\"limits_max\":[%.4f,%.4f,%.4f,%.4f],"
              "\"pos_lim_di\":[%u,%u,%u,%u],"
-             "\"neg_lim_di\":[%u,%u,%u,%u]}",
+             "\"neg_lim_di\":[%u,%u,%u,%u],"
+             "\"vel_axis\":[%lu,%lu,%lu,%lu],"
+             "\"accel_axis\":[%lu,%lu,%lu,%lu],"
+             "\"decel_axis\":[%lu,%lu,%lu,%lu],"
+             "\"watchdog_ms\":%lu}",
              g_nvmLoaded ? "true" : "false",
              storedOk ? "true" : "false",
              (unsigned)(storedOk ? stored.version : 0),
@@ -2003,7 +2177,14 @@ void MotionFillConfigJson(char *buf, uint16_t bufLen) {
              limMinUser[0], limMinUser[1], limMinUser[2], limMinUser[3],
              limMaxUser[0], limMaxUser[1], limMaxUser[2], limMaxUser[3],
              posLimDi[0], posLimDi[1], posLimDi[2], posLimDi[3],
-             negLimDi[0], negLimDi[1], negLimDi[2], negLimDi[3]);
+             negLimDi[0], negLimDi[1], negLimDi[2], negLimDi[3],
+             (unsigned long)g_velAxis[0], (unsigned long)g_velAxis[1],
+             (unsigned long)g_velAxis[2], (unsigned long)g_velAxis[3],
+             (unsigned long)g_accelAxis[0], (unsigned long)g_accelAxis[1],
+             (unsigned long)g_accelAxis[2], (unsigned long)g_accelAxis[3],
+             (unsigned long)g_decelAxis[0], (unsigned long)g_decelAxis[1],
+             (unsigned long)g_decelAxis[2], (unsigned long)g_decelAxis[3],
+             (unsigned long)g_watchdogMs);
 }
 
 static void FormatHlfbPercentArray(char *out, size_t outLen, const MotionStatus *st) {
@@ -2034,13 +2215,24 @@ static void FillPoseObject(char *buf, uint16_t bufLen, bool withFlags) {
     if (withFlags) {
         char hlfbArr[64];
         FormatHlfbPercentArray(hlfbArr, sizeof(hlfbArr), &st);
+        char limitStatus[48];
+        if (st.limitTripped) {
+            snprintf(limitStatus, sizeof(limitStatus),
+                      "{\"tripped\":true,\"axis\":\"%s\",\"dir\":\"%s\"}",
+                      AxisName(st.limitTrippedAxis),
+                      st.limitTrippedPos ? "pos" : "neg");
+        } else {
+            snprintf(limitStatus, sizeof(limitStatus),
+                      "{\"tripped\":false}");
+        }
         snprintf(buf, bufLen,
                  "{\"enabled\":%s,\"moving\":%s,\"hlfb\":%s,\"estop\":%s,\"hw_estop\":%s,"
                  "\"test_mode\":%s,\"alerts\":%s,"
                  "\"queue\":%u,\"queue_active\":%s,\"alert_reg\":%lu,"
                  "\"units\":\"%s\",\"units_a\":\"%s\",\"mode\":\"%s\","
                  "\"axis_mask\":%lu,\"x\":%.4f,\"y\":%.4f,\"z\":%.4f,\"a\":%.4f,"
-                 "\"hlfb_percent\":%s}",
+                 "\"hlfb_percent\":%s,"
+                 "\"watchdog_ms\":%lu,\"watchdog_tripped\":%s,\"limit_status\":%s}",
                  st.enabled ? "true" : "false",
                  st.moving ? "true" : "false",
                  st.hlfb ? "true" : "false",
@@ -2056,7 +2248,10 @@ static void FillPoseObject(char *buf, uint16_t bufLen, bool withFlags) {
                  st.mode == CLEARAI_MODE_ABS ? "abs" : "rel",
                  (unsigned long)st.axisMask,
                  st.work[0], st.work[1], st.work[2], st.work[3],
-                 hlfbArr);
+                 hlfbArr,
+                 (unsigned long)st.watchdogMs,
+                 st.watchdogTripped ? "true" : "false",
+                 limitStatus);
     } else {
         snprintf(buf, bufLen,
                  "{\"units\":\"%s\",\"units_a\":\"%s\",\"mode\":\"%s\","

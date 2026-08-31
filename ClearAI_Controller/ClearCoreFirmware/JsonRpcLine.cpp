@@ -284,6 +284,32 @@ static void ApplyParam(const char *js, const jsmntok_t *key, const jsmntok_t *va
     } else if (TokenEq(js, key, "active") && val->type == JSMN_STRING) {
         p->hasActive = true;
         TokenCopy(js, val, p->active, sizeof(p->active));
+    } else if (TokenEq(js, key, "vel_x") && TokenNumber(js, val, &n)) {
+        p->hasVelX = true; p->velX = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "vel_y") && TokenNumber(js, val, &n)) {
+        p->hasVelY = true; p->velY = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "vel_z") && TokenNumber(js, val, &n)) {
+        p->hasVelZ = true; p->velZ = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "vel_a") && TokenNumber(js, val, &n)) {
+        p->hasVelA = true; p->velA = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "accel_x") && TokenNumber(js, val, &n)) {
+        p->hasAccelX = true; p->accelX = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "accel_y") && TokenNumber(js, val, &n)) {
+        p->hasAccelY = true; p->accelY = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "accel_z") && TokenNumber(js, val, &n)) {
+        p->hasAccelZ = true; p->accelZ = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "accel_a") && TokenNumber(js, val, &n)) {
+        p->hasAccelA = true; p->accelA = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "decel_x") && TokenNumber(js, val, &n)) {
+        p->hasDecelX = true; p->decelX = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "decel_y") && TokenNumber(js, val, &n)) {
+        p->hasDecelY = true; p->decelY = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "decel_z") && TokenNumber(js, val, &n)) {
+        p->hasDecelZ = true; p->decelZ = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "decel_a") && TokenNumber(js, val, &n)) {
+        p->hasDecelA = true; p->decelA = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "watchdog_ms") && TokenNumber(js, val, &n)) {
+        p->hasWatchdogMs = true; p->watchdogMs = (n < 0.0) ? 0u : (uint32_t)n;
     } else if (TokenEq(js, key, "state")) {
         if (TokenBool(js, val, &b)) {
             p->hasIoState = true;

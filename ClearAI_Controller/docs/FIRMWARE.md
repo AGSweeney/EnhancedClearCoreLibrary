@@ -85,7 +85,7 @@ ClearAI stores a versioned blob in ClearCore **user NVM** (`NvmManager`, offset 
 
 | Behavior | Detail |
 |----------|--------|
-| Load | On `MotionInit`, after compile defaults; valid magic `'CAIC'` + version 1, 2, 3, or 4 applies |
+| Load | On `MotionInit`, after compile defaults; valid magic `'CAIC'` + version 1, 2, 3, 4, or 5 applies |
 | Save | After successful `configure`, `set_test_mode`, `set_units`, `set_mode` |
 | Read | `get_config` — live values + `nvm` / `nvm_valid` |
 | Clear | `reset_config` (motors disabled) — compile defaults + wipe blob |
@@ -95,7 +95,7 @@ Requires board supply suitable for NVM writes (~20 V+ per libClearCore). User pa
 
 ### Soft travel limits (NVM v2)
 
-Per-axis min/max in **work coordinates** (`min_x`/`max_x`, …). Values use active linear units (mm/inch); axis A uses the configured A-axis unit (see NVM v4). Negative ranges are supported (e.g. X −50…50 mm).
+Per-axis min/max (`min_x`/`max_x`, …). Values use active linear units (mm/inch); axis A uses the configured A-axis unit (see NVM v4). Negative ranges are supported (e.g. X −50…50 mm). As of NVM v5 these are enforced in **machine (absolute) coordinates** — they bound the physical travel envelope and do not move with `set_work_origin` (see Safety / limits).
 
 | `limit_flags` bit | Meaning |
 |-------------------|---------|
@@ -151,6 +151,13 @@ Coordinated XY moves queue in the planner (`MotionQueueCount`). `queue_status` r
 ### Probing (`probe`)
 
 `probe` moves `axis` toward `dir` at probe `feed` until a probe input DI (`pin`, 1–12, not a pin reserved for a limit) triggers. `active` selects polarity (default `high` = touched when the pin reads high). On contact it decelerates to a stop and reports the touch `pos` in work units; optional `backoff` and `zero` (default false). Same seek/timeout defaults as `home`. Blocking and interruptible.
+
+### Safety / limits (NVM v5)
+
+- **Soft limits are machine-coordinate.** `ValidateTargetSteps` compares the target against `MachineInternal(axis)` directly (not the work-shifted value), so soft limits bound the absolute physical envelope and cannot be escaped by `set_work_origin`.
+- **Per-axis vel/accel/decel overrides.** `vel_x`/…/`vel_a`, `accel_x`/…/`accel_a`, `decel_x`/…/`decel_a` (steps/s, steps/s²). A value of **0** inherits the global `vel`/`accel`/`decel`. `AxisVelCap`/`AxisAccelCap`/`AxisDecelCap` resolve the effective cap; `ApplyLimits` and `ApplyFeed` apply them per motor. Persisted in NVM v5; older blobs load with all per-axis fields = 0 (inherit).
+- **Limit-triggered fault state.** When `MotionPollEstop` decelerates a move because a hardware limit tripped mid-move, it latches `g_limitTrippedAxis`/`g_limitTrippedPos`. Exposed as `limit_status` in `get_status` and cleared by `clear_alerts`.
+- **Host watchdog / keepalive.** `watchdog_ms` (0 = disabled, default). `MotionPollWatchdog` (called from the main loop) decelerates to a stop and latches `g_watchdogTripped` if `(now - g_lastKeepaliveMs) >= watchdogMs`. `GateMotion` blocks further motion while tripped. `keepalive` (and `enable`, and setting `watchdog_ms` via `configure`) re-arm the timer and clear the latch. `keepalive` is in the allowed-during-wait list. Persisted in NVM v5.
 
 ## Motion behavior
 

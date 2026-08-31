@@ -40,6 +40,7 @@ METHODS = (
     "queue_clear",
     "home",
     "probe",
+    "keepalive",
 )
 
 
@@ -169,6 +170,19 @@ def main(argv: Optional[list[str]] = None) -> int:
             sp.add_argument("--neg-lim-z", type=int)
             sp.add_argument("--pos-lim-a", type=int)
             sp.add_argument("--neg-lim-a", type=int)
+            sp.add_argument("--watchdog-ms", type=int)
+            sp.add_argument("--vel-x", type=int)
+            sp.add_argument("--vel-y", type=int)
+            sp.add_argument("--vel-z", type=int)
+            sp.add_argument("--vel-a", type=int)
+            sp.add_argument("--accel-x", type=int)
+            sp.add_argument("--accel-y", type=int)
+            sp.add_argument("--accel-z", type=int)
+            sp.add_argument("--accel-a", type=int)
+            sp.add_argument("--decel-x", type=int)
+            sp.add_argument("--decel-y", type=int)
+            sp.add_argument("--decel-z", type=int)
+            sp.add_argument("--decel-a", type=int)
 
     tools_p = sub.add_parser("tools", help="Print OpenAI/Anthropic tool schema JSON")
     _ = tools_p
@@ -234,6 +248,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         elif args.cmd == "write_output":
             params = {"pin": args.pin, "state": bool(args.state)}
             timeout = 5.0
+        elif args.cmd == "keepalive":
+            params = {}
+            timeout = 5.0
         elif args.cmd == "move_arc":
             params = _params_from_args(args, ("x", "y", "i", "j", "feed"))
             params["clockwise"] = bool(args.clockwise)
@@ -275,6 +292,19 @@ def main(argv: Optional[list[str]] = None) -> int:
                 "neg_lim_z": "neg_lim_z",
                 "pos_lim_a": "pos_lim_a",
                 "neg_lim_a": "neg_lim_a",
+                "watchdog_ms": "watchdog_ms",
+                "vel_x": "vel_x",
+                "vel_y": "vel_y",
+                "vel_z": "vel_z",
+                "vel_a": "vel_a",
+                "accel_x": "accel_x",
+                "accel_y": "accel_y",
+                "accel_z": "accel_z",
+                "accel_a": "accel_a",
+                "decel_x": "decel_x",
+                "decel_y": "decel_y",
+                "decel_z": "decel_z",
+                "decel_a": "decel_a",
             }
             bool_keys = (
                 "clear_limits",

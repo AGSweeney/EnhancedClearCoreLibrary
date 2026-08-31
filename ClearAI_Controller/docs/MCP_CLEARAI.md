@@ -40,15 +40,15 @@ All tools mirror firmware methods unless noted. Motion tools are non-blocking; a
 | Tool | Description |
 |------|-------------|
 | `get_capabilities` | Protocol version, axes, units, mode, method list, ports |
-| `get_status` | Enable/moving/HLFB/estop/test_mode/alerts/queue/`queue_active`/`units_a`/`hlfb_percent` (per-axis torque %)/pose |
+| `get_status` | Enable/moving/HLFB/estop/test_mode/alerts/queue/`queue_active`/`units_a`/`hlfb_percent` (per-axis torque %)/`watchdog_ms`/`watchdog_tripped`/`limit_status`/pose |
 | `get_pose` | Work coordinates x,y,z,a (A in configured A units) |
-| `get_config` | Live config + NVM validity (`axis_mask`, test_mode, mechanics, vel, `units_a`, soft limits, …) |
+| `get_config` | Live config + NVM validity (`axis_mask`, test_mode, mechanics, vel, `units_a`, soft limits, hw limit DIs, `vel_axis`/`accel_axis`/`decel_axis`, `watchdog_ms`, …) |
 | `enable` / `disable` | Enable or abrupt disable |
 | `clear_alerts` | Clear motor alert flags |
 | `stop` | Decelerate; motors stay enabled |
 | `estop` | Immediate stop + disable |
 | `wait_idle` | Block until idle or `timeout_ms` |
-| `configure` | Mechanics, `axis_mask`, vel/accel/decel, soft limits, hardware limit DIs (`pos_lim_x`/…), optional `test_mode` (**NVM**) |
+| `configure` | Mechanics, `axis_mask`, vel/accel/decel, per-axis `vel_x`/…/`decel_a` (0=inherit), soft limits (machine-coord), hardware limit DIs (`pos_lim_x`/…), `watchdog_ms`, optional `test_mode` (**NVM**) |
 | `reset_config` | Compile defaults + clear NVM (motors disabled) |
 | `set_test_mode` | Bench gate bypass (**NVM**) |
 | `set_units` | `mm` or `inch` |
@@ -65,6 +65,7 @@ All tools mirror firmware methods unless noted. Motion tools are non-blocking; a
 | `queue_clear` | Decelerate active move + drop pending queued segments |
 | `home` | Seek configured hw limit for `axis`/`dir`, stop, optional backoff + zero |
 | `probe` | Move until probe DI triggers; report touch position, optional zero |
+| `keepalive` | Reset host watchdog timer + clear watchdog trip latch |
 | `discover` | UDP discover; returns host/ports (does not move) |
 
 ### Feed units

@@ -63,9 +63,9 @@ Unsolicited notifications (no `id`):
 | Method | Params | Result |
 |--------|--------|--------|
 | `get_capabilities` | — | protocol version, axis mask, units, mode, `test_mode`, `nvm`, method list, ports |
-| `get_status` | — | enabled, moving, hlfb, estop, `hw_estop`, `test_mode`, alerts, queue, `queue_active`, `units_a`, `hlfb_percent` (per-axis % of peak torque, or null if unknown), pose |
+| `get_status` | — | enabled, moving, hlfb, estop, `hw_estop`, `test_mode`, alerts, queue, `queue_active`, `units_a`, `hlfb_percent` (per-axis % of peak torque, or null if unknown), `watchdog_ms`, `watchdog_tripped`, `limit_status` (`{tripped,axis,dir}` or `{tripped:false}`), pose |
 | `get_pose` | — | work coordinates in active units (A in configured A units) |
-| `get_config` | — | live config + `nvm` / `nvm_valid` (axis_mask, test_mode, mechanics, vel/accel/decel, `units_a`, `limit_flags`, `limits_min`/`limits_max`, `pos_lim_di`/`neg_lim_di`, …) |
+| `get_config` | — | live config + `nvm` / `nvm_valid` (axis_mask, test_mode, mechanics, vel/accel/decel, `units_a`, `limit_flags`, `limits_min`/`limits_max`, `pos_lim_di`/`neg_lim_di`, `vel_axis`/`accel_axis`/`decel_axis`, `watchdog_ms`, …) |
 | `enable` | — | `{ok:true}` after enable request (short HLFB wait) |
 | `disable` | — | abrupt stop + disable |
 | `clear_alerts` | — | clear motor alerts |
@@ -78,12 +78,13 @@ Unsolicited notifications (no `id`):
 | `queue_clear` | — | `{ok:true}` — decelerate the active move to a stop and drop pending queued segments. Motors stay enabled. Accepted during `wait_idle`/`dwell` (interrupts the wait). |
 | `home` | `axis` (`x`/`y`/`z`/`a`), `dir` (`pos`/`neg`), optional `feed`, `seek` (max travel, default 1000), `backoff`, `zero` (default true), `timeout_ms` (default 30000) | `{homed:true,axis,dir,pos,limit_pin}` — seek the configured hardware limit for `axis`/`dir`, decel-stop on contact, optional backoff, optional zero. Requires `pos_lim_<axis>`/`neg_lim_<axis>` DI configured. Blocking (interruptible by `estop`/`stop`/`queue_clear`). |
 | `probe` | `axis`, `dir`, `pin` (DI 1–12), optional `feed`, `seek`, `backoff`, `zero` (default false), `active` (`high`/`low`, default `high`), `timeout_ms` | `{probed:true,axis,dir,pos,pin}` — move at probe feed until the probe DI triggers, stop, report touch position. Blocking (interruptible). |
+| `keepalive` | — | `{ok:true}` — reset the host watchdog timer and clear the `watchdog_tripped` latch. Allowed during `wait_idle`/`dwell`/`home`/`probe`. |
 
 ### Configuration
 
 | Method | Params |
 |--------|--------|
-| `configure` | `steps_per_rev_x/y/z/a`, `pitch_x/y/z` (mm), `gear_x/y/z/a`, `vel`/`accel`/`decel` (steps/s, steps/s²), `axis_mask` (bit0=X … bit3=A), `estop_di6` (0=off, 1=default, 2=inverted), `test_mode` (bool), soft limits `min_x`/`max_x`/… (work units; A in configured A units), hardware limits `pos_lim_x`/`neg_lim_x`/… (ClearCore **pin index** 0–12: **0–5** = IO-0…IO-5 configurable in/out — firmware forces input when used as a limit; **6–12** = DI-6…A-12 input-only; **0** or **255** = disabled), `clear_limits`, `clear_min_x`/`clear_max_x`/… (bool). Mechanical fields require motors **disabled**; `test_mode`, soft limits, and hardware limit pins may change while enabled. Soft limits reject out-of-range targets; hardware limits reject moves into an active switch and decelerate-stop during motion. **Persisted to ClearCore NVM** (blob version 4). |
+| `configure` | `steps_per_rev_x/y/z/a`, `pitch_x/y/z` (mm), `gear_x/y/z/a`, `vel`/`accel`/`decel` (steps/s, steps/s²), `axis_mask` (bit0=X … bit3=A), `estop_di6` (0=off, 1=default, 2=inverted), `test_mode` (bool), soft limits `min_x`/`max_x`/… (work units; A in configured A units), hardware limits `pos_lim_x`/`neg_lim_x`/… (ClearCore **pin index** 0–12: **0–5** = IO-0…IO-5 configurable in/out — firmware forces input when used as a limit; **6–12** = DI-6…A-12 input-only; **0** or **255** = disabled), `clear_limits`, `clear_min_x`/`clear_max_x`/… (bool), per-axis dynamics `vel_x`/`vel_y`/`vel_z`/`vel_a`/`accel_x`/…/`decel_a` (steps/s, steps/s²; **0** = inherit the global `vel`/`accel`/`decel`), `watchdog_ms` (host keepalive timeout in ms; **0** = disabled, default). Mechanical fields require motors **disabled**; `test_mode`, soft limits, hardware limit pins, per-axis dynamics, and `watchdog_ms` may change while enabled. Soft limits are enforced in **machine (absolute) coordinates** — they bound the physical travel envelope and do **not** move with `set_work_origin`; they reject out-of-range targets. Hardware limits reject moves into an active switch and decelerate-stop during motion (latching `limit_status` in `get_status`, cleared by `clear_alerts`). If `watchdog_ms` is set, the board decelerates to a stop and latches `watchdog_tripped` if no `keepalive`/`enable`/`configure` arrives within the window; further motion is blocked until `keepalive` (or `clear_alerts`). **Persisted to ClearCore NVM** (blob version 5). |
 | `reset_config` | — | Restore compile-time defaults and clear NVM blob. Motors must be **disabled**. |
 | `set_test_mode` | `enabled` or `test_mode` (bool). Omitted params turn **on**. Allowed during `wait_idle`. **Persisted to NVM.** |
 | `set_units` | `units`: `"mm"` or `"inch"` (**NVM**) |
@@ -131,6 +132,19 @@ Both are **blocking** and interruptible by `estop` / `stop` / `queue_clear` (whi
 {"jsonrpc":"2.0","id":30,"method":"configure","params":{"pos_lim_x":7}}
 {"jsonrpc":"2.0","id":31,"method":"home","params":{"axis":"x","dir":"pos","feed":200,"backoff":1.0}}
 {"jsonrpc":"2.0","id":32,"method":"probe","params":{"axis":"z","dir":"neg","pin":8,"feed":100,"zero":true}}
+```
+
+## Safety / limits
+
+- **Soft limits** are enforced in **machine (absolute) coordinates**. They bound the physical travel envelope and do **not** move with `set_work_origin`, so a work-origin shift cannot be used to escape them. Configure with `min_x`/`max_x`/… (work units; A in configured A units) and clear with `clear_min_x`/`clear_max_x`/… or `clear_limits`.
+- **Hardware limits** (`pos_lim_<axis>`/`neg_lim_<axis>`, ClearCore pin index 0–12) reject any move that would start into an already-active switch, and decelerate the active move to a stop if a switch trips mid-move. A tripped hardware limit latches `limit_status` in `get_status` (`{tripped:true,axis,dir}`); clear it with `clear_alerts`.
+- **Per-axis dynamics** (`vel_x`/…/`vel_a`, `accel_x`/…/`accel_a`, `decel_x`/…/`decel_a`) cap each axis independently. A value of **0** means "inherit the global `vel`/`accel`/`decel`". Useful for slowing a Z axis while leaving X/Y fast.
+- **Host watchdog** (`watchdog_ms`): when non-zero, the board expects a `keepalive` (or `enable`/`configure`) within every `watchdog_ms` window. If the host goes silent, the board decelerates to a stop, latches `watchdog_tripped` in `get_status`, and blocks further motion until `keepalive` (or `clear_alerts`) is received. Default **0** (disabled). `keepalive` is allowed during blocking waits.
+
+```json
+{"jsonrpc":"2.0","id":40,"method":"configure","params":{"vel_z":2000,"accel_z":5000,"watchdog_ms":1000}}
+{"jsonrpc":"2.0","id":41,"method":"keepalive","params":{}}
+{"jsonrpc":"2.0","id":42,"method":"get_status","params":{}}
 ```
 
 ## Examples

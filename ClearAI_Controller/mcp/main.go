@@ -163,6 +163,19 @@ type configureArgs struct {
 	NegLimZ      *int     `json:"neg_lim_z,omitempty"`
 	PosLimA      *int     `json:"pos_lim_a,omitempty"`
 	NegLimA      *int     `json:"neg_lim_a,omitempty"`
+	WatchdogMs   *int     `json:"watchdog_ms,omitempty" jsonschema:"host keepalive timeout in ms; 0 disables"`
+	VelX         *int     `json:"vel_x,omitempty" jsonschema:"per-axis velocity cap steps/s; 0 inherits global vel"`
+	VelY         *int     `json:"vel_y,omitempty"`
+	VelZ         *int     `json:"vel_z,omitempty"`
+	VelA         *int     `json:"vel_a,omitempty"`
+	AccelX       *int     `json:"accel_x,omitempty" jsonschema:"per-axis accel cap steps/s^2; 0 inherits global accel"`
+	AccelY       *int     `json:"accel_y,omitempty"`
+	AccelZ       *int     `json:"accel_z,omitempty"`
+	AccelA       *int     `json:"accel_a,omitempty"`
+	DecelX       *int     `json:"decel_x,omitempty" jsonschema:"per-axis decel cap steps/s^2; 0 inherits global decel"`
+	DecelY       *int     `json:"decel_y,omitempty"`
+	DecelZ       *int     `json:"decel_z,omitempty"`
+	DecelA       *int     `json:"decel_a,omitempty"`
 }
 
 func resultJSON(raw json.RawMessage, err error) (*mcp.CallToolResult, any, error) {
@@ -290,6 +303,9 @@ func registerTools(server *mcp.Server, board *rpcClient) {
 	addRPC[probeArgs](server, board, "probe",
 		"Probe along one axis at a slow feed until the probe input DI triggers; reports touch position and optional zero. Blocking.",
 		"probe", 35*time.Second)
+	addRPC[emptyArgs](server, board, "keepalive",
+		"Reset the host watchdog timer and clear any watchdog trip latch. Call periodically (faster than watchdog_ms) while a session is active.",
+		"keepalive", 5*time.Second)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "dwell",
 		Description: "Wait seconds (max 600). Interruptible by estop.",
