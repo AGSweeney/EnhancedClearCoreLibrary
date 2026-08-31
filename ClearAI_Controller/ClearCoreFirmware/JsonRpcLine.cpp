@@ -310,6 +310,37 @@ static void ApplyParam(const char *js, const jsmntok_t *key, const jsmntok_t *va
         p->hasDecelA = true; p->decelA = (n < 0.0) ? 0u : (uint32_t)n;
     } else if (TokenEq(js, key, "watchdog_ms") && TokenNumber(js, val, &n)) {
         p->hasWatchdogMs = true; p->watchdogMs = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "value") && TokenNumber(js, val, &n)) {
+        p->hasAnalogValue = true; p->analogValue = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "microamps") && TokenNumber(js, val, &n)) {
+        p->hasMicroamps = true; p->microamps = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "duty") && TokenNumber(js, val, &n)) {
+        p->hasDuty = true; p->duty = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "debounce_ms") && TokenNumber(js, val, &n)) {
+        p->hasDebounceMs = true; p->debounceMs = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "out_power_on_0") && TokenNumber(js, val, &n)) {
+        p->hasOutPowerOn0 = true; p->outPowerOn0 = (uint8_t)n;
+    } else if (TokenEq(js, key, "out_power_on_1") && TokenNumber(js, val, &n)) {
+        p->hasOutPowerOn1 = true; p->outPowerOn1 = (uint8_t)n;
+    } else if (TokenEq(js, key, "out_power_on_2") && TokenNumber(js, val, &n)) {
+        p->hasOutPowerOn2 = true; p->outPowerOn2 = (uint8_t)n;
+    } else if (TokenEq(js, key, "out_power_on_3") && TokenNumber(js, val, &n)) {
+        p->hasOutPowerOn3 = true; p->outPowerOn3 = (uint8_t)n;
+    } else if (TokenEq(js, key, "out_power_on_4") && TokenNumber(js, val, &n)) {
+        p->hasOutPowerOn4 = true; p->outPowerOn4 = (uint8_t)n;
+    } else if (TokenEq(js, key, "out_power_on_5") && TokenNumber(js, val, &n)) {
+        p->hasOutPowerOn5 = true; p->outPowerOn5 = (uint8_t)n;
+    } else if (TokenEq(js, key, "pins") && val->type == JSMN_ARRAY) {
+        p->hasPins = true;
+        p->pinsCount = 0;
+        const jsmntok_t *child = val + 1;
+        for (int k = 0; k < val->size && p->pinsCount < 13; k++) {
+            double nv;
+            if (TokenNumber(js, child, &nv)) {
+                p->pins[p->pinsCount++] = (uint8_t)nv;
+            }
+            child += 1;
+        }
     } else if (TokenEq(js, key, "state")) {
         if (TokenBool(js, val, &b)) {
             p->hasIoState = true;

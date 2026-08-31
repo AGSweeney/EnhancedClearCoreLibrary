@@ -177,7 +177,13 @@
           "decel_x": { "type": "integer", "description": "Per-axis decel cap steps/s^2; 0 inherits global decel" },
           "decel_y": { "type": "integer" },
           "decel_z": { "type": "integer" },
-          "decel_a": { "type": "integer" }
+          "decel_a": { "type": "integer" },
+          "out_power_on_0": { "type": "integer", "description": "Power-on state for IO-0; 0/1 set, 255 don't care" },
+          "out_power_on_1": { "type": "integer" },
+          "out_power_on_2": { "type": "integer" },
+          "out_power_on_3": { "type": "integer" },
+          "out_power_on_4": { "type": "integer" },
+          "out_power_on_5": { "type": "integer" }
         },
         "additionalProperties": false
       }
@@ -398,10 +404,87 @@
         "required": ["axis", "dir", "pin"],
         "additionalProperties": false
       }
-    },
-    {
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "keepalive",
       "description": "Reset the host watchdog timer and clear any watchdog trip latch. Call periodically (faster than the configured watchdog_ms) while a session is active; also re-arms on enable and configure.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "read_analog",
+      "description": "Read analog voltage (volts) and raw ADC value for A-9..A-12 (pins 9-12). Omit pin to read all analog inputs. Rejects pins reserved as hardware limits.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pin": { "type": "integer", "description": "Analog input pin index 9-12; omit for all" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "write_analog",
+      "description": "Drive IO-0 analog current output (0-20mA). Pass raw 11-bit value (0-2047) or microamps (0-20000). Sets OUTPUT_ANALOG mode automatically. Pin 0 only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pin": { "type": "integer", "description": "Must be 0 (IO-0 analog current output)", "default": 0 },
+          "value": { "type": "integer", "description": "Raw 11-bit DAC value 0-2047" },
+          "microamps": { "type": "integer", "description": "Output current in microamps 0-20000; overrides value" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "write_pwm",
+      "description": "Drive IO-0..IO-5 as PWM output (duty 0-255). Frequency is fixed by the timer. Sets OUTPUT_PWM mode automatically.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pin": { "type": "integer", "description": "Output pin index 0-5" },
+          "duty": { "type": "integer", "description": "PWM duty 0-255" }
+        },
+        "required": ["pin", "duty"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "subscribe_inputs",
+      "description": "Opt-in to edge notifications for the given pins (0-12). input_changed events are pushed on the telemetry stream (port 9101) with {pin,state,edge}. Allowed while a blocking move/home/probe is in progress.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pins": { "type": "array", "items": { "type": "integer" }, "description": "Pin indexes 0-12 to monitor" },
+          "debounce_ms": { "type": "integer", "description": "Min ms between edges per pin; default 5" }
+        },
+        "required": ["pins"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "unsubscribe_inputs",
+      "description": "Stop input edge notifications previously enabled by subscribe_inputs.",
       "parameters": {
         "type": "object",
         "properties": {},

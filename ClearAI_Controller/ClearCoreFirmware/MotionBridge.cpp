@@ -25,6 +25,7 @@
 #include "ClearCore.h"
 #include "NvmManager.h"
 #include "SysTiming.h"
+#include "Transport.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -38,11 +39,12 @@ static NvmManager &Nvm() {
 
 /* User-page blob at NVM_LOC_USER_START (416 bytes available before Teknic reserved). */
 static const uint32_t CLEARAI_NVM_MAGIC = 0x43414943u; /* 'CAIC' */
-static const uint16_t CLEARAI_NVM_VERSION = 5;
+static const uint16_t CLEARAI_NVM_VERSION = 6;
 static const uint16_t CLEARAI_NVM_VERSION_V1 = 1;
 static const uint16_t CLEARAI_NVM_VERSION_V2 = 2;
 static const uint16_t CLEARAI_NVM_VERSION_V3 = 3;
 static const uint16_t CLEARAI_NVM_VERSION_V4 = 4;
+static const uint16_t CLEARAI_NVM_VERSION_V5 = 5;
 
 #pragma pack(push, 1)
 struct ClearAiNvmConfigV1 {
@@ -135,6 +137,37 @@ struct ClearAiNvmConfigV4 {
     uint8_t nvmPad[3];
 };
 
+struct ClearAiNvmConfigV5 {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t size;
+    uint32_t axisMask;
+    uint8_t testMode;
+    uint8_t units;
+    uint8_t mode;
+    uint8_t estopDi6;
+    uint32_t stepsPerRev[CLEARAI_AXIS_COUNT];
+    float pitchMm[CLEARAI_AXIS_COUNT];
+    float gear[CLEARAI_AXIS_COUNT];
+    uint32_t vel;
+    uint32_t accel;
+    uint32_t decel;
+    float feedMmPerMin;
+    uint8_t limitFlags;
+    uint8_t limitPad[3];
+    float limitMin[CLEARAI_AXIS_COUNT];
+    float limitMax[CLEARAI_AXIS_COUNT];
+    uint8_t posLimDi[CLEARAI_AXIS_COUNT];
+    uint8_t negLimDi[CLEARAI_AXIS_COUNT];
+    uint8_t unitsA;
+    uint8_t nvmPad[3];
+    uint32_t velAxis[CLEARAI_AXIS_COUNT];
+    uint32_t accelAxis[CLEARAI_AXIS_COUNT];
+    uint32_t decelAxis[CLEARAI_AXIS_COUNT];
+    uint32_t watchdogMs;
+    uint8_t nvmPad2[4];
+};
+
 struct ClearAiNvmConfig {
     uint32_t magic;
     uint16_t version;
@@ -164,6 +197,9 @@ struct ClearAiNvmConfig {
     uint32_t decelAxis[CLEARAI_AXIS_COUNT];
     uint32_t watchdogMs;
     uint8_t nvmPad2[4];
+    uint8_t outPowerOnState[6];
+    uint8_t outPowerOnMask;
+    uint8_t nvmPad3[3];
 };
 #pragma pack(pop)
 
@@ -206,6 +242,13 @@ static uint32_t g_lastKeepaliveMs = 0;
 static bool g_watchdogTripped = false;
 static uint8_t g_limitTrippedAxis = 0xff;       /* 0xff = none */
 static bool g_limitTrippedPos = false;
+static uint8_t g_pwmDuty[6] = {0};            /* last commanded PWM duty per IO pin */
+static uint8_t g_outPowerOnState[6] = {0};    /* boot state per IO pin (0/1) */
+static uint8_t g_outPowerOnMask = 0;          /* bit i set = apply g_outPowerOnState[i] at boot */
+static uint16_t g_inputSubMask = 0;          /* bits 0-12: subscribed input pins */
+static uint16_t g_inputSubDebounceMs = CLEARAI_INPUT_DEBOUNCE_DEFAULT_MS;
+static uint16_t g_inputState[13] = {0};       /* last reported digital state per pin */
+static uint32_t g_inputLastEdgeMs[13] = {0}; /* last edge timestamp per pin */
 
 static void ApplyLimits();
 
@@ -348,6 +391,13 @@ static void ConfigFillFromLive(ClearAiNvmConfig *cfg) {
     cfg->nvmPad2[1] = 0;
     cfg->nvmPad2[2] = 0;
     cfg->nvmPad2[3] = 0;
+    for (uint8_t i = 0; i < 6; i++) {
+        cfg->outPowerOnState[i] = g_outPowerOnState[i];
+    }
+    cfg->outPowerOnMask = g_outPowerOnMask;
+    cfg->nvmPad3[0] = 0;
+    cfg->nvmPad3[1] = 0;
+    cfg->nvmPad3[2] = 0;
 }
 
 static bool ConfigApplyCommon(const ClearAiNvmConfigV1 *cfg) {
@@ -409,6 +459,12 @@ static const char *PinModeTag(Connector::ConnectorModes mode) {
             return "in";
         case Connector::OUTPUT_DIGITAL:
             return "out";
+        case Connector::OUTPUT_PWM:
+            return "pwm";
+        case Connector::INPUT_ANALOG:
+            return "analog_in";
+        case Connector::OUTPUT_ANALOG:
+            return "analog_out";
         default:
             return "other";
     }
@@ -472,6 +528,28 @@ static void ResetPerAxisDynamics() {
     g_watchdogMs = 0;
 }
 
+static void ResetOutputDefaults() {
+    for (uint8_t i = 0; i < 6; i++) {
+        g_outPowerOnState[i] = 0;
+    }
+    g_outPowerOnMask = 0;
+}
+
+static void ApplyOutputDefaults() {
+    for (uint8_t i = 0; i < 6; i++) {
+        if (!(g_outPowerOnMask & (1u << i))) {
+            continue;
+        }
+        if (PinReservedForLimit(i)) {
+            continue;
+        }
+        Connector *c = LimitInputConnector(i);
+        if (c && c->Mode(Connector::OUTPUT_DIGITAL)) {
+            c->State(g_outPowerOnState[i] ? 1 : 0);
+        }
+    }
+}
+
 static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
     if (cfg->magic != CLEARAI_NVM_MAGIC) {
         return false;
@@ -486,6 +564,7 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         LimitClearAll();
         HwLimClearAll();
         ResetPerAxisDynamics();
+        ResetOutputDefaults();
         return true;
     }
     if (cfg->version == CLEARAI_NVM_VERSION_V2) {
@@ -504,6 +583,7 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         HwLimClearAll();
         g_unitsA = CLEARAI_UNITS_A_DEG;
         ResetPerAxisDynamics();
+        ResetOutputDefaults();
         return true;
     }
     if (cfg->version == CLEARAI_NVM_VERSION_V3) {
@@ -523,6 +603,7 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         }
         g_unitsA = CLEARAI_UNITS_A_DEG;
         ResetPerAxisDynamics();
+        ResetOutputDefaults();
         return true;
     }
     if (cfg->version == CLEARAI_NVM_VERSION_V4) {
@@ -542,6 +623,33 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         }
         g_unitsA = (v4->unitsA == (uint8_t)CLEARAI_UNITS_A_REV) ? CLEARAI_UNITS_A_REV : CLEARAI_UNITS_A_DEG;
         ResetPerAxisDynamics();
+        ResetOutputDefaults();
+        return true;
+    }
+    if (cfg->version == CLEARAI_NVM_VERSION_V5) {
+        if (cfg->size < sizeof(ClearAiNvmConfigV5)) {
+            return false;
+        }
+        const ClearAiNvmConfigV5 *v5 = (const ClearAiNvmConfigV5 *)cfg;
+        if (!ConfigApplyCommon((const ClearAiNvmConfigV1 *)v5)) {
+            return false;
+        }
+        g_limitFlags = v5->limitFlags;
+        for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+            g_limitMin[a] = (double)v5->limitMin[a];
+            g_limitMax[a] = (double)v5->limitMax[a];
+            g_posLimDi[a] = v5->posLimDi[a];
+            g_negLimDi[a] = v5->negLimDi[a];
+        }
+        g_unitsA = (v5->unitsA == (uint8_t)CLEARAI_UNITS_A_REV) ? CLEARAI_UNITS_A_REV : CLEARAI_UNITS_A_DEG;
+        for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+            g_velAxis[a] = v5->velAxis[a];
+            g_accelAxis[a] = v5->accelAxis[a];
+            g_decelAxis[a] = v5->decelAxis[a];
+        }
+        g_watchdogMs = v5->watchdogMs;
+        g_lastKeepaliveMs = Milliseconds();
+        ResetOutputDefaults();
         return true;
     }
     if (cfg->version != CLEARAI_NVM_VERSION) {
@@ -568,6 +676,10 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
     }
     g_watchdogMs = cfg->watchdogMs;
     g_lastKeepaliveMs = Milliseconds();
+    for (uint8_t i = 0; i < 6; i++) {
+        g_outPowerOnState[i] = cfg->outPowerOnState[i];
+    }
+    g_outPowerOnMask = cfg->outPowerOnMask;
     return true;
 }
 
@@ -997,6 +1109,7 @@ bool MotionInit() {
     g_interrupted = false;
     g_nvmLoaded = false;
     ResetPerAxisDynamics();
+    ResetOutputDefaults();
     g_watchdogTripped = false;
     g_limitTrippedAxis = 0xff;
     g_limitTrippedPos = false;
@@ -1007,6 +1120,9 @@ bool MotionInit() {
     MotorMgr.MotorModeSet(MotorManager::MOTOR_ALL, Connector::CPM_MODE_STEP_AND_DIR);
     Delay_ms(50);
     ApplyHwLimitDiModes();
+    /* IO-0 DAC is initialized by the board setup; Mode(OUTPUT_ANALOG) in
+     * write_analog enables it. Just apply output power-on defaults. */
+    ApplyOutputDefaults();
 
     motorX.EnableRequest(false);
     motorY.EnableRequest(false);
@@ -1129,7 +1245,9 @@ const char *MotionConfigure(const RpcParams *p) {
         p->hasClearMinZ || p->hasClearMaxZ || p->hasClearMinA || p->hasClearMaxA ||
         p->hasPosLimX || p->hasNegLimX || p->hasPosLimY || p->hasNegLimY ||
         p->hasPosLimZ || p->hasNegLimZ || p->hasPosLimA || p->hasNegLimA;
-    const bool safetyChange = p->hasWatchdogMs;
+    const bool safetyChange = p->hasWatchdogMs ||
+        p->hasOutPowerOn0 || p->hasOutPowerOn1 || p->hasOutPowerOn2 ||
+        p->hasOutPowerOn3 || p->hasOutPowerOn4 || p->hasOutPowerOn5;
     const bool testOnly = p->hasTestMode && !mechChange && !limitChange && !safetyChange;
 
     if (mechChange && g_enabled) {
@@ -1145,6 +1263,26 @@ const char *MotionConfigure(const RpcParams *p) {
     if (p->hasWatchdogMs) {
         g_watchdogMs = p->watchdogMs;
         MotionKeepalive();  /* re-arm timer and clear any trip on change */
+    }
+    {
+        const uint8_t *src[6] = {p->hasOutPowerOn0 ? &p->outPowerOn0 : nullptr,
+                                 p->hasOutPowerOn1 ? &p->outPowerOn1 : nullptr,
+                                 p->hasOutPowerOn2 ? &p->outPowerOn2 : nullptr,
+                                 p->hasOutPowerOn3 ? &p->outPowerOn3 : nullptr,
+                                 p->hasOutPowerOn4 ? &p->outPowerOn4 : nullptr,
+                                 p->hasOutPowerOn5 ? &p->outPowerOn5 : nullptr};
+        for (uint8_t i = 0; i < 6; i++) {
+            if (!src[i]) {
+                continue;
+            }
+            uint8_t v = *src[i];
+            if (v == 255) {
+                g_outPowerOnMask &= (uint8_t)~(1u << i);
+            } else {
+                g_outPowerOnState[i] = (v != 0) ? 1 : 0;
+                g_outPowerOnMask |= (uint8_t)(1u << i);
+            }
+        }
     }
 
     if (p->hasClearLimits && p->clearLimits) {
@@ -1412,6 +1550,7 @@ const char *MotionResetConfig() {
     g_estopDi6 = 1;
     g_testMode = (CLEARAI_TEST_MODE_DEFAULT != 0);
     ResetPerAxisDynamics();
+    ResetOutputDefaults();
     g_watchdogTripped = false;
     g_limitTrippedAxis = 0xff;
     g_limitTrippedPos = false;
@@ -1806,6 +1945,215 @@ const char *MotionWriteOutput(const RpcParams *p) {
     return nullptr;
 }
 
+static DigitalInAnalogIn *AnalogInConnector(uint8_t pinIndex) {
+    switch (pinIndex) {
+        case 9:  return &ConnectorA9;
+        case 10: return &ConnectorA10;
+        case 11: return &ConnectorA11;
+        case 12: return &ConnectorA12;
+        default: return nullptr;
+    }
+}
+
+static DigitalInOut *PwmOutConnector(uint8_t pinIndex) {
+    switch (pinIndex) {
+        case 0: return &ConnectorIO0;
+        case 1: return &ConnectorIO1;
+        case 2: return &ConnectorIO2;
+        case 3: return &ConnectorIO3;
+        case 4: return &ConnectorIO4;
+        case 5: return &ConnectorIO5;
+        default: return nullptr;
+    }
+}
+
+const char *MotionReadAnalog(const RpcParams *p, char *buf, uint16_t bufLen) {
+    uint8_t startPin = 9;
+    uint8_t endPin = 12;
+    if (p->hasPin) {
+        if (p->pin < 9 || p->pin > 12) {
+            return "pin must be 9-12";
+        }
+        startPin = (uint8_t)p->pin;
+        endPin = startPin;
+    }
+    int pos = snprintf(buf, bufLen, "{\"pins\":[");
+    if (pos < 0 || (uint16_t)pos >= bufLen) {
+        buf[0] = '\0';
+        return nullptr;
+    }
+    bool first = true;
+    for (uint8_t pin = startPin; pin <= endPin; pin++) {
+        if (PinReservedForLimit(pin)) {
+            continue;
+        }
+        DigitalInAnalogIn *a = AnalogInConnector(pin);
+        if (!a) {
+            continue;
+        }
+        a->Mode(Connector::INPUT_ANALOG);
+        const float volts = a->AnalogVoltage();
+        const int16_t raw = a->State();
+        const int n = snprintf(buf + pos, (size_t)(bufLen - (uint16_t)pos),
+                               "%s{\"pin\":%u,\"volts\":%.3f,\"raw\":%d}",
+                               first ? "" : ",", (unsigned)pin, (double)volts, (int)raw);
+        if (n < 0) {
+            break;
+        }
+        pos += n;
+        first = false;
+        if ((uint16_t)pos >= bufLen) {
+            break;
+        }
+    }
+    if ((uint16_t)pos + 2 < bufLen) {
+        snprintf(buf + pos, (size_t)(bufLen - (uint16_t)pos), "]}");
+    }
+    return nullptr;
+}
+
+const char *MotionWriteAnalog(const RpcParams *p) {
+    if (!p->hasPin) {
+        return "pin required";
+    }
+    if (p->pin != 0) {
+        return "analog output is pin 0 only";
+    }
+    if (PinReservedForLimit(0)) {
+        return "pin reserved for limit";
+    }
+    if (p->hasMicroamps) {
+        if (!ConnectorIO0.Mode(Connector::OUTPUT_ANALOG)) {
+            return "analog mode rejected";
+        }
+        ConnectorIO0.OutputCurrent((uint16_t)p->microamps);
+        return nullptr;
+    }
+    if (!p->hasAnalogValue) {
+        return "value or microamps required";
+    }
+    if (p->analogValue > 2047) {
+        return "value must be 0-2047";
+    }
+    if (!ConnectorIO0.Mode(Connector::OUTPUT_ANALOG)) {
+        return "analog mode rejected";
+    }
+    ConnectorIO0.AnalogWrite((uint16_t)p->analogValue);
+    return nullptr;
+}
+
+const char *MotionWritePwm(const RpcParams *p) {
+    if (!p->hasPin) {
+        return "pin required";
+    }
+    if (!p->hasDuty) {
+        return "duty required";
+    }
+    if (p->pin > 5) {
+        return "pin not output capable";
+    }
+    if (PinReservedForLimit((uint8_t)p->pin)) {
+        return "pin reserved for limit";
+    }
+    DigitalInOut *connector = PwmOutConnector((uint8_t)p->pin);
+    if (!connector) {
+        return "pin missing";
+    }
+    if (!connector->Mode(Connector::OUTPUT_PWM)) {
+        return "pwm mode rejected";
+    }
+    if (!connector->PwmDuty((uint8_t)p->duty)) {
+        return "pwm rejected";
+    }
+    g_pwmDuty[(uint8_t)p->pin] = (uint8_t)p->duty;
+    return nullptr;
+}
+
+const char *MotionSubscribeInputs(const RpcParams *p, char *buf, uint16_t bufLen) {
+    if (!p->hasPins || p->pinsCount == 0) {
+        g_inputSubMask = 0;
+        snprintf(buf, bufLen, "{\"subscribed\":[]}");
+        return nullptr;
+    }
+    uint16_t mask = 0;
+    int pos = snprintf(buf, bufLen, "{\"subscribed\":[");
+    if (pos < 0 || (uint16_t)pos >= bufLen) {
+        buf[0] = '\0';
+        return nullptr;
+    }
+    bool first = true;
+    for (uint8_t i = 0; i < p->pinsCount; i++) {
+        uint8_t pin = p->pins[i];
+        if (pin > 12) {
+            return "pin must be 0-12";
+        }
+        mask |= (uint16_t)(1u << pin);
+        const int n = snprintf(buf + pos, (size_t)(bufLen - (uint16_t)pos),
+                               "%s%u", first ? "" : ",", (unsigned)pin);
+        if (n < 0) {
+            break;
+        }
+        pos += n;
+        first = false;
+        if ((uint16_t)pos >= bufLen) {
+            break;
+        }
+    }
+    if ((uint16_t)pos + 2 < bufLen) {
+        snprintf(buf + pos, (size_t)(bufLen - (uint16_t)pos), "]}");
+    }
+    g_inputSubMask = mask;
+    if (p->hasDebounceMs) {
+        g_inputSubDebounceMs = p->debounceMs;
+    }
+    /* Seed current state so we only emit edges after subscription. */
+    for (uint8_t pin = 0; pin <= 12; pin++) {
+        if (mask & (1u << pin)) {
+            Connector *c = LimitInputConnector(pin);
+            g_inputState[pin] = c ? ((c->State() != 0) ? 1 : 0) : 0;
+            g_inputLastEdgeMs[pin] = Milliseconds();
+        }
+    }
+    return nullptr;
+}
+
+const char *MotionUnsubscribeInputs() {
+    g_inputSubMask = 0;
+    return nullptr;
+}
+
+void MotionPollInputs() {
+    if (g_inputSubMask == 0) {
+        return;
+    }
+    const uint32_t now = Milliseconds();
+    for (uint8_t pin = 0; pin <= 12; pin++) {
+        if (!(g_inputSubMask & (1u << pin))) {
+            continue;
+        }
+        Connector *c = LimitInputConnector(pin);
+        if (!c) {
+            continue;
+        }
+        const uint16_t state = (c->State() != 0) ? 1 : 0;
+        if (state == g_inputState[pin]) {
+            continue;
+        }
+        if ((now - g_inputLastEdgeMs[pin]) < g_inputSubDebounceMs) {
+            continue;
+        }
+        g_inputState[pin] = state;
+        g_inputLastEdgeMs[pin] = now;
+        char line[64];
+        snprintf(line, sizeof(line),
+                 "{\"pin\":%u,\"state\":%u,\"edge\":\"%s\"}",
+                 (unsigned)pin, (unsigned)state, state ? "rising" : "falling");
+        char notif[160];
+        JsonRpcFormatNotification(notif, sizeof(notif), "input_changed", line);
+        TransportSendTelemetryLine(notif);
+    }
+}
+
 const char *MotionQueueClear() {
     /* StopDecel() decelerates the active coordinated segment to a stop and
      * drops all pending queued segments (it zeros the planner queue counts). */
@@ -2103,7 +2451,9 @@ void MotionFillCapabilitiesJson(char *buf, uint16_t bufLen) {
              "\"configure\",\"reset_config\",\"set_test_mode\",\"set_units\",\"set_units_a\",\"set_mode\","
              "\"set_work_origin\",\"move_linear\",\"move_arc\",\"jog\",\"dwell\","
              "\"read_inputs\",\"write_output\",\"queue_status\",\"queue_clear\","
-             "\"home\",\"probe\",\"keepalive\"],"
+             "\"home\",\"probe\",\"keepalive\","
+             "\"read_analog\",\"write_analog\",\"write_pwm\","
+             "\"subscribe_inputs\",\"unsubscribe_inputs\"],"
              "\"tcp\":%u,\"tel\":%u,\"discover\":%u}",
              CLEARAI_PROTOCOL_VERSION,
              (unsigned long)g_axisMask,
@@ -2123,6 +2473,7 @@ void MotionFillConfigJson(char *buf, uint16_t bufLen) {
     Nvm().BlockRead(NvmManager::NVM_LOC_USER_START, (int)sizeof(stored), (uint8_t *)&stored);
     storedOk = (stored.magic == CLEARAI_NVM_MAGIC &&
                 (stored.version == CLEARAI_NVM_VERSION ||
+                 stored.version == CLEARAI_NVM_VERSION_V5 ||
                  stored.version == CLEARAI_NVM_VERSION_V4 ||
                  stored.version == CLEARAI_NVM_VERSION_V3 ||
                  stored.version == CLEARAI_NVM_VERSION_V2 ||
@@ -2155,7 +2506,9 @@ void MotionFillConfigJson(char *buf, uint16_t bufLen) {
              "\"vel_axis\":[%lu,%lu,%lu,%lu],"
              "\"accel_axis\":[%lu,%lu,%lu,%lu],"
              "\"decel_axis\":[%lu,%lu,%lu,%lu],"
-             "\"watchdog_ms\":%lu}",
+             "\"watchdog_ms\":%lu,"
+             "\"out_power_on_state\":[%u,%u,%u,%u,%u,%u],"
+             "\"out_power_on_mask\":%u}",
              g_nvmLoaded ? "true" : "false",
              storedOk ? "true" : "false",
              (unsigned)(storedOk ? stored.version : 0),
@@ -2184,7 +2537,11 @@ void MotionFillConfigJson(char *buf, uint16_t bufLen) {
              (unsigned long)g_accelAxis[2], (unsigned long)g_accelAxis[3],
              (unsigned long)g_decelAxis[0], (unsigned long)g_decelAxis[1],
              (unsigned long)g_decelAxis[2], (unsigned long)g_decelAxis[3],
-             (unsigned long)g_watchdogMs);
+             (unsigned long)g_watchdogMs,
+             (unsigned)g_outPowerOnState[0], (unsigned)g_outPowerOnState[1],
+             (unsigned)g_outPowerOnState[2], (unsigned)g_outPowerOnState[3],
+             (unsigned)g_outPowerOnState[4], (unsigned)g_outPowerOnState[5],
+             (unsigned)g_outPowerOnMask);
 }
 
 static void FormatHlfbPercentArray(char *out, size_t outLen, const MotionStatus *st) {
@@ -2225,6 +2582,11 @@ static void FillPoseObject(char *buf, uint16_t bufLen, bool withFlags) {
             snprintf(limitStatus, sizeof(limitStatus),
                       "{\"tripped\":false}");
         }
+        char pwmDuty[40];
+        snprintf(pwmDuty, sizeof(pwmDuty), "[%u,%u,%u,%u,%u,%u]",
+                 (unsigned)g_pwmDuty[0], (unsigned)g_pwmDuty[1],
+                 (unsigned)g_pwmDuty[2], (unsigned)g_pwmDuty[3],
+                 (unsigned)g_pwmDuty[4], (unsigned)g_pwmDuty[5]);
         snprintf(buf, bufLen,
                  "{\"enabled\":%s,\"moving\":%s,\"hlfb\":%s,\"estop\":%s,\"hw_estop\":%s,"
                  "\"test_mode\":%s,\"alerts\":%s,"
@@ -2232,7 +2594,8 @@ static void FillPoseObject(char *buf, uint16_t bufLen, bool withFlags) {
                  "\"units\":\"%s\",\"units_a\":\"%s\",\"mode\":\"%s\","
                  "\"axis_mask\":%lu,\"x\":%.4f,\"y\":%.4f,\"z\":%.4f,\"a\":%.4f,"
                  "\"hlfb_percent\":%s,"
-                 "\"watchdog_ms\":%lu,\"watchdog_tripped\":%s,\"limit_status\":%s}",
+                 "\"watchdog_ms\":%lu,\"watchdog_tripped\":%s,\"limit_status\":%s,"
+                 "\"pwm_duty\":%s}",
                  st.enabled ? "true" : "false",
                  st.moving ? "true" : "false",
                  st.hlfb ? "true" : "false",
@@ -2251,7 +2614,8 @@ static void FillPoseObject(char *buf, uint16_t bufLen, bool withFlags) {
                  hlfbArr,
                  (unsigned long)st.watchdogMs,
                  st.watchdogTripped ? "true" : "false",
-                 limitStatus);
+                 limitStatus,
+                 pwmDuty);
     } else {
         snprintf(buf, bufLen,
                  "{\"units\":\"%s\",\"units_a\":\"%s\",\"mode\":\"%s\","

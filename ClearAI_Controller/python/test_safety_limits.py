@@ -33,7 +33,7 @@ def main() -> int:
     for k in ("vel_axis", "accel_axis", "decel_axis", "watchdog_ms"):
         if k not in cfg:
             errors.append(f"get_config missing {k}")
-    if cfg.get("nvm_version") not in (4, 5):
+    if cfg.get("nvm_version") not in (4, 5, 6):
         errors.append(f"nvm_version unexpected: {cfg.get('nvm_version')}")
 
     # ---- get_status should report watchdog + limit_status ----
@@ -56,8 +56,8 @@ def main() -> int:
     print("vel_axis =", cfg.get("vel_axis"), "nvm_version =", cfg.get("nvm_version"))
     if cfg.get("vel_axis", [None])[2] != 2000:
         errors.append(f"vel_z not applied: {cfg.get('vel_axis')}")
-    if cfg.get("nvm_version") != 5:
-        errors.append(f"nvm_version expected 5 after save, got {cfg.get('nvm_version')}")
+    if cfg.get("nvm_version") != 6:
+        errors.append(f"nvm_version expected 6 after save, got {cfg.get('nvm_version')}")
 
     # clear it back to inherit
     client.call("configure", {"vel_z": 0})

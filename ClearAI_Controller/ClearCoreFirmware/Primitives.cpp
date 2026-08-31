@@ -56,7 +56,9 @@ static bool IsSafetyMethod(const char *method) {
            strcmp(method, "stop") == 0 ||
            strcmp(method, "disable") == 0 ||
            strcmp(method, "queue_clear") == 0 ||
-           strcmp(method, "keepalive") == 0;
+           strcmp(method, "keepalive") == 0 ||
+           strcmp(method, "subscribe_inputs") == 0 ||
+           strcmp(method, "unsubscribe_inputs") == 0;
 }
 
 static void DispatchParsed(const RpcRequest *req) {
@@ -105,6 +107,49 @@ static void DispatchParsed(const RpcRequest *req) {
         } else {
             ReplyOk(id);
         }
+        return;
+    }
+    if (strcmp(method, "read_analog") == 0) {
+        char body[CLEARAI_MAX_REPLY];
+        const char *err = MotionReadAnalog(p, body, sizeof(body));
+        if (err) {
+            ReplyError(id, JSONRPC_INVALID_PARAMS, err);
+        } else {
+            ReplyResult(id, body);
+        }
+        return;
+    }
+    if (strcmp(method, "write_analog") == 0) {
+        const char *err = MotionWriteAnalog(p);
+        if (err) {
+            ReplyError(id, JSONRPC_APP_ERROR, err);
+        } else {
+            ReplyOk(id);
+        }
+        return;
+    }
+    if (strcmp(method, "write_pwm") == 0) {
+        const char *err = MotionWritePwm(p);
+        if (err) {
+            ReplyError(id, JSONRPC_APP_ERROR, err);
+        } else {
+            ReplyOk(id);
+        }
+        return;
+    }
+    if (strcmp(method, "subscribe_inputs") == 0) {
+        char body[CLEARAI_MAX_REPLY];
+        const char *err = MotionSubscribeInputs(p, body, sizeof(body));
+        if (err) {
+            ReplyError(id, JSONRPC_APP_ERROR, err);
+        } else {
+            ReplyResult(id, body);
+        }
+        return;
+    }
+    if (strcmp(method, "unsubscribe_inputs") == 0) {
+        MotionUnsubscribeInputs();
+        ReplyOk(id);
         return;
     }
     if (strcmp(method, "enable") == 0) {
@@ -315,11 +360,12 @@ bool PrimitivesPollSafetyDuringWait() {
         g_safetyHit = true;
         return true;
     }
-    if (strcmp(req.method, "get_status") == 0 ||
+    if (        strcmp(req.method, "get_status") == 0 ||
         strcmp(req.method, "get_pose") == 0 ||
         strcmp(req.method, "get_capabilities") == 0 ||
         strcmp(req.method, "get_config") == 0 ||
         strcmp(req.method, "read_inputs") == 0 ||
+        strcmp(req.method, "read_analog") == 0 ||
         strcmp(req.method, "queue_status") == 0 ||
         strcmp(req.method, "set_test_mode") == 0) {
         DispatchParsed(&req);

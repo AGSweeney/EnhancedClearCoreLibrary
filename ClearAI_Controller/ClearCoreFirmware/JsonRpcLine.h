@@ -61,6 +61,9 @@ struct RpcParams {
     bool hasAccelX, hasAccelY, hasAccelZ, hasAccelA;
     bool hasDecelX, hasDecelY, hasDecelZ, hasDecelA;
     bool hasWatchdogMs;
+    bool hasAnalogValue, hasMicroamps, hasDuty;
+    bool hasOutPowerOn0, hasOutPowerOn1, hasOutPowerOn2, hasOutPowerOn3, hasOutPowerOn4, hasOutPowerOn5;
+    bool hasPins, hasDebounceMs;
     double x, y, z, a;
     double i, j, feed, seconds;
     uint32_t timeoutMs;
@@ -93,6 +96,13 @@ struct RpcParams {
     uint32_t accelX, accelY, accelZ, accelA;
     uint32_t decelX, decelY, decelZ, decelA;
     uint32_t watchdogMs;
+    uint32_t analogValue;
+    uint32_t microamps;
+    uint32_t duty;
+    uint8_t outPowerOn0, outPowerOn1, outPowerOn2, outPowerOn3, outPowerOn4, outPowerOn5;
+    uint8_t pins[13];
+    uint8_t pinsCount;
+    uint32_t debounceMs;
 };
 
 struct RpcRequest {

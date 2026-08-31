@@ -1,6 +1,6 @@
 """ClearAI host: JSON-RPC Lines client for Code as Policies gantry primitives."""
 
-from .client import ClearAiClient, discover
+from .client import ClearAiClient, TelemetryReader, discover
 from .primitives import (
     clear_alerts,
     configure,
@@ -25,6 +25,11 @@ from .primitives import (
     stop,
     wait_idle,
     write_output,
+    read_analog,
+    write_analog,
+    write_pwm,
+    subscribe_inputs,
+    unsubscribe_inputs,
     queue_status,
     queue_clear,
     home,
@@ -35,6 +40,7 @@ from .primitives import (
 
 __all__ = [
     "ClearAiClient",
+    "TelemetryReader",
     "clear_alerts",
     "configure",
     "connect_serial",
@@ -59,6 +65,11 @@ __all__ = [
     "stop",
     "wait_idle",
     "write_output",
+    "read_analog",
+    "write_analog",
+    "write_pwm",
+    "subscribe_inputs",
+    "unsubscribe_inputs",
     "queue_status",
     "queue_clear",
     "home",

@@ -193,3 +193,86 @@ class ClearAiClient:
                 err = obj["error"] or {}
                 raise ClearAiError(int(err.get("code", -32000)), str(err.get("message", "error")))
             return obj.get("result")
+
+
+class TelemetryReader:
+    """Reads JSON-RPC notifications from the ClearAI telemetry stream (port 9101).
+
+    Dispatches ``status`` and ``input_changed`` notifications to a user callback
+    in a background thread. Usage::
+
+        def on_event(method, params):
+            print(method, params)
+
+        reader = TelemetryReader("172.16.82.113")
+        reader.start(on_event)
+        ...
+        reader.stop()
+    """
+
+    def __init__(self, host: str, port: int = 9101) -> None:
+        self._host = host
+        self._port = port
+        self._sock: Optional[socket.socket] = None
+        self._thread = None
+        self._stop = False
+        self._rx = b""
+        self._callback = None
+
+    def start(self, callback, timeout: float = 3.0) -> None:
+        if self._thread is not None:
+            raise RuntimeError("TelemetryReader already running")
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._sock.settimeout(timeout)
+        self._sock.connect((self._host, self._port))
+        self._sock.settimeout(0.5)
+        self._stop = False
+        self._rx = b""
+        self._callback = callback
+        import threading
+
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _read_line(self) -> Optional[str]:
+        while b"\n" not in self._rx:
+            try:
+                chunk = self._sock.recv(4096)
+            except socket.timeout:
+                return None
+            if not chunk:
+                raise TimeoutError("ClearAI telemetry closed")
+            self._rx += chunk
+        line, self._rx = self._rx.split(b"\n", 1)
+        return line.decode("utf-8", errors="replace").strip()
+
+    def _run(self) -> None:
+        while not self._stop:
+            try:
+                line = self._read_line()
+            except (socket.timeout, TimeoutError, OSError):
+                continue
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(obj, dict) or "method" not in obj:
+                continue
+            try:
+                self._callback(obj.get("method"), obj.get("params"))
+            except Exception:
+                pass
+
+    def stop(self) -> None:
+        self._stop = True
+        if self._sock is not None:
+            try:
+                self._sock.close()
+            except OSError:
+                pass
+            self._sock = None
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+            self._thread = None

@@ -95,5 +95,11 @@ void MotionFillTelemetryJson(char *buf, uint16_t bufLen);
 
 const char *MotionReadInputs(const RpcParams *p, char *buf, uint16_t bufLen);
 const char *MotionWriteOutput(const RpcParams *p);
+const char *MotionReadAnalog(const RpcParams *p, char *buf, uint16_t bufLen);
+const char *MotionWriteAnalog(const RpcParams *p);
+const char *MotionWritePwm(const RpcParams *p);
+const char *MotionSubscribeInputs(const RpcParams *p, char *buf, uint16_t bufLen);
+const char *MotionUnsubscribeInputs();
+void MotionPollInputs();
 
 #endif

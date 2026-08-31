@@ -98,6 +98,26 @@ type writeOutputArgs struct {
 	State bool `json:"state" jsonschema:"true=high false=low"`
 }
 
+type readAnalogArgs struct {
+	Pin *int `json:"pin,omitempty" jsonschema:"A-9..A-12 pin index; omit for all analog inputs"`
+}
+
+type writeAnalogArgs struct {
+	Pin       int  `json:"pin" jsonschema:"must be 0 (IO-0 analog current output)"`
+	Value     *int `json:"value,omitempty" jsonschema:"raw 11-bit DAC 0-2047 (0-20mA)"`
+	Microamps *int `json:"microamps,omitempty" jsonschema:"output current in microamps (0-20000); overrides value"`
+}
+
+type writePwmArgs struct {
+	Pin  int `json:"pin" jsonschema:"IO pin index 0-5 only"`
+	Duty int `json:"duty" jsonschema:"PWM duty 0-255"`
+}
+
+type subscribeInputsArgs struct {
+	Pins       []int `json:"pins" jsonschema:"array of pin indexes 0-12 to monitor for edges"`
+	DebounceMs *int  `json:"debounce_ms,omitempty" jsonschema:"min ms between edges per pin; default 5"`
+}
+
 type homeArgs struct {
 	Axis      string   `json:"axis" jsonschema:"x, y, z, or a"`
 	Dir       string   `json:"dir" jsonschema:"pos or neg (which limit to seek)"`
@@ -176,6 +196,12 @@ type configureArgs struct {
 	DecelY       *int     `json:"decel_y,omitempty"`
 	DecelZ       *int     `json:"decel_z,omitempty"`
 	DecelA       *int     `json:"decel_a,omitempty"`
+	OutPowerOn0  *int     `json:"out_power_on_0,omitempty" jsonschema:"power-on state for IO-0; 0/1 set, 255 don't care"`
+	OutPowerOn1  *int     `json:"out_power_on_1,omitempty"`
+	OutPowerOn2  *int     `json:"out_power_on_2,omitempty"`
+	OutPowerOn3  *int     `json:"out_power_on_3,omitempty"`
+	OutPowerOn4  *int     `json:"out_power_on_4,omitempty"`
+	OutPowerOn5  *int     `json:"out_power_on_5,omitempty"`
 }
 
 func resultJSON(raw json.RawMessage, err error) (*mcp.CallToolResult, any, error) {
@@ -306,6 +332,21 @@ func registerTools(server *mcp.Server, board *rpcClient) {
 	addRPC[emptyArgs](server, board, "keepalive",
 		"Reset the host watchdog timer and clear any watchdog trip latch. Call periodically (faster than watchdog_ms) while a session is active.",
 		"keepalive", 5*time.Second)
+	addRPC[readAnalogArgs](server, board, "read_analog",
+		"Read analog voltage (volts) and raw ADC for A-9..A-12. Optional pin for one connector.",
+		"read_analog", 5*time.Second)
+	addRPC[writeAnalogArgs](server, board, "write_analog",
+		"Drive IO-0 analog current output: raw 11-bit value (0-2047, 0-20mA) or microamps.",
+		"write_analog", 5*time.Second)
+	addRPC[writePwmArgs](server, board, "write_pwm",
+		"Drive IO-0..IO-5 as PWM output (duty 0-255). Frequency is fixed by the timer.",
+		"write_pwm", 5*time.Second)
+	addRPC[subscribeInputsArgs](server, board, "subscribe_inputs",
+		"Opt-in to edge notifications for the given pins (0-12). input_changed events are pushed on the telemetry stream (port 9101).",
+		"subscribe_inputs", 5*time.Second)
+	addRPC[emptyArgs](server, board, "unsubscribe_inputs",
+		"Stop input edge notifications previously enabled by subscribe_inputs.",
+		"unsubscribe_inputs", 5*time.Second)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "dwell",
 		Description: "Wait seconds (max 600). Interruptible by estop.",

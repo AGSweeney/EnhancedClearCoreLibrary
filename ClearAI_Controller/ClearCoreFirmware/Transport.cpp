@@ -183,7 +183,7 @@ void TransportPollTelemetry() {
         return;
     }
     g_lastTelemetryMs = now;
-    char pose[448];
+    char pose[512];
     MotionFillTelemetryJson(pose, sizeof(pose));
     char line[CLEARAI_MAX_REPLY];
     JsonRpcFormatNotification(line, sizeof(line), "status", pose);

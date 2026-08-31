@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 
+# Cursor IDE local state (MCP config, plans, etc.)
+.cursor/
+
 # Atmel Studio / ClearCore firmware build outputs (keep Makefile + makedep.mk)
 ClearAI_Controller/ClearCoreFirmware/Debug/*.o
 ClearAI_Controller/ClearCoreFirmware/Debug/*.d

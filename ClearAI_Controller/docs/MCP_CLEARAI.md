@@ -40,15 +40,15 @@ All tools mirror firmware methods unless noted. Motion tools are non-blocking; a
 | Tool | Description |
 |------|-------------|
 | `get_capabilities` | Protocol version, axes, units, mode, method list, ports |
-| `get_status` | Enable/moving/HLFB/estop/test_mode/alerts/queue/`queue_active`/`units_a`/`hlfb_percent` (per-axis torque %)/`watchdog_ms`/`watchdog_tripped`/`limit_status`/pose |
+| `get_status` | Enable/moving/HLFB/estop/test_mode/alerts/queue/`queue_active`/`units_a`/`hlfb_percent` (per-axis torque %)/`watchdog_ms`/`watchdog_tripped`/`limit_status`/`pwm_duty`/pose |
 | `get_pose` | Work coordinates x,y,z,a (A in configured A units) |
-| `get_config` | Live config + NVM validity (`axis_mask`, test_mode, mechanics, vel, `units_a`, soft limits, hw limit DIs, `vel_axis`/`accel_axis`/`decel_axis`, `watchdog_ms`, …) |
+| `get_config` | Live config + NVM validity (`axis_mask`, test_mode, mechanics, vel, `units_a`, soft limits, hw limit DIs, `vel_axis`/`accel_axis`/`decel_axis`, `watchdog_ms`, `out_power_on_state`/`out_power_on_mask`, …) |
 | `enable` / `disable` | Enable or abrupt disable |
 | `clear_alerts` | Clear motor alert flags |
 | `stop` | Decelerate; motors stay enabled |
 | `estop` | Immediate stop + disable |
 | `wait_idle` | Block until idle or `timeout_ms` |
-| `configure` | Mechanics, `axis_mask`, vel/accel/decel, per-axis `vel_x`/…/`decel_a` (0=inherit), soft limits (machine-coord), hardware limit DIs (`pos_lim_x`/…), `watchdog_ms`, optional `test_mode` (**NVM**) |
+| `configure` | Mechanics, `axis_mask`, vel/accel/decel, per-axis `vel_x`/…/`decel_a` (0=inherit), soft limits (machine-coord), hardware limit DIs (`pos_lim_x`/…), `watchdog_ms`, `out_power_on_0`/…/`out_power_on_5` (0/1 set, 255 don't care), optional `test_mode` (**NVM v6**) |
 | `reset_config` | Compile defaults + clear NVM (motors disabled) |
 | `set_test_mode` | Bench gate bypass (**NVM**) |
 | `set_units` | `mm` or `inch` |
@@ -61,6 +61,11 @@ All tools mirror firmware methods unless noted. Motion tools are non-blocking; a
 | `dwell` | Wait seconds (max 600) |
 | `read_inputs` | Optional pin 0–12; raw digital state for onboard I/O |
 | `write_output` | Drive IO-0…IO-5 high/low |
+| `read_analog` | Read analog voltage (V) + raw ADC for A-9…A-12 |
+| `write_analog` | Drive IO-0 analog current output (raw 0–2047 or microamps) |
+| `write_pwm` | Drive IO-0…IO-5 as PWM (duty 0–255; fixed frequency) |
+| `subscribe_inputs` | Opt-in edge notifications for pins 0–12 (events on telemetry 9101) |
+| `unsubscribe_inputs` | Stop input edge notifications |
 | `queue_status` | Pending coordinated queue depth + active flag |
 | `queue_clear` | Decelerate active move + drop pending queued segments |
 | `home` | Seek configured hw limit for `axis`/`dir`, stop, optional backoff + zero |

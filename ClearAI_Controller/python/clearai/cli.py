@@ -41,6 +41,11 @@ METHODS = (
     "home",
     "probe",
     "keepalive",
+    "read_analog",
+    "write_analog",
+    "write_pwm",
+    "subscribe_inputs",
+    "unsubscribe_inputs",
 )
 
 
@@ -116,9 +121,23 @@ def main(argv: Optional[list[str]] = None) -> int:
             sp.add_argument("--seconds", type=float, required=True)
         if name == "read_inputs":
             sp.add_argument("--pin", type=int)
+        if name == "read_analog":
+            sp.add_argument("--pin", type=int)
         if name == "write_output":
             sp.add_argument("--pin", type=int, required=True)
             sp.add_argument("--state", type=int, choices=(0, 1), required=True)
+        if name == "write_analog":
+            sp.add_argument("--pin", type=int, default=0)
+            sp.add_argument("--value", type=int)
+            sp.add_argument("--microamps", type=int)
+        if name == "write_pwm":
+            sp.add_argument("--pin", type=int, required=True)
+            sp.add_argument("--duty", type=int, required=True)
+        if name == "subscribe_inputs":
+            sp.add_argument("--pin", type=int, nargs="+", required=True)
+            sp.add_argument("--debounce-ms", type=int)
+        if name == "unsubscribe_inputs":
+            pass
         if name in ("home", "probe"):
             sp.add_argument("--axis", required=True, choices=("x", "y", "z", "a"))
             sp.add_argument("--dir", required=True, choices=("pos", "neg"))
@@ -183,6 +202,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             sp.add_argument("--decel-y", type=int)
             sp.add_argument("--decel-z", type=int)
             sp.add_argument("--decel-a", type=int)
+            sp.add_argument("--out-power-on-0", type=int)
+            sp.add_argument("--out-power-on-1", type=int)
+            sp.add_argument("--out-power-on-2", type=int)
+            sp.add_argument("--out-power-on-3", type=int)
+            sp.add_argument("--out-power-on-4", type=int)
+            sp.add_argument("--out-power-on-5", type=int)
 
     tools_p = sub.add_parser("tools", help="Print OpenAI/Anthropic tool schema JSON")
     _ = tools_p
@@ -245,8 +270,30 @@ def main(argv: Optional[list[str]] = None) -> int:
             if args.pin is not None:
                 params = {"pin": args.pin}
             timeout = 5.0
+        elif args.cmd == "read_analog":
+            if args.pin is not None:
+                params = {"pin": args.pin}
+            timeout = 5.0
         elif args.cmd == "write_output":
             params = {"pin": args.pin, "state": bool(args.state)}
+            timeout = 5.0
+        elif args.cmd == "write_analog":
+            params = {"pin": args.pin}
+            if args.microamps is not None:
+                params["microamps"] = args.microamps
+            elif args.value is not None:
+                params["value"] = args.value
+            timeout = 5.0
+        elif args.cmd == "write_pwm":
+            params = {"pin": args.pin, "duty": args.duty}
+            timeout = 5.0
+        elif args.cmd == "subscribe_inputs":
+            params = {"pins": list(args.pin)}
+            if args.debounce_ms is not None:
+                params["debounce_ms"] = args.debounce_ms
+            timeout = 5.0
+        elif args.cmd == "unsubscribe_inputs":
+            params = {}
             timeout = 5.0
         elif args.cmd == "keepalive":
             params = {}
@@ -305,6 +352,12 @@ def main(argv: Optional[list[str]] = None) -> int:
                 "decel_y": "decel_y",
                 "decel_z": "decel_z",
                 "decel_a": "decel_a",
+                "out_power_on_0": "out_power_on_0",
+                "out_power_on_1": "out_power_on_1",
+                "out_power_on_2": "out_power_on_2",
+                "out_power_on_3": "out_power_on_3",
+                "out_power_on_4": "out_power_on_4",
+                "out_power_on_5": "out_power_on_5",
             }
             bool_keys = (
                 "clear_limits",

@@ -182,6 +182,43 @@ def write_output(pin: int, state: bool) -> Any:
     return _c().call("write_output", {"pin": pin, "state": state})
 
 
+def read_analog(pin: Optional[int] = None) -> Any:
+    """Read analog voltage (volts) and raw ADC for A-9..A-12."""
+    params: dict[str, Any] = {}
+    if pin is not None:
+        params["pin"] = pin
+    return _c().call("read_analog", params)
+
+
+def write_analog(pin: int = 0, value: Optional[int] = None, microamps: Optional[int] = None) -> Any:
+    """Drive IO-0 analog current output. Pass raw value (0-2047) or microamps."""
+    params: dict[str, Any] = {"pin": pin}
+    if microamps is not None:
+        params["microamps"] = microamps
+    elif value is not None:
+        params["value"] = value
+    return _c().call("write_analog", params)
+
+
+def write_pwm(pin: int, duty: int) -> Any:
+    """Drive IO-0..IO-5 as PWM output (duty 0-255). Frequency is fixed."""
+    return _c().call("write_pwm", {"pin": pin, "duty": duty})
+
+
+def subscribe_inputs(pins: list[int], debounce_ms: Optional[int] = None) -> Any:
+    """Opt-in to edge notifications for the given pins (0-12). Events arrive on
+    the telemetry stream (port 9101) as input_changed notifications."""
+    params: dict[str, Any] = {"pins": list(pins)}
+    if debounce_ms is not None:
+        params["debounce_ms"] = debounce_ms
+    return _c().call("subscribe_inputs", params)
+
+
+def unsubscribe_inputs() -> Any:
+    """Stop input edge notifications."""
+    return _c().call("unsubscribe_inputs", {})
+
+
 def queue_status() -> Any:
     return _c().call("queue_status")
 
@@ -261,9 +298,16 @@ def configure_safety(
     decel_y: Optional[int] = None,
     decel_z: Optional[int] = None,
     decel_a: Optional[int] = None,
+    out_power_on_0: Optional[int] = None,
+    out_power_on_1: Optional[int] = None,
+    out_power_on_2: Optional[int] = None,
+    out_power_on_3: Optional[int] = None,
+    out_power_on_4: Optional[int] = None,
+    out_power_on_5: Optional[int] = None,
 ) -> Any:
     """Configure safety/dynamics overrides. Per-axis values of 0 inherit the
-    global vel/accel/decel. watchdog_ms of 0 disables the watchdog."""
+    global vel/accel/decel. watchdog_ms of 0 disables the watchdog.
+    out_power_on_<n> sets the boot state for IO-n (0/1 set, 255 don't care)."""
     params: dict[str, Any] = {}
     if watchdog_ms is not None:
         params["watchdog_ms"] = watchdog_ms
@@ -271,6 +315,9 @@ def configure_safety(
         ("vel_x", vel_x), ("vel_y", vel_y), ("vel_z", vel_z), ("vel_a", vel_a),
         ("accel_x", accel_x), ("accel_y", accel_y), ("accel_z", accel_z), ("accel_a", accel_a),
         ("decel_x", decel_x), ("decel_y", decel_y), ("decel_z", decel_z), ("decel_a", decel_a),
+        ("out_power_on_0", out_power_on_0), ("out_power_on_1", out_power_on_1),
+        ("out_power_on_2", out_power_on_2), ("out_power_on_3", out_power_on_3),
+        ("out_power_on_4", out_power_on_4), ("out_power_on_5", out_power_on_5),
     ):
         if val is not None:
             params[name] = val

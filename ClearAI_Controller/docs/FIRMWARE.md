@@ -123,14 +123,25 @@ Configure with `pos_lim_x`, `neg_lim_x`, … (pin index). **0** or **255** disab
 - Bypassed in `test_mode` (same as hardware estop).
 - `clear_limits` clears soft limits and hardware limit DI assignments.
 
-### Digital I/O (`read_inputs` / `write_output`)
+### Digital I/O (`read_inputs` / `write_output` / `read_analog` / `write_analog` / `write_pwm`)
 
 | Method | Detail |
 |--------|--------|
-| `read_inputs` | Optional `pin` 0–12; returns `{pins:[{pin,state,mode}]}` with raw digital level |
+| `read_inputs` | Optional `pin` 0–12; returns `{pins:[{pin,state,mode}]}` with raw digital level. `mode` is `in`, `out`, `pwm`, `analog_in`, `analog_out`, or `other` |
 | `write_output` | `pin` 0–5, `state` bool — drives IO-0…IO-5 as **OUTPUT_DIGITAL** |
+| `read_analog` | Optional `pin` 9–12; returns `{pins:[{pin,volts,raw}]}` — sets **INPUT_ANALOG** and reads `AnalogVoltage()` + `State()` for A-9…A-12 |
+| `write_analog` | `pin` 0 only, `value` (raw 0–2047) or `microamps` (0–20000) — sets **OUTPUT_ANALOG** on IO-0 and commands the DAC (0–20 mA) |
+| `write_pwm` | `pin` 0–5, `duty` 0–255 — sets **OUTPUT_PWM** and commands the duty. Frequency is fixed by the timer. Last duty per pin reported in `get_status` as `pwm_duty` |
 
-DI-6…A-12 are read-only via `read_inputs`. Pins assigned as hardware limits cannot be written.
+DI-6…A-12 are read-only via `read_inputs`. Pins assigned as hardware limits cannot be written or re-purposed by `read_analog`/`write_analog`/`write_pwm`.
+
+### Input-change notifications (NVM v6)
+
+`subscribe_inputs` opts in to edge notifications for a set of pins (0–12); `input_changed` events are pushed on the telemetry stream (port 9101) as JSON-RPC notifications `{pin,state,edge}` (`edge` = `rising`/`falling`), debounced per pin by `debounce_ms` (default 5, `CLEARAI_INPUT_DEBOUNCE_DEFAULT_MS`). `unsubscribe_inputs` stops them. Both are allowed during blocking waits (`wait_idle`/`dwell`/`home`/`probe`). Subscription state is RAM-only (not persisted).
+
+### Output power-on default (NVM v6)
+
+`configure` accepts `out_power_on_0` … `out_power_on_5` (0/1 set, 255 = don't care / clear). At boot — after hardware-limit DI modes are applied — `ApplyOutputDefaults()` drives each IO-0…IO-5 with a set mask bit to its stored state. Default mask 0 leaves boot behavior unchanged. Reported by `get_config` as `out_power_on_state` / `out_power_on_mask`. May change while motors are enabled.
 
 ### A-axis units (NVM v4)
 

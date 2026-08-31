@@ -63,17 +63,22 @@ Unsolicited notifications (no `id`):
 | Method | Params | Result |
 |--------|--------|--------|
 | `get_capabilities` | — | protocol version, axis mask, units, mode, `test_mode`, `nvm`, method list, ports |
-| `get_status` | — | enabled, moving, hlfb, estop, `hw_estop`, `test_mode`, alerts, queue, `queue_active`, `units_a`, `hlfb_percent` (per-axis % of peak torque, or null if unknown), `watchdog_ms`, `watchdog_tripped`, `limit_status` (`{tripped,axis,dir}` or `{tripped:false}`), pose |
+| `get_status` | — | enabled, moving, hlfb, estop, `hw_estop`, `test_mode`, alerts, queue, `queue_active`, `units_a`, `hlfb_percent` (per-axis % of peak torque, or null if unknown), `watchdog_ms`, `watchdog_tripped`, `limit_status` (`{tripped,axis,dir}` or `{tripped:false}`), `pwm_duty` (last commanded duty per IO-0…IO-5), pose |
 | `get_pose` | — | work coordinates in active units (A in configured A units) |
-| `get_config` | — | live config + `nvm` / `nvm_valid` (axis_mask, test_mode, mechanics, vel/accel/decel, `units_a`, `limit_flags`, `limits_min`/`limits_max`, `pos_lim_di`/`neg_lim_di`, `vel_axis`/`accel_axis`/`decel_axis`, `watchdog_ms`, …) |
+| `get_config` | — | live config + `nvm` / `nvm_valid` (axis_mask, test_mode, mechanics, vel/accel/decel, `units_a`, `limit_flags`, `limits_min`/`limits_max`, `pos_lim_di`/`neg_lim_di`, `vel_axis`/`accel_axis`/`decel_axis`, `watchdog_ms`, `out_power_on_state` (boot state per IO-0…IO-5), `out_power_on_mask`, …) |
 | `enable` | — | `{ok:true}` after enable request (short HLFB wait) |
 | `disable` | — | abrupt stop + disable |
 | `clear_alerts` | — | clear motor alerts |
 | `stop` | — | decelerate |
 | `estop` | — | abrupt stop + disable |
 | `wait_idle` | `timeout_ms` (default 60000) | `{ok:true}` or timeout/estop error |
-| `read_inputs` | optional `pin` (0–12); omit for all onboard pins | `{pins:[{pin,state,mode},…]}` — raw digital state; `mode` is `in`, `out`, or `other` |
+| `read_inputs` | optional `pin` (0–12); omit for all onboard pins | `{pins:[{pin,state,mode},…]}` — raw digital state; `mode` is `in`, `out`, `pwm`, `analog_in`, `analog_out`, or `other` |
 | `write_output` | `pin` (0–5 only), `state` (bool or 0/1) | `{ok:true}` — sets **OUTPUT_DIGITAL** then drives the pin |
+| `read_analog` | optional `pin` (9–12); omit for all analog inputs | `{pins:[{pin,volts,raw},…]}` — analog voltage (V) and raw ADC for A-9…A-12. Sets **INPUT_ANALOG** on read. Rejects pins reserved for hardware limits. Allowed during `wait_idle`. |
+| `write_analog` | `pin` (must be 0), `value` (raw 11-bit 0–2047, 0–20 mA) **or** `microamps` (0–20000) | `{ok:true}` — sets **OUTPUT_ANALOG** on IO-0 and commands the DAC. |
+| `write_pwm` | `pin` (0–5 only), `duty` (0–255) | `{ok:true}` — sets **OUTPUT_PWM** and commands the duty. Frequency is fixed by the timer. |
+| `subscribe_inputs` | `pins` (array of 0–12), optional `debounce_ms` (default 5) | `{subscribed:[…]}` — opt-in to edge notifications for the given pins. `input_changed` events are pushed on the telemetry stream (port 9101). Allowed during `wait_idle`/`dwell`/`home`/`probe`. |
+| `unsubscribe_inputs` | — | `{ok:true}` — stop input edge notifications. |
 | `queue_status` | — | `{queue:N, active:bool}` — pending coordinated segments and active flag. Allowed during `wait_idle`. |
 | `queue_clear` | — | `{ok:true}` — decelerate the active move to a stop and drop pending queued segments. Motors stay enabled. Accepted during `wait_idle`/`dwell` (interrupts the wait). |
 | `home` | `axis` (`x`/`y`/`z`/`a`), `dir` (`pos`/`neg`), optional `feed`, `seek` (max travel, default 1000), `backoff`, `zero` (default true), `timeout_ms` (default 30000) | `{homed:true,axis,dir,pos,limit_pin}` — seek the configured hardware limit for `axis`/`dir`, decel-stop on contact, optional backoff, optional zero. Requires `pos_lim_<axis>`/`neg_lim_<axis>` DI configured. Blocking (interruptible by `estop`/`stop`/`queue_clear`). |
@@ -84,7 +89,7 @@ Unsolicited notifications (no `id`):
 
 | Method | Params |
 |--------|--------|
-| `configure` | `steps_per_rev_x/y/z/a`, `pitch_x/y/z` (mm), `gear_x/y/z/a`, `vel`/`accel`/`decel` (steps/s, steps/s²), `axis_mask` (bit0=X … bit3=A), `estop_di6` (0=off, 1=default, 2=inverted), `test_mode` (bool), soft limits `min_x`/`max_x`/… (work units; A in configured A units), hardware limits `pos_lim_x`/`neg_lim_x`/… (ClearCore **pin index** 0–12: **0–5** = IO-0…IO-5 configurable in/out — firmware forces input when used as a limit; **6–12** = DI-6…A-12 input-only; **0** or **255** = disabled), `clear_limits`, `clear_min_x`/`clear_max_x`/… (bool), per-axis dynamics `vel_x`/`vel_y`/`vel_z`/`vel_a`/`accel_x`/…/`decel_a` (steps/s, steps/s²; **0** = inherit the global `vel`/`accel`/`decel`), `watchdog_ms` (host keepalive timeout in ms; **0** = disabled, default). Mechanical fields require motors **disabled**; `test_mode`, soft limits, hardware limit pins, per-axis dynamics, and `watchdog_ms` may change while enabled. Soft limits are enforced in **machine (absolute) coordinates** — they bound the physical travel envelope and do **not** move with `set_work_origin`; they reject out-of-range targets. Hardware limits reject moves into an active switch and decelerate-stop during motion (latching `limit_status` in `get_status`, cleared by `clear_alerts`). If `watchdog_ms` is set, the board decelerates to a stop and latches `watchdog_tripped` if no `keepalive`/`enable`/`configure` arrives within the window; further motion is blocked until `keepalive` (or `clear_alerts`). **Persisted to ClearCore NVM** (blob version 5). |
+| `configure` | `steps_per_rev_x/y/z/a`, `pitch_x/y/z` (mm), `gear_x/y/z/a`, `vel`/`accel`/`decel` (steps/s, steps/s²), `axis_mask` (bit0=X … bit3=A), `estop_di6` (0=off, 1=default, 2=inverted), `test_mode` (bool), soft limits `min_x`/`max_x`/… (work units; A in configured A units), hardware limits `pos_lim_x`/`neg_lim_x`/… (ClearCore **pin index** 0–12: **0–5** = IO-0…IO-5 configurable in/out — firmware forces input when used as a limit; **6–12** = DI-6…A-12 input-only; **0** or **255** = disabled), `clear_limits`, `clear_min_x`/`clear_max_x`/… (bool), per-axis dynamics `vel_x`/`vel_y`/`vel_z`/`vel_a`/`accel_x`/…/`decel_a` (steps/s, steps/s²; **0** = inherit the global `vel`/`accel`/`decel`), `watchdog_ms` (host keepalive timeout in ms; **0** = disabled, default), `out_power_on_0`/…/`out_power_on_5` (boot state for IO-n: **0**/**1** set, **255** = don't care / clear). Mechanical fields require motors **disabled**; `test_mode`, soft limits, hardware limit pins, per-axis dynamics, `watchdog_ms`, and `out_power_on_*` may change while enabled. Soft limits are enforced in **machine (absolute) coordinates** — they bound the physical travel envelope and do **not** move with `set_work_origin`; they reject out-of-range targets. Hardware limits reject moves into an active switch and decelerate-stop during motion (latching `limit_status` in `get_status`, cleared by `clear_alerts`). If `watchdog_ms` is set, the board decelerates to a stop and latches `watchdog_tripped` if no `keepalive`/`enable`/`configure` arrives within the window; further motion is blocked until `keepalive` (or `clear_alerts`). `out_power_on_*` drives the pin to the stored state at boot (after limit DI modes are applied). **Persisted to ClearCore NVM** (blob version 6). |
 | `reset_config` | — | Restore compile-time defaults and clear NVM blob. Motors must be **disabled**. |
 | `set_test_mode` | `enabled` or `test_mode` (bool). Omitted params turn **on**. Allowed during `wait_idle`. **Persisted to NVM.** |
 | `set_units` | `units`: `"mm"` or `"inch"` (**NVM**) |
@@ -111,15 +116,34 @@ Feed is **units per minute** in the active linear unit (mm/min or inch/min).
 
 ### Digital I/O
 
-ClearCore onboard pin indices **0–12** (IO-0 … A-12). IO-0 … IO-5 are configurable input/output; DI-6 … A-12 are input-only.
+ClearCore onboard pin indices **0–12** (IO-0 … A-12). IO-0 … IO-5 are configurable input/output (and PWM-capable; IO-0 also provides a 0–20 mA analog current output via the DAC); DI-6 … A-12 are input-only (A-9 … A-12 additionally support analog input). The live per-pin function is reported by `read_inputs`/`get_status` as `mode` (`in`, `out`, `pwm`, `analog_in`, `analog_out`, `other`).
 
 - **`read_inputs`**: read raw `state` (0/1) for one pin or all pins. Allowed during `wait_idle`.
 - **`write_output`**: drive IO-0 … IO-5 high/low. Rejects pins **6–12** and pins reserved for hardware limit switches.
+- **`read_analog`**: read analog voltage (V) and raw ADC for A-9 … A-12. Sets **INPUT_ANALOG** on read; rejects pins reserved for limits. Allowed during `wait_idle`.
+- **`write_analog`**: drive IO-0 analog current output (0–20 mA). Pass raw `value` (0–2047) or `microamps` (0–20000). Pin 0 only; rejects limit pins.
+- **`write_pwm`**: drive IO-0 … IO-5 as PWM (`duty` 0–255). Frequency is fixed by the timer (no per-pin frequency API). Rejects pins **>5** and limit pins. The last commanded duty per pin is reported in `get_status` as `pwm_duty`.
+- **`subscribe_inputs` / `unsubscribe_inputs`**: opt-in edge notifications for pins 0–12. `input_changed` events are pushed on the telemetry stream (port 9101) as JSON-RPC notifications with `{pin,state,edge}` (`edge` = `rising`/`falling`), debounced by `debounce_ms` (default 5). Allowed during blocking waits.
 
 ```json
 {"jsonrpc":"2.0","id":20,"method":"read_inputs","params":{"pin":6}}
 {"jsonrpc":"2.0","id":21,"method":"write_output","params":{"pin":0,"state":true}}
+{"jsonrpc":"2.0","id":22,"method":"read_analog","params":{"pin":9}}
+{"jsonrpc":"2.0","id":23,"method":"write_analog","params":{"pin":0,"microamps":5000}}
+{"jsonrpc":"2.0","id":24,"method":"write_pwm","params":{"pin":1,"duty":128}}
+{"jsonrpc":"2.0","id":25,"method":"subscribe_inputs","params":{"pins":[6,9],"debounce_ms":5}}
+{"jsonrpc":"2.0","id":26,"method":"unsubscribe_inputs","params":{}}
 ```
+
+Telemetry notification (port 9101) for a subscribed edge:
+
+```json
+{"jsonrpc":"2.0","method":"input_changed","params":{"pin":6,"state":1,"edge":"rising"}}
+```
+
+### Output power-on default
+
+`configure` accepts `out_power_on_0` … `out_power_on_5` (**0**/**1** set the boot state, **255** = don't care / clear). At boot — after hardware-limit DI modes are applied — each IO-0 … IO-5 with a set bit is driven to its stored state. Default mask 0 leaves boot behavior unchanged. Reported by `get_config` as `out_power_on_state` / `out_power_on_mask`. May change while motors are enabled.
 
 ## Homing / probing
 
