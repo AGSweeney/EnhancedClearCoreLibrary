@@ -54,7 +54,8 @@ static void ReplyOk(const RpcId *id) {
 static bool IsSafetyMethod(const char *method) {
     return strcmp(method, "estop") == 0 ||
            strcmp(method, "stop") == 0 ||
-           strcmp(method, "disable") == 0;
+           strcmp(method, "disable") == 0 ||
+           strcmp(method, "queue_clear") == 0;
 }
 
 static void DispatchParsed(const RpcRequest *req) {
@@ -78,6 +79,31 @@ static void DispatchParsed(const RpcRequest *req) {
         char body[CLEARAI_MAX_REPLY];
         MotionFillPoseJson(body, sizeof(body));
         ReplyResult(id, body);
+        return;
+    }
+    if (strcmp(method, "get_config") == 0) {
+        char body[CLEARAI_MAX_REPLY];
+        MotionFillConfigJson(body, sizeof(body));
+        ReplyResult(id, body);
+        return;
+    }
+    if (strcmp(method, "read_inputs") == 0) {
+        char body[CLEARAI_MAX_REPLY];
+        const char *err = MotionReadInputs(p, body, sizeof(body));
+        if (err) {
+            ReplyError(id, JSONRPC_INVALID_PARAMS, err);
+        } else {
+            ReplyResult(id, body);
+        }
+        return;
+    }
+    if (strcmp(method, "write_output") == 0) {
+        const char *err = MotionWriteOutput(p);
+        if (err) {
+            ReplyError(id, JSONRPC_APP_ERROR, err);
+        } else {
+            ReplyOk(id);
+        }
         return;
     }
     if (strcmp(method, "enable") == 0) {
@@ -118,6 +144,15 @@ static void DispatchParsed(const RpcRequest *req) {
         }
         return;
     }
+    if (strcmp(method, "reset_config") == 0) {
+        const char *err = MotionResetConfig();
+        if (err) {
+            ReplyError(id, JSONRPC_APP_ERROR, err);
+        } else {
+            ReplyOk(id);
+        }
+        return;
+    }
     if (strcmp(method, "set_test_mode") == 0) {
         MotionSetTestMode(p);
         ReplyOk(id);
@@ -125,6 +160,15 @@ static void DispatchParsed(const RpcRequest *req) {
     }
     if (strcmp(method, "set_units") == 0) {
         const char *err = MotionSetUnits(p);
+        if (err) {
+            ReplyError(id, JSONRPC_INVALID_PARAMS, err);
+        } else {
+            ReplyOk(id);
+        }
+        return;
+    }
+    if (strcmp(method, "set_units_a") == 0) {
+        const char *err = MotionSetUnitsA(p);
         if (err) {
             ReplyError(id, JSONRPC_INVALID_PARAMS, err);
         } else {
@@ -197,6 +241,43 @@ static void DispatchParsed(const RpcRequest *req) {
         }
         return;
     }
+    if (strcmp(method, "queue_status") == 0) {
+        char body[CLEARAI_MAX_REPLY];
+        MotionFillQueueStatusJson(body, sizeof(body));
+        ReplyResult(id, body);
+        return;
+    }
+    if (strcmp(method, "queue_clear") == 0) {
+        MotionQueueClear();
+        ReplyOk(id);
+        return;
+    }
+    if (strcmp(method, "home") == 0) {
+        g_inWait = true;
+        g_safetyHit = false;
+        char body[CLEARAI_MAX_REPLY];
+        const char *err = MotionHome(p, body, sizeof(body), PrimitivesPollSafetyDuringWait);
+        g_inWait = false;
+        if (err) {
+            ReplyError(id, JSONRPC_APP_ERROR, err);
+        } else {
+            ReplyResult(id, body);
+        }
+        return;
+    }
+    if (strcmp(method, "probe") == 0) {
+        g_inWait = true;
+        g_safetyHit = false;
+        char body[CLEARAI_MAX_REPLY];
+        const char *err = MotionProbe(p, body, sizeof(body), PrimitivesPollSafetyDuringWait);
+        g_inWait = false;
+        if (err) {
+            ReplyError(id, JSONRPC_APP_ERROR, err);
+        } else {
+            ReplyResult(id, body);
+        }
+        return;
+    }
 
     ReplyError(id, JSONRPC_METHOD_NOT_FOUND, "method not found");
 }
@@ -231,6 +312,9 @@ bool PrimitivesPollSafetyDuringWait() {
     if (strcmp(req.method, "get_status") == 0 ||
         strcmp(req.method, "get_pose") == 0 ||
         strcmp(req.method, "get_capabilities") == 0 ||
+        strcmp(req.method, "get_config") == 0 ||
+        strcmp(req.method, "read_inputs") == 0 ||
+        strcmp(req.method, "queue_status") == 0 ||
         strcmp(req.method, "set_test_mode") == 0) {
         DispatchParsed(&req);
         return MotionInterrupted();

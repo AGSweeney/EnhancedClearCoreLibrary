@@ -40,22 +40,31 @@ All tools mirror firmware methods unless noted. Motion tools are non-blocking; a
 | Tool | Description |
 |------|-------------|
 | `get_capabilities` | Protocol version, axes, units, mode, method list, ports |
-| `get_status` | Enable/moving/HLFB/estop/test_mode/alerts/queue/pose |
-| `get_pose` | Work coordinates x,y,z,a |
+| `get_status` | Enable/moving/HLFB/estop/test_mode/alerts/queue/`queue_active`/`units_a`/`hlfb_percent` (per-axis torque %)/pose |
+| `get_pose` | Work coordinates x,y,z,a (A in configured A units) |
+| `get_config` | Live config + NVM validity (`axis_mask`, test_mode, mechanics, vel, `units_a`, soft limits, …) |
 | `enable` / `disable` | Enable or abrupt disable |
 | `clear_alerts` | Clear motor alert flags |
 | `stop` | Decelerate; motors stay enabled |
 | `estop` | Immediate stop + disable |
 | `wait_idle` | Block until idle or `timeout_ms` |
-| `configure` | Mechanics, `axis_mask`, vel/accel/decel, optional `test_mode` |
-| `set_test_mode` | Bench gate bypass |
+| `configure` | Mechanics, `axis_mask`, vel/accel/decel, soft limits, hardware limit DIs (`pos_lim_x`/…), optional `test_mode` (**NVM**) |
+| `reset_config` | Compile defaults + clear NVM (motors disabled) |
+| `set_test_mode` | Bench gate bypass (**NVM**) |
 | `set_units` | `mm` or `inch` |
+| `set_units_a` | A-axis unit `deg` or `rev` (**NVM**) |
 | `set_mode` | `abs` or `rel` |
 | `set_work_origin` | G92-style work offset |
 | `move_linear` | Queue linear move |
 | `move_arc` | Queue XY arc (i,j from start) |
 | `jog` | Relative move (ignores abs/rel) |
 | `dwell` | Wait seconds (max 600) |
+| `read_inputs` | Optional pin 0–12; raw digital state for onboard I/O |
+| `write_output` | Drive IO-0…IO-5 high/low |
+| `queue_status` | Pending coordinated queue depth + active flag |
+| `queue_clear` | Decelerate active move + drop pending queued segments |
+| `home` | Seek configured hw limit for `axis`/`dir`, stop, optional backoff + zero |
+| `probe` | Move until probe DI triggers; report touch position, optional zero |
 | `discover` | UDP discover; returns host/ports (does not move) |
 
 ### Feed units

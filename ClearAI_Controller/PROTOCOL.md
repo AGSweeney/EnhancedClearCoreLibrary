@@ -46,7 +46,7 @@ Unsolicited notifications (no `id`):
 | -32600 | Invalid request (missing method/id) |
 | -32601 | Method not found |
 | -32602 | Invalid params |
-| -32000 | Application error (not enabled, alert, estop, timeout, queue reject) |
+| -32000 | Application error (not enabled, alert, estop, timeout, queue reject, out of limits) |
 
 ## Safety
 
@@ -62,31 +62,40 @@ Unsolicited notifications (no `id`):
 
 | Method | Params | Result |
 |--------|--------|--------|
-| `get_capabilities` | — | protocol version, axis mask, units, mode, `test_mode`, method list, ports |
-| `get_status` | — | enabled, moving, hlfb, estop, `hw_estop`, `test_mode`, alerts, queue, pose |
-| `get_pose` | — | work coordinates in active units |
+| `get_capabilities` | — | protocol version, axis mask, units, mode, `test_mode`, `nvm`, method list, ports |
+| `get_status` | — | enabled, moving, hlfb, estop, `hw_estop`, `test_mode`, alerts, queue, `queue_active`, `units_a`, `hlfb_percent` (per-axis % of peak torque, or null if unknown), pose |
+| `get_pose` | — | work coordinates in active units (A in configured A units) |
+| `get_config` | — | live config + `nvm` / `nvm_valid` (axis_mask, test_mode, mechanics, vel/accel/decel, `units_a`, `limit_flags`, `limits_min`/`limits_max`, `pos_lim_di`/`neg_lim_di`, …) |
 | `enable` | — | `{ok:true}` after enable request (short HLFB wait) |
 | `disable` | — | abrupt stop + disable |
 | `clear_alerts` | — | clear motor alerts |
 | `stop` | — | decelerate |
 | `estop` | — | abrupt stop + disable |
 | `wait_idle` | `timeout_ms` (default 60000) | `{ok:true}` or timeout/estop error |
+| `read_inputs` | optional `pin` (0–12); omit for all onboard pins | `{pins:[{pin,state,mode},…]}` — raw digital state; `mode` is `in`, `out`, or `other` |
+| `write_output` | `pin` (0–5 only), `state` (bool or 0/1) | `{ok:true}` — sets **OUTPUT_DIGITAL** then drives the pin |
+| `queue_status` | — | `{queue:N, active:bool}` — pending coordinated segments and active flag. Allowed during `wait_idle`. |
+| `queue_clear` | — | `{ok:true}` — decelerate the active move to a stop and drop pending queued segments. Motors stay enabled. Accepted during `wait_idle`/`dwell` (interrupts the wait). |
+| `home` | `axis` (`x`/`y`/`z`/`a`), `dir` (`pos`/`neg`), optional `feed`, `seek` (max travel, default 1000), `backoff`, `zero` (default true), `timeout_ms` (default 30000) | `{homed:true,axis,dir,pos,limit_pin}` — seek the configured hardware limit for `axis`/`dir`, decel-stop on contact, optional backoff, optional zero. Requires `pos_lim_<axis>`/`neg_lim_<axis>` DI configured. Blocking (interruptible by `estop`/`stop`/`queue_clear`). |
+| `probe` | `axis`, `dir`, `pin` (DI 1–12), optional `feed`, `seek`, `backoff`, `zero` (default false), `active` (`high`/`low`, default `high`), `timeout_ms` | `{probed:true,axis,dir,pos,pin}` — move at probe feed until the probe DI triggers, stop, report touch position. Blocking (interruptible). |
 
 ### Configuration
 
 | Method | Params |
 |--------|--------|
-| `configure` | `steps_per_rev_x/y/z/a`, `pitch_x/y/z` (mm), `gear_x/y/z/a`, `vel`/`accel`/`decel` (steps/s, steps/s²), `axis_mask` (bit0=X … bit3=A), `estop_di6` (0=off, 1=default, 2=inverted), `test_mode` (bool). Mechanical fields require motors **disabled**; `test_mode` may change while enabled. |
-| `set_test_mode` | `enabled` or `test_mode` (bool). Omitted params turn **on**. Allowed during `wait_idle`. |
-| `set_units` | `units`: `"mm"` or `"inch"` |
-| `set_mode` | `mode`: `"abs"` or `"rel"` |
-| `set_work_origin` | `x`,`y`,`z`,`a` — new work coordinates at the current machine pose (G92-style offset). Omitted axes unchanged. Empty object zeros all axes. |
+| `configure` | `steps_per_rev_x/y/z/a`, `pitch_x/y/z` (mm), `gear_x/y/z/a`, `vel`/`accel`/`decel` (steps/s, steps/s²), `axis_mask` (bit0=X … bit3=A), `estop_di6` (0=off, 1=default, 2=inverted), `test_mode` (bool), soft limits `min_x`/`max_x`/… (work units; A in configured A units), hardware limits `pos_lim_x`/`neg_lim_x`/… (ClearCore **pin index** 0–12: **0–5** = IO-0…IO-5 configurable in/out — firmware forces input when used as a limit; **6–12** = DI-6…A-12 input-only; **0** or **255** = disabled), `clear_limits`, `clear_min_x`/`clear_max_x`/… (bool). Mechanical fields require motors **disabled**; `test_mode`, soft limits, and hardware limit pins may change while enabled. Soft limits reject out-of-range targets; hardware limits reject moves into an active switch and decelerate-stop during motion. **Persisted to ClearCore NVM** (blob version 4). |
+| `reset_config` | — | Restore compile-time defaults and clear NVM blob. Motors must be **disabled**. |
+| `set_test_mode` | `enabled` or `test_mode` (bool). Omitted params turn **on**. Allowed during `wait_idle`. **Persisted to NVM.** |
+| `set_units` | `units`: `"mm"` or `"inch"` (**NVM**) |
+| `set_units_a` | `units`: `"deg"` or `"rev"` — rotary A-axis unit (**NVM**, blob v4). Internal storage stays degrees; pose and limits convert accordingly. |
+| `set_mode` | `mode`: `"abs"` or `"rel"` (**NVM**) |
+| `set_work_origin` | `x`,`y`,`z`,`a` — new work coordinates at the current machine pose (G92-style offset). Omitted axes unchanged. Empty object zeros all axes. **Not** NVM-backed (session only). |
 
-Default mechanics: 800 steps/rev, 5 mm pitch, XY enabled (`axis_mask` 3), mm, absolute.
+Default mechanics: 800 steps/rev, 5 mm pitch, XY enabled (`axis_mask` 3), mm, absolute. On boot, a valid NVM blob overrides these defaults.
 
 One-motor bench: `configure` `axis_mask` **1** (X/M0 only) so enable/HLFB/alerts ignore the empty connector. If the partner XY motor is missing or in alert, `move_linear` / `jog` fall back to independent `Move` instead of coordinated `QueueLinear` (that path was rejecting with `xy queue rejected`).
 
-Axis A is rotary: values are **degrees** regardless of `set_units`.
+Axis A is rotary: values are in the configured A-axis unit (`set_units_a`, default **degrees**) regardless of `set_units`.
 
 ### Motion
 
@@ -98,6 +107,31 @@ Feed is **units per minute** in the active linear unit (mm/min or inch/min).
 | `move_arc` | `x`,`y`,`i`,`j`,`clockwise`,`feed`. I/J relative to start (G-code convention). XY only; `z`/`a` rejected. |
 | `jog` | relative `x`,`y`,`z`,`a`,`feed` (ignores abs/rel mode) |
 | `dwell` | `seconds` (max 600), interruptible by estop |
+
+### Digital I/O
+
+ClearCore onboard pin indices **0–12** (IO-0 … A-12). IO-0 … IO-5 are configurable input/output; DI-6 … A-12 are input-only.
+
+- **`read_inputs`**: read raw `state` (0/1) for one pin or all pins. Allowed during `wait_idle`.
+- **`write_output`**: drive IO-0 … IO-5 high/low. Rejects pins **6–12** and pins reserved for hardware limit switches.
+
+```json
+{"jsonrpc":"2.0","id":20,"method":"read_inputs","params":{"pin":6}}
+{"jsonrpc":"2.0","id":21,"method":"write_output","params":{"pin":0,"state":true}}
+```
+
+## Homing / probing
+
+- **`home`**: seek the hardware limit switch configured for `axis`/`dir` (`pos_lim_<axis>` or `neg_lim_<axis>`) at a slow `feed`, decelerate to a stop on contact, optionally `backoff` away from the switch, then optionally set the work origin to 0 (`zero`, default true). The seek move bypasses soft limits; the hardware limit is expected to stop it. Fails with `"limit not configured"` if no DI is assigned, `"limit already active"` if the switch is already tripped, or `"limit not reached"` if the seek distance is exhausted without contact. Requires `enable` (or `test_mode`).
+- **`probe`**: move `axis` toward `dir` at probe `feed` until the probe input `pin` (DI 1–12) triggers, then stop and report the touch `pos` in work units. `active` selects trigger polarity (default `high` = touched when the pin reads high). Optional `backoff` and `zero` (default false). Fails with `"probe already active"`, `"probe not reached"`, or `"pin reserved for limit"`.
+
+Both are **blocking** and interruptible by `estop` / `stop` / `queue_clear` (which abort the seek and return an error).
+
+```json
+{"jsonrpc":"2.0","id":30,"method":"configure","params":{"pos_lim_x":7}}
+{"jsonrpc":"2.0","id":31,"method":"home","params":{"axis":"x","dir":"pos","feed":200,"backoff":1.0}}
+{"jsonrpc":"2.0","id":32,"method":"probe","params":{"axis":"z","dir":"neg","pin":8,"feed":100,"zero":true}}
+```
 
 ## Examples
 
@@ -128,6 +162,28 @@ Bench: bypass hardware interlocks (after flashing firmware that includes `set_te
 ```json
 {"jsonrpc":"2.0","id":8,"method":"set_test_mode","params":{"enabled":true}}
 {"jsonrpc":"2.0","id":9,"method":"get_status","params":{}}
+```
+
+Set X soft limits 0–300 mm (persisted; limits may be set while enabled):
+
+```json
+{"jsonrpc":"2.0","id":10,"method":"configure","params":{"min_x":0,"max_x":300}}
+{"jsonrpc":"2.0","id":11,"method":"move_linear","params":{"x":350,"feed":5000}}
+```
+
+Map X positive hardware limit to DI-7 (active when DI reads ON):
+
+```json
+{"jsonrpc":"2.0","id":12,"method":"configure","params":{"pos_lim_x":7}}
+```
+
+Set the A axis to revolutions and read torque/queue:
+
+```json
+{"jsonrpc":"2.0","id":13,"method":"set_units_a","params":{"units":"rev"}}
+{"jsonrpc":"2.0","id":14,"method":"get_status","params":{}}
+{"jsonrpc":"2.0","id":15,"method":"queue_status","params":{}}
+{"jsonrpc":"2.0","id":16,"method":"queue_clear","params":{}}
 ```
 
 ## Code as Policies (host Python)

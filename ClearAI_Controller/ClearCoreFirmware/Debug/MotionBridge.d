@@ -228,6 +228,7 @@ MotionBridge.d MotionBridge.o: .././MotionBridge.cpp .././MotionBridge.h \
  ../../../libClearCore/inc/SdCardDriver.h \
  ../../../libClearCore/inc/SerialUsb.h \
  ../../../libClearCore/inc/XBeeDriver.h \
+ ../../../libClearCore/inc/NvmManager.h \
  ../../../libClearCore/inc/SysTiming.h
 
 .././MotionBridge.h:
@@ -691,5 +692,7 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 ../../../libClearCore/inc/SerialUsb.h:
 
 ../../../libClearCore/inc/XBeeDriver.h:
+
+../../../libClearCore/inc/NvmManager.h:
 
 ../../../libClearCore/inc/SysTiming.h:

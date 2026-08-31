@@ -16,6 +16,7 @@ METHODS = (
     "get_capabilities",
     "get_status",
     "get_pose",
+    "get_config",
     "enable",
     "disable",
     "clear_alerts",
@@ -23,14 +24,22 @@ METHODS = (
     "estop",
     "wait_idle",
     "configure",
+    "reset_config",
     "set_test_mode",
     "set_units",
+    "set_units_a",
     "set_mode",
     "set_work_origin",
     "move_linear",
     "move_arc",
     "jog",
     "dwell",
+    "read_inputs",
+    "write_output",
+    "queue_status",
+    "queue_clear",
+    "home",
+    "probe",
 )
 
 
@@ -81,6 +90,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             sp.add_argument("--timeout-ms", type=int, default=60000)
         if name == "set_units":
             sp.add_argument("--units", required=True, choices=("mm", "inch"))
+        if name == "set_units_a":
+            sp.add_argument("--units", required=True, choices=("deg", "rev"))
         if name == "set_mode":
             sp.add_argument("--mode", required=True, choices=("abs", "rel"))
         if name in ("move_linear", "jog", "set_work_origin"):
@@ -102,6 +113,23 @@ def main(argv: Optional[list[str]] = None) -> int:
             sp.add_argument("--feed", type=float)
         if name == "dwell":
             sp.add_argument("--seconds", type=float, required=True)
+        if name == "read_inputs":
+            sp.add_argument("--pin", type=int)
+        if name == "write_output":
+            sp.add_argument("--pin", type=int, required=True)
+            sp.add_argument("--state", type=int, choices=(0, 1), required=True)
+        if name in ("home", "probe"):
+            sp.add_argument("--axis", required=True, choices=("x", "y", "z", "a"))
+            sp.add_argument("--dir", required=True, choices=("pos", "neg"))
+            sp.add_argument("--feed", type=float)
+            sp.add_argument("--seek", type=float)
+            sp.add_argument("--backoff", type=float)
+            sp.add_argument("--zero", action="store_true", default=True)
+            sp.add_argument("--no-zero", dest="zero", action="store_false")
+            sp.add_argument("--timeout-ms", type=int)
+        if name == "probe":
+            sp.add_argument("--pin", type=int, required=True)
+            sp.add_argument("--active", choices=("high", "low"))
         if name == "set_test_mode":
             sp.add_argument("--on", dest="enabled", action="store_true", default=True)
             sp.add_argument("--off", dest="enabled", action="store_false")
@@ -116,6 +144,31 @@ def main(argv: Optional[list[str]] = None) -> int:
             sp.add_argument("--pitch-x", type=float)
             sp.add_argument("--pitch-y", type=float)
             sp.add_argument("--test-mode", type=int, choices=(0, 1))
+            sp.add_argument("--min-x", type=float)
+            sp.add_argument("--max-x", type=float)
+            sp.add_argument("--min-y", type=float)
+            sp.add_argument("--max-y", type=float)
+            sp.add_argument("--min-z", type=float)
+            sp.add_argument("--max-z", type=float)
+            sp.add_argument("--min-a", type=float)
+            sp.add_argument("--max-a", type=float)
+            sp.add_argument("--clear-limits", action="store_true")
+            sp.add_argument("--clear-min-x", action="store_true")
+            sp.add_argument("--clear-max-x", action="store_true")
+            sp.add_argument("--clear-min-y", action="store_true")
+            sp.add_argument("--clear-max-y", action="store_true")
+            sp.add_argument("--clear-min-z", action="store_true")
+            sp.add_argument("--clear-max-z", action="store_true")
+            sp.add_argument("--clear-min-a", action="store_true")
+            sp.add_argument("--clear-max-a", action="store_true")
+            sp.add_argument("--pos-lim-x", type=int)
+            sp.add_argument("--neg-lim-x", type=int)
+            sp.add_argument("--pos-lim-y", type=int)
+            sp.add_argument("--neg-lim-y", type=int)
+            sp.add_argument("--pos-lim-z", type=int)
+            sp.add_argument("--neg-lim-z", type=int)
+            sp.add_argument("--pos-lim-a", type=int)
+            sp.add_argument("--neg-lim-a", type=int)
 
     tools_p = sub.add_parser("tools", help="Print OpenAI/Anthropic tool schema JSON")
     _ = tools_p
@@ -145,6 +198,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         elif args.cmd == "set_units":
             params = {"units": args.units}
             timeout = 5.0
+        elif args.cmd == "set_units_a":
+            params = {"units": args.units}
+            timeout = 5.0
         elif args.cmd == "set_mode":
             params = {"mode": args.mode}
             timeout = 5.0
@@ -154,6 +210,30 @@ def main(argv: Optional[list[str]] = None) -> int:
         elif args.cmd == "dwell":
             params = {"seconds": args.seconds}
             timeout = max(1.0, args.seconds + 2.0)
+        elif args.cmd in ("home", "probe"):
+            params = {"axis": args.axis, "dir": args.dir}
+            if args.feed is not None:
+                params["feed"] = args.feed
+            if args.seek is not None:
+                params["seek"] = args.seek
+            if args.backoff is not None:
+                params["backoff"] = args.backoff
+            if args.zero is not None:
+                params["zero"] = args.zero
+            if args.timeout_ms is not None:
+                params["timeout_ms"] = args.timeout_ms
+            if args.cmd == "probe":
+                params["pin"] = args.pin
+                if args.active is not None:
+                    params["active"] = args.active
+            timeout = max(1.0, (args.timeout_ms or 30000) / 1000.0 + 2.0)
+        elif args.cmd == "read_inputs":
+            if args.pin is not None:
+                params = {"pin": args.pin}
+            timeout = 5.0
+        elif args.cmd == "write_output":
+            params = {"pin": args.pin, "state": bool(args.state)}
+            timeout = 5.0
         elif args.cmd == "move_arc":
             params = _params_from_args(args, ("x", "y", "i", "j", "feed"))
             params["clockwise"] = bool(args.clockwise)
@@ -179,11 +259,41 @@ def main(argv: Optional[list[str]] = None) -> int:
                 "pitch_x": "pitch_x",
                 "pitch_y": "pitch_y",
                 "test_mode": "test_mode",
+                "min_x": "min_x",
+                "max_x": "max_x",
+                "min_y": "min_y",
+                "max_y": "max_y",
+                "min_z": "min_z",
+                "max_z": "max_z",
+                "min_a": "min_a",
+                "max_a": "max_a",
+                "pos_lim_x": "pos_lim_x",
+                "neg_lim_x": "neg_lim_x",
+                "pos_lim_y": "pos_lim_y",
+                "neg_lim_y": "neg_lim_y",
+                "pos_lim_z": "pos_lim_z",
+                "neg_lim_z": "neg_lim_z",
+                "pos_lim_a": "pos_lim_a",
+                "neg_lim_a": "neg_lim_a",
             }
+            bool_keys = (
+                "clear_limits",
+                "clear_min_x",
+                "clear_max_x",
+                "clear_min_y",
+                "clear_max_y",
+                "clear_min_z",
+                "clear_max_z",
+                "clear_min_a",
+                "clear_max_a",
+            )
             for attr, key in mapping.items():
                 val = getattr(args, attr, None)
                 if val is not None:
                     params[key] = bool(val) if key == "test_mode" else val
+            for key in bool_keys:
+                if getattr(args, key, False):
+                    params[key] = True
             timeout = 5.0
         else:
             timeout = 5.0

@@ -39,12 +39,15 @@ struct MotionStatus {
     uint32_t alertReg;
     double work[CLEARAI_AXIS_COUNT];
     ClearAiUnits units;
+    ClearAiUnitsA unitsA;
     ClearAiMode mode;
     uint32_t axisMask;
     bool testMode;
     bool hwEstop;
     uint32_t vel;
     uint32_t accel;
+    float hlfbPercent[CLEARAI_AXIS_COUNT]; /* -100..100, or HLFB_DUTY_UNKNOWN */
+    bool queueActive;
 };
 
 bool MotionInit();
@@ -62,18 +65,28 @@ const char *MotionEstop();
 const char *MotionConfigure(const RpcParams *p);
 const char *MotionSetTestMode(const RpcParams *p);
 const char *MotionSetUnits(const RpcParams *p);
+const char *MotionSetUnitsA(const RpcParams *p);
 const char *MotionSetMode(const RpcParams *p);
 const char *MotionSetWorkOrigin(const RpcParams *p);
+const char *MotionResetConfig();
+void MotionFillConfigJson(char *buf, uint16_t bufLen);
 const char *MotionMoveLinear(const RpcParams *p);
 const char *MotionMoveArc(const RpcParams *p);
 const char *MotionJog(const RpcParams *p);
 const char *MotionDwell(const RpcParams *p, ClearAiUrgentFn urgent);
 const char *MotionWaitIdle(const RpcParams *p, ClearAiUrgentFn urgent);
+const char *MotionHome(const RpcParams *p, char *body, uint16_t bufLen, ClearAiUrgentFn urgent);
+const char *MotionProbe(const RpcParams *p, char *body, uint16_t bufLen, ClearAiUrgentFn urgent);
+const char *MotionQueueClear();
+void MotionFillQueueStatusJson(char *buf, uint16_t bufLen);
 
 void MotionGetStatus(MotionStatus *out);
 void MotionFillCapabilitiesJson(char *buf, uint16_t bufLen);
 void MotionFillStatusJson(char *buf, uint16_t bufLen);
 void MotionFillPoseJson(char *buf, uint16_t bufLen);
 void MotionFillTelemetryJson(char *buf, uint16_t bufLen);
+
+const char *MotionReadInputs(const RpcParams *p, char *buf, uint16_t bufLen);
+const char *MotionWriteOutput(const RpcParams *p);
 
 #endif

@@ -19,7 +19,15 @@
     "type": "function",
     "function": {
       "name": "get_pose",
-      "description": "Return work coordinates x,y,z,a in the active units (A is always degrees).",
+      "description": "Return work coordinates x,y,z,a in the active units (A in configured A units: deg or rev).",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_config",
+      "description": "Return live ClearAI config and NVM validity (axis_mask, test_mode, mechanics, vel/accel/decel).",
       "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
     }
   },
@@ -80,8 +88,38 @@
   {
     "type": "function",
     "function": {
+      "name": "read_inputs",
+      "description": "Read raw digital input state for ClearCore onboard pins 0-12 (IO-0 through A-12). Omit pin to read all.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pin": { "type": "integer", "description": "Pin index 0-12; omit for all pins" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "write_output",
+      "description": "Set digital output on IO-0..IO-5 (pin 0-5 only). Sets OUTPUT_DIGITAL mode automatically.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "pin": { "type": "integer", "description": "Output pin index 0-5" },
+          "state": { "type": "boolean", "description": "true=high false=low" }
+        },
+        "required": ["pin", "state"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "configure",
-      "description": "Set mechanical parameters and axis mask. Motors must be disabled first, except test_mode which may be changed while enabled.",
+      "description": "Set mechanical parameters, axis mask, and optional soft travel limits (min_x/max_x, etc.). Mechanical fields require motors disabled; limits and test_mode may change while enabled. Persisted to NVM.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -101,7 +139,32 @@
           "decel": { "type": "integer" },
           "axis_mask": { "type": "integer", "description": "Bit0=X bit1=Y bit2=Z bit3=A" },
           "estop_di6": { "type": "integer", "description": "0=off 1=default 2=inverted" },
-          "test_mode": { "type": "boolean", "description": "Bench: bypass hardware estop, enable, HLFB, and alert gates" }
+          "test_mode": { "type": "boolean", "description": "Bench: bypass hardware estop, enable, HLFB, and alert gates" },
+          "min_x": { "type": "number", "description": "Soft min travel in work units (mm/inch; A always degrees)" },
+          "max_x": { "type": "number", "description": "Soft max travel in work units" },
+          "min_y": { "type": "number" },
+          "max_y": { "type": "number" },
+          "min_z": { "type": "number" },
+          "max_z": { "type": "number" },
+          "min_a": { "type": "number" },
+          "max_a": { "type": "number" },
+          "clear_limits": { "type": "boolean", "description": "Clear all axis soft limits" },
+          "clear_min_x": { "type": "boolean" },
+          "clear_max_x": { "type": "boolean" },
+          "clear_min_y": { "type": "boolean" },
+          "clear_max_y": { "type": "boolean" },
+          "clear_min_z": { "type": "boolean" },
+          "clear_max_z": { "type": "boolean" },
+          "clear_min_a": { "type": "boolean" },
+          "clear_max_a": { "type": "boolean" },
+          "pos_lim_x": { "type": "integer", "description": "ClearCore pin index for X+ limit: 0-5 IO (in/out, forced input); 6-12 DI/A (input only); 0 or 255 disables" },
+          "neg_lim_x": { "type": "integer", "description": "ClearCore pin index for X- limit; 0 or 255 disables" },
+          "pos_lim_y": { "type": "integer" },
+          "neg_lim_y": { "type": "integer" },
+          "pos_lim_z": { "type": "integer" },
+          "neg_lim_z": { "type": "integer" },
+          "pos_lim_a": { "type": "integer" },
+          "neg_lim_a": { "type": "integer" }
         },
         "additionalProperties": false
       }
@@ -110,8 +173,16 @@
   {
     "type": "function",
     "function": {
+      "name": "reset_config",
+      "description": "Restore compile-time defaults and clear the NVM config blob. Motors must be disabled first.",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "set_test_mode",
-      "description": "Bench test mode: bypass hardware estop (DI-6), HLFB, alert, and enable gates so motion can be commanded without interlocks. Software stop/estop/disable still halt. Default enabled=true if omitted. Not for production.",
+      "description": "Bench test mode: bypass hardware estop (DI-6), HLFB, alert, and enable gates so motion can be commanded without interlocks. Persisted to NVM. Software stop/estop/disable still halt. Default enabled=true if omitted. Not for production.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -126,11 +197,26 @@
     "type": "function",
     "function": {
       "name": "set_units",
-      "description": "Set linear units to mm or inch. Axis A remains degrees.",
+      "description": "Set linear units to mm or inch. Axis A is unaffected (use set_units_a).",
       "parameters": {
         "type": "object",
         "properties": {
           "units": { "type": "string", "enum": ["mm", "inch"] }
+        },
+        "required": ["units"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "set_units_a",
+      "description": "Set the rotary A-axis unit to degrees (deg) or revolutions (rev). Internal storage stays degrees; pose and limits convert accordingly. Persisted to NVM.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "units": { "type": "string", "enum": ["deg", "rev"] }
         },
         "required": ["units"],
         "additionalProperties": false
@@ -237,6 +323,66 @@
           "seconds": { "type": "number" }
         },
         "required": ["seconds"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "queue_status",
+      "description": "Introspect the coordinated motion queue: number of pending queued segments and whether a move is currently active.",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "queue_clear",
+      "description": "Flush the coordinated motion queue: decelerate the active move to a stop and drop all pending queued segments. Motors stay enabled. Accepted during wait_idle/dwell (interrupts the wait).",
+      "parameters": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "home",
+      "description": "Home/zero one axis: seek the configured hardware limit switch for the given axis/dir at a slow feed, decelerate to a stop on contact, optionally back off, then optionally set the work origin to 0 at the final position. Requires the corresponding pos_lim_<axis>/neg_lim_<axis> DI to be configured. Blocking (interruptible by estop/stop/queue_clear).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "axis": { "type": "string", "enum": ["x", "y", "z", "a"] },
+          "dir": { "type": "string", "enum": ["pos", "neg"], "description": "Which limit to seek (pos_lim_<axis> or neg_lim_<axis>)" },
+          "feed": { "type": "number", "description": "Homing feed in units/min" },
+          "seek": { "type": "number", "description": "Max travel in work units before giving up (default 1000)" },
+          "backoff": { "type": "number", "description": "Distance to retract after contact (work units)" },
+          "zero": { "type": "boolean", "description": "Set work origin = 0 at the final position (default true)" },
+          "timeout_ms": { "type": "integer", "description": "Overall timeout (default 30000)" }
+        },
+        "required": ["axis", "dir"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "probe",
+      "description": "Probe along one axis at a slow feed until a probe input DI triggers, then stop and report the touch position (and optionally zero there). Blocking (interruptible by estop/stop/queue_clear).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "axis": { "type": "string", "enum": ["x", "y", "z", "a"] },
+          "dir": { "type": "string", "enum": ["pos", "neg"] },
+          "pin": { "type": "integer", "description": "Probe input DI index 1-12 (not 0/255; cannot be a pin reserved for a limit)" },
+          "feed": { "type": "number", "description": "Probe feed in units/min" },
+          "seek": { "type": "number", "description": "Max travel in work units before giving up (default 1000)" },
+          "backoff": { "type": "number", "description": "Distance to retract after touch (work units)" },
+          "zero": { "type": "boolean", "description": "Set work origin = 0 at the touch point (default false)" },
+          "active": { "type": "string", "enum": ["high", "low"], "description": "Probe trigger polarity (default high: touched = pin reads high)" },
+          "timeout_ms": { "type": "integer", "description": "Overall timeout (default 30000)" }
+        },
+        "required": ["axis", "dir", "pin"],
         "additionalProperties": false
       }
     }

@@ -77,7 +77,80 @@ Linked libraries: `libClearCore`, `LwIP` (Ethernet).
 | `CLEARAI_DEFAULT_VEL_STEPS` | 27000 | ~2025 rpm at 800 ppr |
 | `CLEARAI_DEFAULT_ACCEL_STEPS` | 250000 | Accel/decel steps/s² |
 | `CLEARAI_DEFAULT_AXIS_MASK` | `0x3` | XY |
-| `CLEARAI_TEST_MODE_DEFAULT` | 0 | Boot with gates on |
+| `CLEARAI_TEST_MODE_DEFAULT` | 0 | Boot with gates on (overridden if NVM valid) |
+
+## NVM-backed configuration
+
+ClearAI stores a versioned blob in ClearCore **user NVM** (`NvmManager`, offset `NVM_LOC_USER_START`) so you only `configure` when values change.
+
+| Behavior | Detail |
+|----------|--------|
+| Load | On `MotionInit`, after compile defaults; valid magic `'CAIC'` + version 1, 2, 3, or 4 applies |
+| Save | After successful `configure`, `set_test_mode`, `set_units`, `set_mode` |
+| Read | `get_config` — live values + `nvm` / `nvm_valid` |
+| Clear | `reset_config` (motors disabled) — compile defaults + wipe blob |
+| Not stored | Work origin / enable / pose (session only) |
+
+Requires board supply suitable for NVM writes (~20 V+ per libClearCore). User page survives chip erase; invalid/missing blob → compile defaults.
+
+### Soft travel limits (NVM v2)
+
+Per-axis min/max in **work coordinates** (`min_x`/`max_x`, …). Values use active linear units (mm/inch); axis A uses the configured A-axis unit (see NVM v4). Negative ranges are supported (e.g. X −50…50 mm).
+
+| `limit_flags` bit | Meaning |
+|-------------------|---------|
+| 0,1 | X min / max enabled |
+| 2,3 | Y min / max |
+| 4,5 | Z min / max |
+| 6,7 | A min / max |
+
+`move_linear`, `jog`, and `move_arc` (endpoint XY) reject targets outside enabled limits with `"x below min limit"`, etc. Limits can be set via `configure` while motors are enabled; mechanical fields still require disable. Use `clear_limits` or `clear_min_x`/`clear_max_x`/… to remove limits.
+
+### Hardware limit switches (NVM v3)
+
+Optional per-axis POS/NEG limit inputs on ClearCore onboard I/O **pin indices 0–12** (libClearCore `ClearCorePins`):
+
+| Index | Connector | Capability |
+|-------|-----------|------------|
+| 0–5 | IO-0 … IO-5 | Digital **input or output** on the connector; when assigned as a limit, firmware forces **INPUT_DIGITAL** |
+| 6–8 | DI-6 … DI-8 | **Input only** |
+| 9–12 | A-9 … A-12 | **Input only** (also analog-capable, not used as analog here) |
+
+Configure with `pos_lim_x`, `neg_lim_x`, … (pin index). **0** or **255** disables that input. CCIO expansion pins (64+) are not supported yet.
+
+- Rejects queued moves that would travel further into an active limit (`"x pos limit active"`, `"y neg limit active"`, …).
+- During motion, triggers deceleration stop if a limit activates while moving in that direction.
+- Bypassed in `test_mode` (same as hardware estop).
+- `clear_limits` clears soft limits and hardware limit DI assignments.
+
+### Digital I/O (`read_inputs` / `write_output`)
+
+| Method | Detail |
+|--------|--------|
+| `read_inputs` | Optional `pin` 0–12; returns `{pins:[{pin,state,mode}]}` with raw digital level |
+| `write_output` | `pin` 0–5, `state` bool — drives IO-0…IO-5 as **OUTPUT_DIGITAL** |
+
+DI-6…A-12 are read-only via `read_inputs`. Pins assigned as hardware limits cannot be written.
+
+### A-axis units (NVM v4)
+
+Axis A is rotary. The user-facing unit is configurable with `set_units_a` (`"deg"` or `"rev"`), persisted to NVM (blob v4). Internal storage stays **degrees** (motor A mechanical params use `UNIT_DEGREES`), so `ToInternal`/`FromInternal` convert revolutions ↔ 360°. `get_pose`, `get_status`, and soft limits all report/accept A values in the active A unit. Older NVM blobs (v1–v3) load with the default `deg`.
+
+### Motor torque / HLFB readback
+
+HLFB is configured for **measured torque** (`HLFB_MODE_HAS_BIPOLAR_PWM`). `get_status` returns `hlfb_percent`, a per-axis array of the latest HLFB duty cycle as a percentage of peak torque (−100…100). `null` means no measurement yet (`HLFB_DUTY_UNKNOWN`). The aggregate `hlfb` boolean remains true only when every enabled axis is asserted.
+
+### Move queue introspection & flush
+
+Coordinated XY moves queue in the planner (`MotionQueueCount`). `queue_status` returns `{queue, active}` (pending segment count and whether a move is executing); allowed during `wait_idle`. `queue_clear` decelerates the active coordinated segment to a stop and drops all pending segments (it zeroes the planner queue counts), then stops independent Z/A with `MoveStopDecel`. Motors stay enabled. Accepted during `wait_idle`/`dwell` (treated as a safety method, it interrupts the wait).
+
+### Homing / zeroing (`home`)
+
+`home` seeks the hardware limit switch assigned for `axis`/`dir` (`pos_lim_<axis>`/`neg_lim_<axis>`) at a slow `feed`. The seek move bypasses soft limits (the physical limit is expected to stop it) and is commanded as a far relative target — coordinated `QueueLinear` for X/Y (other axis held), independent `Move` for Z/A. The poll loop watches the limit DI; on contact it decelerates everything to a stop, optionally retracts by `backoff`, and optionally sets the work origin to 0 (`zero`, default true) at the final position. Requires the limit DI to be configured; rejects if the switch is already active or never reached (`seek` max travel, default 1000 work units; `timeout_ms` default 30000). Blocking and interruptible by `estop`/`stop`/`queue_clear`.
+
+### Probing (`probe`)
+
+`probe` moves `axis` toward `dir` at probe `feed` until a probe input DI (`pin`, 1–12, not a pin reserved for a limit) triggers. `active` selects polarity (default `high` = touched when the pin reads high). On contact it decelerates to a stop and reports the touch `pos` in work units; optional `backoff` and `zero` (default false). Same seek/timeout defaults as `home`. Blocking and interruptible.
 
 ## Motion behavior
 

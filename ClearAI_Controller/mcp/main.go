@@ -89,6 +89,37 @@ type dwellArgs struct {
 	Seconds float64 `json:"seconds"`
 }
 
+type readInputsArgs struct {
+	Pin *int `json:"pin,omitempty" jsonschema:"ClearCore pin index 0-12; omit for all"`
+}
+
+type writeOutputArgs struct {
+	Pin   int  `json:"pin" jsonschema:"IO pin index 0-5 only"`
+	State bool `json:"state" jsonschema:"true=high false=low"`
+}
+
+type homeArgs struct {
+	Axis      string   `json:"axis" jsonschema:"x, y, z, or a"`
+	Dir       string   `json:"dir" jsonschema:"pos or neg (which limit to seek)"`
+	Feed      *float64 `json:"feed,omitempty" jsonschema:"homing feed in units/min"`
+	Seek      *float64 `json:"seek,omitempty" jsonschema:"max travel in work units (default 1000)"`
+	Backoff   *float64 `json:"backoff,omitempty" jsonschema:"retract after contact (work units)"`
+	Zero     *bool    `json:"zero,omitempty" jsonschema:"set work origin = 0 at final position (default true)"`
+	TimeoutMS *int    `json:"timeout_ms,omitempty" jsonschema:"overall timeout ms (default 30000)"`
+}
+
+type probeArgs struct {
+	Axis      string   `json:"axis" jsonschema:"x, y, z, or a"`
+	Dir       string   `json:"dir" jsonschema:"pos or neg"`
+	Pin       int      `json:"pin" jsonschema:"probe input DI index 1-12"`
+	Feed      *float64 `json:"feed,omitempty" jsonschema:"probe feed in units/min"`
+	Seek      *float64 `json:"seek,omitempty" jsonschema:"max travel in work units (default 1000)"`
+	Backoff   *float64 `json:"backoff,omitempty" jsonschema:"retract after touch (work units)"`
+	Zero      *bool    `json:"zero,omitempty" jsonschema:"set work origin = 0 at touch point (default false)"`
+	Active    string   `json:"active,omitempty" jsonschema:"probe polarity: high or low (default high)"`
+	TimeoutMS *int    `json:"timeout_ms,omitempty" jsonschema:"overall timeout ms (default 30000)"`
+}
+
 type configureArgs struct {
 	StepsPerRevX *int     `json:"steps_per_rev_x,omitempty"`
 	StepsPerRevY *int     `json:"steps_per_rev_y,omitempty"`
@@ -107,6 +138,31 @@ type configureArgs struct {
 	AxisMask     *int     `json:"axis_mask,omitempty" jsonschema:"bit0 X, bit1 Y, bit2 Z, bit3 A"`
 	EstopDI6     *int     `json:"estop_di6,omitempty"`
 	TestMode     *bool    `json:"test_mode,omitempty"`
+	MinX         *float64 `json:"min_x,omitempty" jsonschema:"soft min in work units (mm/inch; A=deg)"`
+	MaxX         *float64 `json:"max_x,omitempty"`
+	MinY         *float64 `json:"min_y,omitempty"`
+	MaxY         *float64 `json:"max_y,omitempty"`
+	MinZ         *float64 `json:"min_z,omitempty"`
+	MaxZ         *float64 `json:"max_z,omitempty"`
+	MinA         *float64 `json:"min_a,omitempty"`
+	MaxA         *float64 `json:"max_a,omitempty"`
+	ClearLimits  *bool    `json:"clear_limits,omitempty"`
+	ClearMinX    *bool    `json:"clear_min_x,omitempty"`
+	ClearMaxX    *bool    `json:"clear_max_x,omitempty"`
+	ClearMinY    *bool    `json:"clear_min_y,omitempty"`
+	ClearMaxY    *bool    `json:"clear_max_y,omitempty"`
+	ClearMinZ    *bool    `json:"clear_min_z,omitempty"`
+	ClearMaxZ    *bool    `json:"clear_max_z,omitempty"`
+	ClearMinA    *bool    `json:"clear_min_a,omitempty"`
+	ClearMaxA    *bool    `json:"clear_max_a,omitempty"`
+	PosLimX      *int     `json:"pos_lim_x,omitempty" jsonschema:"Pin index 0-5 IO in/out (forced input), 6-12 DI/A input-only; 0 or 255 disables"`
+	NegLimX      *int     `json:"neg_lim_x,omitempty" jsonschema:"Pin index for X- limit; 0 or 255 disables"`
+	PosLimY      *int     `json:"pos_lim_y,omitempty"`
+	NegLimY      *int     `json:"neg_lim_y,omitempty"`
+	PosLimZ      *int     `json:"pos_lim_z,omitempty"`
+	NegLimZ      *int     `json:"neg_lim_z,omitempty"`
+	PosLimA      *int     `json:"pos_lim_a,omitempty"`
+	NegLimA      *int     `json:"neg_lim_a,omitempty"`
 }
 
 func resultJSON(raw json.RawMessage, err error) (*mcp.CallToolResult, any, error) {
@@ -145,6 +201,9 @@ func registerTools(server *mcp.Server, board *rpcClient) {
 	addRPC[emptyArgs](server, board, "get_pose",
 		"Return work coordinates x,y,z,a in the active units (A is always degrees).",
 		"get_pose", 5*time.Second)
+	addRPC[emptyArgs](server, board, "get_config",
+		"Return live ClearAI config and whether NVM has a valid persisted blob (axis_mask, test_mode, mechanics, vel).",
+		"get_config", 5*time.Second)
 	addRPC[emptyArgs](server, board, "enable",
 		"Enable ClearPath motors on the configured axis mask. Required before motion.",
 		"enable", 5*time.Second)
@@ -172,11 +231,14 @@ func registerTools(server *mcp.Server, board *rpcClient) {
 		return resultJSON(board.call("wait_idle", args, time.Duration(ms+2000)*time.Millisecond))
 	})
 	addRPC[configureArgs](server, board, "configure",
-		"Set mechanical parameters and axis mask. Motors must be disabled first, except test_mode.",
+		"Set mechanical parameters, axis mask, and optional soft travel limits (min_x/max_x, etc.). Mechanical fields require motors disabled; limits and test_mode may change while enabled. Persisted to NVM.",
 		"configure", 5*time.Second)
+	addRPC[emptyArgs](server, board, "reset_config",
+		"Restore compile-time defaults, clear NVM config blob. Motors must be disabled first.",
+		"reset_config", 5*time.Second)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "set_test_mode",
-		Description: "Bench test mode: bypass hardware estop, HLFB, alert, and enable gates. Software stop/estop/disable still halt.",
+		Description: "Bench test mode: bypass hardware estop, HLFB, alert, and enable gates. Persisted to NVM. Software stop/estop/disable still halt.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args testModeArgs) (*mcp.CallToolResult, any, error) {
 		_ = ctx
 		params := map[string]any{}
@@ -190,8 +252,11 @@ func registerTools(server *mcp.Server, board *rpcClient) {
 		return resultJSON(board.call("set_test_mode", params, 5*time.Second))
 	})
 	addRPC[unitsArgs](server, board, "set_units",
-		"Set linear units to mm or inch. Axis A remains degrees.",
+		"Set linear units to mm or inch. Axis A is unaffected (use set_units_a).",
 		"set_units", 5*time.Second)
+	addRPC[unitsArgs](server, board, "set_units_a",
+		"Set the rotary A-axis unit to degrees (deg) or revolutions (rev). Persisted to NVM.",
+		"set_units_a", 5*time.Second)
 	addRPC[modeArgs](server, board, "set_mode",
 		"Set absolute or relative coordinate mode for move_linear and move_arc.",
 		"set_mode", 5*time.Second)
@@ -207,6 +272,24 @@ func registerTools(server *mcp.Server, board *rpcClient) {
 	addRPC[jogArgs](server, board, "jog",
 		"Relative jog; ignores abs/rel mode.",
 		"jog", 5*time.Second)
+	addRPC[readInputsArgs](server, board, "read_inputs",
+		"Read raw digital state for ClearCore onboard pins 0-12 (IO-0..A-12). Optional pin for one connector.",
+		"read_inputs", 5*time.Second)
+	addRPC[writeOutputArgs](server, board, "write_output",
+		"Drive IO-0..IO-5 as digital output (state true/false). Pins 6-12 are input-only.",
+		"write_output", 5*time.Second)
+	addRPC[emptyArgs](server, board, "queue_status",
+		"Introspect the coordinated motion queue: pending segment count and active flag.",
+		"queue_status", 5*time.Second)
+	addRPC[emptyArgs](server, board, "queue_clear",
+		"Flush the coordinated motion queue: decelerate the active move to a stop and drop pending segments. Motors stay enabled.",
+		"queue_clear", 5*time.Second)
+	addRPC[homeArgs](server, board, "home",
+		"Home/zero one axis: seek the configured hardware limit (pos_lim_<axis>/neg_lim_<axis>) at a slow feed, stop on contact, optional backoff, optional zero. Blocking.",
+		"home", 35*time.Second)
+	addRPC[probeArgs](server, board, "probe",
+		"Probe along one axis at a slow feed until the probe input DI triggers; reports touch position and optional zero. Blocking.",
+		"probe", 35*time.Second)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "dwell",
 		Description: "Wait seconds (max 600). Interruptible by estop.",

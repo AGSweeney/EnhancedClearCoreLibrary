@@ -188,6 +188,110 @@ static void ApplyParam(const char *js, const jsmntok_t *key, const jsmntok_t *va
     } else if (TokenEq(js, key, "gear_a") && TokenNumber(js, val, &n)) {
         p->hasGearA = true;
         p->gearA = n;
+    } else if (TokenEq(js, key, "min_x") && TokenNumber(js, val, &n)) {
+        p->hasMinX = true;
+        p->minX = n;
+    } else if (TokenEq(js, key, "max_x") && TokenNumber(js, val, &n)) {
+        p->hasMaxX = true;
+        p->maxX = n;
+    } else if (TokenEq(js, key, "min_y") && TokenNumber(js, val, &n)) {
+        p->hasMinY = true;
+        p->minY = n;
+    } else if (TokenEq(js, key, "max_y") && TokenNumber(js, val, &n)) {
+        p->hasMaxY = true;
+        p->maxY = n;
+    } else if (TokenEq(js, key, "min_z") && TokenNumber(js, val, &n)) {
+        p->hasMinZ = true;
+        p->minZ = n;
+    } else if (TokenEq(js, key, "max_z") && TokenNumber(js, val, &n)) {
+        p->hasMaxZ = true;
+        p->maxZ = n;
+    } else if (TokenEq(js, key, "min_a") && TokenNumber(js, val, &n)) {
+        p->hasMinA = true;
+        p->minA = n;
+    } else if (TokenEq(js, key, "max_a") && TokenNumber(js, val, &n)) {
+        p->hasMaxA = true;
+        p->maxA = n;
+    } else if (TokenEq(js, key, "clear_limits") && TokenBool(js, val, &b)) {
+        p->hasClearLimits = true;
+        p->clearLimits = b;
+    } else if (TokenEq(js, key, "clear_min_x") && TokenBool(js, val, &b)) {
+        p->hasClearMinX = true;
+        p->clearMinX = b;
+    } else if (TokenEq(js, key, "clear_max_x") && TokenBool(js, val, &b)) {
+        p->hasClearMaxX = true;
+        p->clearMaxX = b;
+    } else if (TokenEq(js, key, "clear_min_y") && TokenBool(js, val, &b)) {
+        p->hasClearMinY = true;
+        p->clearMinY = b;
+    } else if (TokenEq(js, key, "clear_max_y") && TokenBool(js, val, &b)) {
+        p->hasClearMaxY = true;
+        p->clearMaxY = b;
+    } else if (TokenEq(js, key, "clear_min_z") && TokenBool(js, val, &b)) {
+        p->hasClearMinZ = true;
+        p->clearMinZ = b;
+    } else if (TokenEq(js, key, "clear_max_z") && TokenBool(js, val, &b)) {
+        p->hasClearMaxZ = true;
+        p->clearMaxZ = b;
+    } else if (TokenEq(js, key, "clear_min_a") && TokenBool(js, val, &b)) {
+        p->hasClearMinA = true;
+        p->clearMinA = b;
+    } else if (TokenEq(js, key, "clear_max_a") && TokenBool(js, val, &b)) {
+        p->hasClearMaxA = true;
+        p->clearMaxA = b;
+    } else if (TokenEq(js, key, "pos_lim_x") && TokenNumber(js, val, &n)) {
+        p->hasPosLimX = true;
+        p->posLimX = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "neg_lim_x") && TokenNumber(js, val, &n)) {
+        p->hasNegLimX = true;
+        p->negLimX = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "pos_lim_y") && TokenNumber(js, val, &n)) {
+        p->hasPosLimY = true;
+        p->posLimY = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "neg_lim_y") && TokenNumber(js, val, &n)) {
+        p->hasNegLimY = true;
+        p->negLimY = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "pos_lim_z") && TokenNumber(js, val, &n)) {
+        p->hasPosLimZ = true;
+        p->posLimZ = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "neg_lim_z") && TokenNumber(js, val, &n)) {
+        p->hasNegLimZ = true;
+        p->negLimZ = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "pos_lim_a") && TokenNumber(js, val, &n)) {
+        p->hasPosLimA = true;
+        p->posLimA = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "neg_lim_a") && TokenNumber(js, val, &n)) {
+        p->hasNegLimA = true;
+        p->negLimA = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "pin") && TokenNumber(js, val, &n)) {
+        p->hasPin = true;
+        p->pin = (n < 0.0) ? 0u : (uint32_t)n;
+    } else if (TokenEq(js, key, "axis") && val->type == JSMN_STRING) {
+        p->hasAxis = true;
+        TokenCopy(js, val, p->axis, sizeof(p->axis));
+    } else if (TokenEq(js, key, "dir") && val->type == JSMN_STRING) {
+        p->hasDir = true;
+        TokenCopy(js, val, p->dir, sizeof(p->dir));
+    } else if (TokenEq(js, key, "seek") && TokenNumber(js, val, &n)) {
+        p->hasSeek = true;
+        p->seek = n;
+    } else if (TokenEq(js, key, "backoff") && TokenNumber(js, val, &n)) {
+        p->hasBackoff = true;
+        p->backoff = n;
+    } else if (TokenEq(js, key, "zero") && TokenBool(js, val, &b)) {
+        p->hasZero = true;
+        p->zero = b;
+    } else if (TokenEq(js, key, "active") && val->type == JSMN_STRING) {
+        p->hasActive = true;
+        TokenCopy(js, val, p->active, sizeof(p->active));
+    } else if (TokenEq(js, key, "state")) {
+        if (TokenBool(js, val, &b)) {
+            p->hasIoState = true;
+            p->ioState = b;
+        } else if (TokenNumber(js, val, &n)) {
+            p->hasIoState = true;
+            p->ioState = (n != 0.0);
+        }
     }
 }
 

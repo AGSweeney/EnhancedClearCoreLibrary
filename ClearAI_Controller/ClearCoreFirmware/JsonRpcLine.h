@@ -49,6 +49,14 @@ struct RpcParams {
     bool hasStepsX, hasStepsY, hasStepsZ, hasStepsA;
     bool hasPitchX, hasPitchY, hasPitchZ, hasPitchA;
     bool hasGearX, hasGearY, hasGearZ, hasGearA;
+    bool hasMinX, hasMaxX, hasMinY, hasMaxY, hasMinZ, hasMaxZ, hasMinA, hasMaxA;
+    bool hasClearLimits;
+    bool hasClearMinX, hasClearMaxX, hasClearMinY, hasClearMaxY;
+    bool hasClearMinZ, hasClearMaxZ, hasClearMinA, hasClearMaxA;
+    bool hasPosLimX, hasNegLimX, hasPosLimY, hasNegLimY;
+    bool hasPosLimZ, hasNegLimZ, hasPosLimA, hasNegLimA;
+    bool hasPin, hasIoState;
+    bool hasAxis, hasDir, hasSeek, hasBackoff, hasZero, hasActive;
     double x, y, z, a;
     double i, j, feed, seconds;
     uint32_t timeoutMs;
@@ -64,6 +72,19 @@ struct RpcParams {
     uint32_t stepsX, stepsY, stepsZ, stepsA;
     double pitchX, pitchY, pitchZ, pitchA;
     double gearX, gearY, gearZ, gearA;
+    double minX, maxX, minY, maxY, minZ, maxZ, minA, maxA;
+    bool clearLimits;
+    bool clearMinX, clearMaxX, clearMinY, clearMaxY;
+    bool clearMinZ, clearMaxZ, clearMinA, clearMaxA;
+    uint32_t posLimX, negLimX, posLimY, negLimY, posLimZ, negLimZ, posLimA, negLimA;
+    uint32_t pin;
+    bool ioState;
+    char axis[8];
+    char dir[8];
+    double seek;
+    double backoff;
+    bool zero;
+    char active[8];
 };
 
 struct RpcRequest {

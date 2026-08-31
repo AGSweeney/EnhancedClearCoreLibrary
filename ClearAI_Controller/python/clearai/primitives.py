@@ -46,6 +46,10 @@ def get_pose() -> Any:
     return _c().call("get_pose")
 
 
+def get_config() -> Any:
+    return _c().call("get_config")
+
+
 def enable() -> Any:
     return _c().call("enable")
 
@@ -75,8 +79,16 @@ def configure(**kwargs: Any) -> Any:
     return _c().call("configure", kwargs)
 
 
+def reset_config() -> Any:
+    return _c().call("reset_config")
+
+
 def set_units(units: str) -> Any:
     return _c().call("set_units", {"units": units})
+
+
+def set_units_a(units: str) -> Any:
+    return _c().call("set_units_a", {"units": units})
 
 
 def set_mode(mode: str) -> Any:
@@ -157,3 +169,74 @@ def jog(
 def dwell(seconds: float) -> Any:
     timeout_s = max(1.0, seconds + 2.0)
     return _c().call("dwell", {"seconds": seconds}, timeout=timeout_s)
+
+
+def read_inputs(pin: Optional[int] = None) -> Any:
+    params: dict[str, Any] = {}
+    if pin is not None:
+        params["pin"] = pin
+    return _c().call("read_inputs", params)
+
+
+def write_output(pin: int, state: bool) -> Any:
+    return _c().call("write_output", {"pin": pin, "state": state})
+
+
+def queue_status() -> Any:
+    return _c().call("queue_status")
+
+
+def queue_clear() -> Any:
+    return _c().call("queue_clear")
+
+
+def home(
+    axis: str,
+    dir: str,
+    feed: Optional[float] = None,
+    seek: Optional[float] = None,
+    backoff: Optional[float] = None,
+    zero: Optional[bool] = None,
+    timeout_ms: Optional[int] = None,
+) -> Any:
+    params: dict[str, Any] = {"axis": axis, "dir": dir}
+    if feed is not None:
+        params["feed"] = feed
+    if seek is not None:
+        params["seek"] = seek
+    if backoff is not None:
+        params["backoff"] = backoff
+    if zero is not None:
+        params["zero"] = zero
+    if timeout_ms is not None:
+        params["timeout_ms"] = timeout_ms
+    timeout = max(1.0, (timeout_ms or 30000) / 1000.0 + 2.0)
+    return _c().call("home", params, timeout=timeout)
+
+
+def probe(
+    axis: str,
+    dir: str,
+    pin: int,
+    feed: Optional[float] = None,
+    seek: Optional[float] = None,
+    backoff: Optional[float] = None,
+    zero: Optional[bool] = None,
+    active: Optional[str] = None,
+    timeout_ms: Optional[int] = None,
+) -> Any:
+    params: dict[str, Any] = {"axis": axis, "dir": dir, "pin": pin}
+    if feed is not None:
+        params["feed"] = feed
+    if seek is not None:
+        params["seek"] = seek
+    if backoff is not None:
+        params["backoff"] = backoff
+    if zero is not None:
+        params["zero"] = zero
+    if active is not None:
+        params["active"] = active
+    if timeout_ms is not None:
+        params["timeout_ms"] = timeout_ms
+    timeout = max(1.0, (timeout_ms or 30000) / 1000.0 + 2.0)
+    return _c().call("probe", params, timeout=timeout)

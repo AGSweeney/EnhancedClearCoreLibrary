@@ -28,7 +28,7 @@
 #define CLEARAI_PROTOCOL_VERSION "1.0"
 #define CLEARAI_SERIAL_BAUD 115200
 #define CLEARAI_MAX_LINE 512
-#define CLEARAI_MAX_REPLY 640
+#define CLEARAI_MAX_REPLY 896
 #define CLEARAI_AXIS_COUNT 4
 #define CLEARAI_TCP_CONTROL_PORT 9100
 #define CLEARAI_TCP_TELEMETRY_PORT 9101
@@ -37,6 +37,11 @@
 #define CLEARAI_TELEMETRY_INTERVAL_MS 50
 #define CLEARAI_WAIT_USB_MS 5000
 #define CLEARAI_DWELL_MS_MAX 600000u
+/* Homing/probing defaults (work units and ms). */
+#define CLEARAI_HOME_SEEK_DEFAULT 1000.0
+#define CLEARAI_HOME_TIMEOUT_MS 30000u
+#define CLEARAI_PROBE_TIMEOUT_MS 30000u
+#define CLEARAI_SEEK_BACKOFF_MS 60000u
 #define CLEARAI_DEFAULT_STEPS_PER_REV 800u
 #define CLEARAI_DEFAULT_PITCH_MM 5.0
 /* 800 ppr × 2025 rpm ≈ 27000 steps/s (motor rated 2000+ rpm, unloaded bench). */
@@ -61,6 +66,12 @@ enum ClearAiAxis {
 enum ClearAiUnits {
     CLEARAI_UNITS_MM = 0,
     CLEARAI_UNITS_INCH = 1
+};
+
+/* Axis A is rotary; user-facing unit is degrees or revolutions. Internal stays degrees. */
+enum ClearAiUnitsA {
+    CLEARAI_UNITS_A_DEG = 0,
+    CLEARAI_UNITS_A_REV = 1
 };
 
 enum ClearAiMode {
