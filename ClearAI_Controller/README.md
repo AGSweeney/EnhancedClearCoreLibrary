@@ -2,7 +2,7 @@
 
 **Experimental.** Not certified for production or safety-critical use. Use with machine safeguards.
 
-JSON-RPC Lines firmware and hosts so an LLM can command ClearPath servos on ClearCore (**Code as Policies** primitives — not G-code). Optional **LocoRix** MCP reads Helios ToF Detect numbers for hole CX.
+JSON-RPC Lines firmware and hosts so an LLM can command ClearPath servos on ClearCore (**Code as Policies** primitives — not G-code). Optional **LOCORiX** MCP reads Helios ToF Detect numbers for hole CX.
 
 ## Documentation
 
