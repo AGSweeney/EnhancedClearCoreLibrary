@@ -313,6 +313,12 @@ static uint32_t g_movesRejected = 0;
 static int32_t g_distanceSteps[CLEARAI_AXIS_COUNT] = {0};
 static int32_t g_arcPathSteps = 0;
 
+/* Sub-step residual per axis: fractional step error between the exact
+ * commanded position and the integer step position actually commanded.
+ * Folded into the next relative move so cumulative commanded position tracks
+ * the requested displacement exactly (bounded, no random-walk rounding drift). */
+static double g_stepResidual[CLEARAI_AXIS_COUNT] = {0.0};
+
 static void ApplyLimits();
 
 static int32_t I32Round(double v) {
@@ -1247,6 +1253,7 @@ bool MotionInit() {
     g_movesRejected = 0;
     for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
         g_distanceSteps[a] = 0;
+        g_stepResidual[a] = 0.0;
     }
     g_arcPathSteps = 0;
     g_watchdogTripped = false;
@@ -1724,6 +1731,7 @@ const char *MotionSetWorkOrigin(const RpcParams *p) {
         }
         if (setThis) {
             g_workOrigin[a] = MachineInternal(a) - ToInternal(a, user);
+            g_stepResidual[a] = 0.0; /* re-anchor: next absolute move re-derives it */
         }
     }
     return nullptr;
@@ -1735,11 +1743,19 @@ static int32_t TargetSteps(uint8_t axis, bool hasUser, double user, bool relativ
         return cur;
     }
     const double internal = ToInternal(axis, user);
+    const double spu = g_stepsPerMm[axis];
     if (relative) {
-        return cur + I32Round(internal * g_stepsPerMm[axis]);
+        /* exact new position (fractional steps) = current commanded + prior residual + this delta. */
+        const double exact = (double)cur + g_stepResidual[axis] + internal * spu;
+        const int32_t commanded = I32Round(exact);
+        g_stepResidual[axis] = exact - (double)commanded; /* carry the rounding error forward */
+        return commanded;
     }
     const double machine = internal + g_workOrigin[axis];
-    return I32Round(machine * g_stepsPerMm[axis]);
+    const double exact = machine * spu;
+    const int32_t commanded = I32Round(exact);
+    g_stepResidual[axis] = exact - (double)commanded; /* re-anchor on absolute move */
+    return commanded;
 }
 
 static void ApplyFeed(bool rapid, bool hasFeed, double feedUser) {
@@ -2809,6 +2825,7 @@ const char *MotionHome(const RpcParams *p, char *body, uint16_t bufLen, ClearAiU
     const bool zero = p->hasZero ? p->zero : true;
     if (zero) {
         g_workOrigin[axis] = MachineInternal(axis);
+        g_stepResidual[axis] = 0.0;
     }
 
     const double posUser = FromInternal(axis, WorkInternal(axis));
@@ -2914,6 +2931,7 @@ const char *MotionProbe(const RpcParams *p, char *body, uint16_t bufLen, ClearAi
     const bool zero = p->hasZero ? p->zero : false;
     if (zero) {
         g_workOrigin[axis] = MachineInternal(axis);
+        g_stepResidual[axis] = 0.0;
     }
 
     snprintf(body, bufLen,
