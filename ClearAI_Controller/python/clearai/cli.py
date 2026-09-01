@@ -48,6 +48,11 @@ METHODS = (
     "unsubscribe_inputs",
     "configure_network",
     "restart",
+    "jog_velocity",
+    "jog_stop",
+    "move_batch",
+    "get_log",
+    "clear_log",
 )
 
 
@@ -112,6 +117,14 @@ def main(argv: Optional[list[str]] = None) -> int:
             sp.add_argument("--rapid", action="store_true")
         if name == "jog":
             sp.add_argument("--feed", type=float)
+        if name == "jog_velocity":
+            sp.add_argument("--x", type=float)
+            sp.add_argument("--y", type=float)
+            sp.add_argument("--z", type=float)
+            sp.add_argument("--a", type=float)
+        if name == "move_batch":
+            sp.add_argument("--moves", required=True,
+                             help="JSON array of move objects, or @file.json")
         if name == "move_arc":
             sp.add_argument("--x", type=float)
             sp.add_argument("--y", type=float)
@@ -316,6 +329,30 @@ def main(argv: Optional[list[str]] = None) -> int:
                 params["gateway"] = args.gateway
             timeout = 5.0
         elif args.cmd == "restart":
+            params = {}
+            timeout = 5.0
+        elif args.cmd == "jog_velocity":
+            params = {}
+            for ax in ("x", "y", "z", "a"):
+                v = getattr(args, ax, None)
+                if v is not None:
+                    params[ax] = v
+            timeout = 5.0
+        elif args.cmd == "jog_stop":
+            params = {}
+            timeout = 5.0
+        elif args.cmd == "move_batch":
+            raw = args.moves
+            if raw.startswith("@"):
+                with open(raw[1:], encoding="utf-8") as fh:
+                    raw = fh.read()
+            import json as _json
+            params = {"moves": _json.loads(raw)}
+            timeout = 10.0
+        elif args.cmd == "get_log":
+            params = {}
+            timeout = 5.0
+        elif args.cmd == "clear_log":
             params = {}
             timeout = 5.0
         elif args.cmd == "keepalive":

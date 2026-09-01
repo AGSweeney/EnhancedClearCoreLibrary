@@ -40,7 +40,7 @@ All tools mirror firmware methods unless noted. Motion tools are non-blocking; a
 | Tool | Description |
 |------|-------------|
 | `get_capabilities` | Protocol version, axes, units, mode, method list, ports |
-| `get_status` | Enable/moving/HLFB/estop/test_mode/alerts/queue/`queue_active`/`units_a`/`hlfb_percent` (per-axis torque %)/`watchdog_ms`/`watchdog_tripped`/`limit_status`/`pwm_duty`/pose |
+| `get_status` | Enable/moving/HLFB/estop/test_mode/alerts/queue/`queue_active`/`alert_reg`/`alert_reg_axis`/`alerts_decoded`/`units_a`/`hlfb_percent` (per-axis torque %)/`watchdog_ms`/`watchdog_tripped`/`limit_status`/`pwm_duty`/`uptime_ms`/`moves`/`moves_rejected`/`distance`/`arc_path`/pose |
 | `get_pose` | Work coordinates x,y,z,a (A in configured A units) |
 | `get_config` | Live config + NVM validity (`axis_mask`, test_mode, mechanics, vel, `units_a`, soft limits, hw limit DIs, `vel_axis`/`accel_axis`/`decel_axis`, `watchdog_ms`, `out_power_on_state`/`out_power_on_mask`, `network_mode`/`ip_address`/`netmask`/`gateway`, …) |
 | `enable` / `disable` | Enable or abrupt disable |
@@ -68,6 +68,11 @@ All tools mirror firmware methods unless noted. Motion tools are non-blocking; a
 | `unsubscribe_inputs` | Stop input edge notifications |
 | `configure_network` | Set network mode (dhcp/static) + static IP/netmask/gateway; persisted, applies on restart |
 | `restart` | Reset board to apply pending network config (connection drops) |
+| `jog_velocity` | Start continuous per-axis velocity jog (signed user units/sec); hw limits auto-stop, no soft-limit enforcement |
+| `jog_stop` | Decelerate-stop active jog_velocity |
+| `move_batch` | Queue an array of linear/arc/dwell moves in one round-trip; stops at first rejected element |
+| `get_log` | Recent motion log (rejected moves + info events), most-recent first |
+| `clear_log` | Clear the motion log ring buffer |
 | `queue_status` | Pending coordinated queue depth + active flag |
 | `queue_clear` | Decelerate active move + drop pending queued segments |
 | `home` | Seek configured hw limit for `axis`/`dir`, stop, optional backoff + zero |

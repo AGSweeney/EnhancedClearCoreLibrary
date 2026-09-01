@@ -78,8 +78,41 @@ static bool TokenNumber(const char *js, const jsmntok_t *tok, double *out) {
     return true;
 }
 
-static void ApplyParam(const char *js, const jsmntok_t *key, const jsmntok_t *val,
-                       RpcParams *p) {
+/* Forward declarations for nested-object parsing (move_batch). */
+static int SkipSubtree(const jsmntok_t *tokens, int idx);
+static void ApplyParam(const char *js, const jsmntok_t *tokens, int ntok,
+                       const jsmntok_t *key, const jsmntok_t *val, RpcParams *p);
+static void ParseObjectParams(const char *js, const jsmntok_t *tokens, int ntok,
+                               int objIdx, RpcParams *p);
+
+/* Single-request-at-a-time batch buffer for move_batch sub-params. */
+static RpcParams s_movesBatch[CLEARAI_MAX_BATCH];
+
+/* Return the token index just past the subtree rooted at idx. */
+static int SkipSubtree(const jsmntok_t *tokens, int idx) {
+    int remaining = 1;
+    while (remaining > 0) {
+        remaining += tokens[idx].size;
+        remaining--;
+        idx++;
+    }
+    return idx;
+}
+
+static void ParseObjectParams(const char *js, const jsmntok_t *tokens, int ntok,
+                               int objIdx, RpcParams *p) {
+    const jsmntok_t *obj = &tokens[objIdx];
+    int idx = objIdx + 1;
+    for (int e = 0; e < obj->size && idx + 1 < ntok; e++) {
+        const jsmntok_t *key = &tokens[idx];
+        const jsmntok_t *val = &tokens[idx + 1];
+        ApplyParam(js, tokens, ntok, key, val, p);
+        idx = SkipSubtree(tokens, idx + 1);
+    }
+}
+
+static void ApplyParam(const char *js, const jsmntok_t *tokens, int ntok,
+                       const jsmntok_t *key, const jsmntok_t *val, RpcParams *p) {
     double n = 0.0;
     bool b = false;
     if (TokenEq(js, key, "x") && TokenNumber(js, val, &n)) {
@@ -341,6 +374,19 @@ static void ApplyParam(const char *js, const jsmntok_t *key, const jsmntok_t *va
             }
             child += 1;
         }
+    } else if (TokenEq(js, key, "moves") && val->type == JSMN_ARRAY) {
+        p->hasMoves = true;
+        p->moves = s_movesBatch;
+        p->movesCount = 0;
+        int idx = (int)(val - tokens) + 1;
+        for (int m = 0; m < val->size && p->movesCount < CLEARAI_MAX_BATCH; m++) {
+            if (tokens[idx].type == JSMN_OBJECT) {
+                memset(&s_movesBatch[p->movesCount], 0, sizeof(RpcParams));
+                ParseObjectParams(js, tokens, ntok, idx, &s_movesBatch[p->movesCount]);
+                p->movesCount++;
+            }
+            idx = SkipSubtree(tokens, idx);
+        }
     } else if (TokenEq(js, key, "ip_address") && val->type == JSMN_STRING) {
         TokenCopy(js, val, p->ipAddress, sizeof(p->ipAddress));
         p->hasIpAddress = true;
@@ -422,23 +468,7 @@ bool JsonRpcParseLine(const char *line, RpcRequest *out) {
     }
 
     if (paramsTok >= 0) {
-        const jsmntok_t *obj = &tokens[paramsTok];
-        int idx = paramsTok + 1;
-        for (int p = 0; p < obj->size && idx + 1 < ntok; p++) {
-            const jsmntok_t *key = &tokens[idx];
-            const jsmntok_t *val = &tokens[idx + 1];
-            ApplyParam(line, key, val, &out->params);
-            idx += 2;
-            if (val->type == JSMN_OBJECT || val->type == JSMN_ARRAY) {
-                // Skip nested tokens; v1 params are scalars only.
-                int remaining = val->size;
-                while (remaining > 0 && idx < ntok) {
-                    remaining += tokens[idx].size;
-                    remaining--;
-                    idx++;
-                }
-            }
-        }
+        ParseObjectParams(line, tokens, ntok, paramsTok, &out->params);
     }
 
     out->ok = true;

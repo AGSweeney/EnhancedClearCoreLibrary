@@ -107,7 +107,12 @@ struct RpcParams {
     char ipAddress[20];
     char netmask[20];
     char gateway[20];
+    bool hasMoves;
+    uint8_t movesCount;
+    const RpcParams *moves; /* points to a parser-local batch buffer */
 };
+
+#define CLEARAI_MAX_BATCH 8
 
 struct RpcRequest {
     bool ok;

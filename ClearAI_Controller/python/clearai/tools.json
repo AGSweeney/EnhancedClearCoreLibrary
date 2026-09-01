@@ -520,5 +520,77 @@
         "additionalProperties": false
       }
     }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "jog_velocity",
+      "description": "Start a continuous per-axis velocity jog (user units/sec, signed). Hardware limits auto-stop; soft limits are not enforced. Stop with jog_stop or stop.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "x": { "type": "number", "description": "X velocity in user units/sec (signed)" },
+          "y": { "type": "number", "description": "Y velocity in user units/sec (signed)" },
+          "z": { "type": "number", "description": "Z velocity in user units/sec (signed)" },
+          "a": { "type": "number", "description": "A velocity in user units/sec (signed)" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "jog_stop",
+      "description": "Decelerate-stop any active jog_velocity motion.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "move_batch",
+      "description": "Queue a batch of moves (array of linear/arc/dwell objects) in one round-trip. Stops at the first rejected element.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "moves": {
+            "type": "array",
+            "description": "Array of move objects. Each object is a move_linear/move_arc/dwell params set (with x/y/z/a/i/j/clockwise/seconds/feed as needed).",
+            "items": { "type": "object" }
+          }
+        },
+        "required": ["moves"],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_log",
+      "description": "Return the recent motion log (rejected moves and info events) as a JSON array, most-recent first.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "clear_log",
+      "description": "Clear the motion log ring buffer.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    }
   }
 ]

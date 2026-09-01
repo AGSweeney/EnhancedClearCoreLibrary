@@ -244,6 +244,45 @@ def restart() -> Any:
     return _c().call("restart", {}, timeout=5.0)
 
 
+def jog_velocity(
+    x: Optional[float] = None,
+    y: Optional[float] = None,
+    z: Optional[float] = None,
+    a: Optional[float] = None,
+) -> Any:
+    """Start a continuous per-axis velocity jog (user units/sec, signed). Stop with jog_stop or stop."""
+    params: dict[str, Any] = {}
+    if x is not None:
+        params["x"] = x
+    if y is not None:
+        params["y"] = y
+    if z is not None:
+        params["z"] = z
+    if a is not None:
+        params["a"] = a
+    return _c().call("jog_velocity", params)
+
+
+def jog_stop() -> Any:
+    """Decelerate-stop any active jog_velocity motion."""
+    return _c().call("jog_stop", {})
+
+
+def move_batch(moves: list[dict[str, Any]]) -> Any:
+    """Queue a batch of moves (list of linear/arc/dwell param dicts) in one round-trip."""
+    return _c().call("move_batch", {"moves": moves}, timeout=10.0)
+
+
+def get_log() -> Any:
+    """Return the recent motion log (most-recent first)."""
+    return _c().call("get_log")
+
+
+def clear_log() -> Any:
+    """Clear the motion log ring buffer."""
+    return _c().call("clear_log", {})
+
+
 def queue_status() -> Any:
     return _c().call("queue_status")
 

@@ -294,6 +294,25 @@ static uint8_t g_ipOctets[4] = {0};
 static uint8_t g_netmaskOctets[4] = {0};
 static uint8_t g_gatewayOctets[4] = {0};
 
+#define CLEARAI_LOG_SIZE 16
+#define CLEARAI_LOG_METHOD_LEN 16
+#define CLEARAI_LOG_REASON_LEN 48
+struct ClearAiLogEntry {
+    uint32_t ms;
+    char method[CLEARAI_LOG_METHOD_LEN];
+    char reason[CLEARAI_LOG_REASON_LEN];
+    uint8_t kind; /* 0 = rejected move, 1 = info event */
+};
+static ClearAiLogEntry g_log[CLEARAI_LOG_SIZE];
+static uint8_t g_logHead = 0;   /* next write slot */
+static uint8_t g_logCount = 0;  /* entries present (<= CLEARAI_LOG_SIZE) */
+
+static uint32_t g_bootMs = 0;
+static uint32_t g_moveCount = 0;
+static uint32_t g_movesRejected = 0;
+static int32_t g_distanceSteps[CLEARAI_AXIS_COUNT] = {0};
+static int32_t g_arcPathSteps = 0;
+
 static void ApplyLimits();
 
 static int32_t I32Round(double v) {
@@ -846,6 +865,15 @@ static double FromInternal(uint8_t axis, double internal) {
     return internal;
 }
 
+/* Convert accumulated step counts to user units (steps -> mm/deg, then unit-convert). */
+static double StepsToUserUnits(uint8_t axis, int32_t steps) {
+    double spu = g_stepsPerMm[axis];
+    if (spu <= 0.0) {
+        return 0.0;
+    }
+    return FromInternal(axis, (double)steps / spu);
+}
+
 static int32_t MachineSteps(uint8_t axis) {
     MotorDriver *m = MotorForAxis(axis);
     return m ? m->PositionRefCommanded() : 0;
@@ -1214,6 +1242,13 @@ bool MotionInit() {
     ResetPerAxisDynamics();
     ResetOutputDefaults();
     ResetNetworkDefaults();
+    g_bootMs = Milliseconds();
+    g_moveCount = 0;
+    g_movesRejected = 0;
+    for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+        g_distanceSteps[a] = 0;
+    }
+    g_arcPathSteps = 0;
     g_watchdogTripped = false;
     g_limitTrippedAxis = 0xff;
     g_limitTrippedPos = false;
@@ -1800,12 +1835,65 @@ static const char *IssueXyLinear(int32_t tx, int32_t ty, bool hasX, bool hasY) {
     return nullptr;
 }
 
-const char *MotionMoveLinear(const RpcParams *p) {
+static void AccumulateLinear(bool hasX, int32_t tx, bool hasY, int32_t ty,
+                             bool hasZ, int32_t tz, bool hasA, int32_t ta) {
+    if (hasX) {
+        g_distanceSteps[0] += labs(tx - MachineSteps(CLEARAI_AXIS_X));
+    }
+    if (hasY) {
+        g_distanceSteps[1] += labs(ty - MachineSteps(CLEARAI_AXIS_Y));
+    }
+    if (hasZ) {
+        g_distanceSteps[2] += labs(tz - MachineSteps(CLEARAI_AXIS_Z));
+    }
+    if (hasA) {
+        g_distanceSteps[3] += labs(ta - MachineSteps(CLEARAI_AXIS_A));
+    }
+}
+
+static uint32_t EstimateLinearMs(bool hasX, int32_t dxSteps, bool hasY, int32_t dySteps,
+                                bool hasZ, int32_t dzSteps, bool hasA, int32_t daSteps) {
+    /* Rough cruise-time estimate (ignores accel/decel ramps). */
+    uint32_t est = 0;
+    if (hasX || hasY) {
+        double dxmm = (g_stepsPerMm[0] > 0.0) ? (double)dxSteps / g_stepsPerMm[0] : 0.0;
+        double dymm = (g_stepsPerMm[1] > 0.0) ? (double)dySteps / g_stepsPerMm[1] : 0.0;
+        double path = sqrt(dxmm * dxmm + dymm * dymm);
+        double feedMmPerSec = g_feedMmPerMin / 60.0;
+        if (feedMmPerSec > 0.0 && path > 0.0) {
+            uint32_t t = (uint32_t)(path / feedMmPerSec * 1000.0);
+            if (t > est) { est = t; }
+        }
+    }
+    if (hasZ && g_stepsPerMm[2] > 0.0) {
+        double dzmm = fabs((double)dzSteps) / g_stepsPerMm[2];
+        double vMmPerSec = (double)g_velAxis[2] / g_stepsPerMm[2];
+        if (vMmPerSec > 0.0 && dzmm > 0.0) {
+            uint32_t t = (uint32_t)(dzmm / vMmPerSec * 1000.0);
+            if (t > est) { est = t; }
+        }
+    }
+    if (hasA && g_stepsPerMm[3] > 0.0) {
+        double dadeg = fabs((double)daSteps) / g_stepsPerMm[3];
+        double vDegPerSec = (double)g_velAxis[3] / g_stepsPerMm[3];
+        if (vDegPerSec > 0.0 && dadeg > 0.0) {
+            uint32_t t = (uint32_t)(dadeg / vDegPerSec * 1000.0);
+            if (t > est) { est = t; }
+        }
+    }
+    return est;
+}
+
+const char *MotionMoveLinear(const RpcParams *p, uint32_t *estMsOut) {
     const char *err = GateMotion();
     if (err) {
         return err;
     }
     const bool rel = (g_mode == CLEARAI_MODE_REL);
+    const int32_t sx = MachineSteps(CLEARAI_AXIS_X);
+    const int32_t sy = MachineSteps(CLEARAI_AXIS_Y);
+    const int32_t sz = MachineSteps(CLEARAI_AXIS_Z);
+    const int32_t sa = MachineSteps(CLEARAI_AXIS_A);
     const int32_t tx = TargetSteps(CLEARAI_AXIS_X, p->hasX, p->x, rel);
     const int32_t ty = TargetSteps(CLEARAI_AXIS_Y, p->hasY, p->y, rel);
     const int32_t tz = TargetSteps(CLEARAI_AXIS_Z, p->hasZ, p->z, rel);
@@ -1824,10 +1912,16 @@ const char *MotionMoveLinear(const RpcParams *p) {
         }
     }
     MoveZa(tz, ta, p->hasZ, p->hasA);
+    AccumulateLinear(p->hasX, tx, p->hasY, ty, p->hasZ, tz, p->hasA, ta);
+    g_moveCount++;
+    if (estMsOut) {
+        *estMsOut = EstimateLinearMs(p->hasX, tx - sx, p->hasY, ty - sy,
+                                    p->hasZ, tz - sz, p->hasA, ta - sa);
+    }
     return nullptr;
 }
 
-const char *MotionMoveArc(const RpcParams *p) {
+const char *MotionMoveArc(const RpcParams *p, uint32_t *estMsOut) {
     const char *err = GateMotion();
     if (err) {
         return err;
@@ -1870,6 +1964,24 @@ const char *MotionMoveArc(const RpcParams *p) {
     if (!g_xy.QueueArc(cx, cy, I32Round(radius), startAngle, endAngle, clockwise)) {
         return "arc queue rejected";
     }
+    double swept = endAngle - startAngle;
+    if (swept < 0) {
+        swept += 2.0 * 3.14159265358979323846;
+    }
+    swept = clockwise ? (2.0 * 3.14159265358979323846 - swept) : swept;
+    if (swept < 1e-6) {
+        swept = 2.0 * 3.14159265358979323846; /* full circle */
+    }
+    g_arcPathSteps += I32Round(radius * swept);
+    g_moveCount++;
+    if (estMsOut) {
+        double radiusMm = (g_stepsPerMm[0] > 0.0) ? radius / g_stepsPerMm[0] : 0.0;
+        double arcLenMm = radiusMm * swept;
+        double feedMmPerSec = g_feedMmPerMin / 60.0;
+        if (feedMmPerSec > 0.0 && arcLenMm > 0.0) {
+            *estMsOut = (uint32_t)(arcLenMm / feedMmPerSec * 1000.0);
+        }
+    }
     return nullptr;
 }
 
@@ -1894,6 +2006,133 @@ const char *MotionJog(const RpcParams *p) {
         }
     }
     MoveZa(tz, ta, p->hasZ, p->hasA);
+    AccumulateLinear(p->hasX, tx, p->hasY, ty, p->hasZ, tz, p->hasA, ta);
+    g_moveCount++;
+    return nullptr;
+}
+
+const char *MotionJogVelocity(const RpcParams *p) {
+    const char *err = GateMotion();
+    if (err) {
+        return err;
+    }
+    /* Per-axis continuous velocity. The coordinated XY controller has no
+     * velocity mode, so X/Y are driven as independent motors. Hardware
+     * limit switches auto-stop a velocity move; soft limits are NOT
+     * enforced in velocity mode. */
+    if (p->hasX && AxisOn(CLEARAI_AXIS_X)) {
+        MotorDriver *m = MotorForAxis(CLEARAI_AXIS_X);
+        if (m) {
+            m->MoveVelocity(I32Round(ToInternal(CLEARAI_AXIS_X, p->x) * g_stepsPerMm[0]));
+        }
+    }
+    if (p->hasY && AxisOn(CLEARAI_AXIS_Y)) {
+        MotorDriver *m = MotorForAxis(CLEARAI_AXIS_Y);
+        if (m) {
+            m->MoveVelocity(I32Round(ToInternal(CLEARAI_AXIS_Y, p->y) * g_stepsPerMm[1]));
+        }
+    }
+    if (p->hasZ && AxisOn(CLEARAI_AXIS_Z)) {
+        MotorDriver *m = MotorForAxis(CLEARAI_AXIS_Z);
+        if (m) {
+            m->MoveVelocity(I32Round(ToInternal(CLEARAI_AXIS_Z, p->z) * g_stepsPerMm[2]));
+        }
+    }
+    if (p->hasA && AxisOn(CLEARAI_AXIS_A)) {
+        MotorDriver *m = MotorForAxis(CLEARAI_AXIS_A);
+        if (m) {
+            m->MoveVelocity(I32Round(ToInternal(CLEARAI_AXIS_A, p->a) * g_stepsPerMm[3]));
+        }
+    }
+    return nullptr;
+}
+
+void MotionJogStop() {
+    g_xy.StopDecel();
+    for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+        MotorDriver *m = MotorForAxis(a);
+        if (m) {
+            m->MoveStopDecel(g_decel);
+        }
+    }
+}
+
+void MotionLog(const char *method, const char *reason, uint8_t kind) {
+    ClearAiLogEntry *e = &g_log[g_logHead];
+    e->ms = Milliseconds();
+    strncpy(e->method, method ? method : "", sizeof(e->method) - 1);
+    e->method[sizeof(e->method) - 1] = '\0';
+    strncpy(e->reason, reason ? reason : "", sizeof(e->reason) - 1);
+    e->reason[sizeof(e->reason) - 1] = '\0';
+    e->kind = kind;
+    g_logHead = (g_logHead + 1) % CLEARAI_LOG_SIZE;
+    if (g_logCount < CLEARAI_LOG_SIZE) {
+        g_logCount++;
+    }
+}
+
+void MotionGetLog(char *buf, uint16_t bufLen) {
+    size_t pos = 0;
+    if (pos + 1 < bufLen) {
+        buf[pos++] = '[';
+    }
+    /* Most-recent first: walk backwards from the last written slot. */
+    for (uint8_t i = 0; i < g_logCount; i++) {
+        uint8_t idx = (g_logHead + CLEARAI_LOG_SIZE - 1 - i) % CLEARAI_LOG_SIZE;
+        ClearAiLogEntry *e = &g_log[idx];
+        char entry[96];
+        int n = snprintf(entry, sizeof(entry),
+                          "%s{\"ms\":%lu,\"method\":\"%s\",\"reason\":\"%s\",\"kind\":%u}",
+                          (i == 0) ? "" : ",",
+                          (unsigned long)e->ms, e->method, e->reason, (unsigned)e->kind);
+        if (n < 0 || pos + (size_t)n + 1 >= bufLen) {
+            break;
+        }
+        memcpy(buf + pos, entry, (size_t)n);
+        pos += (size_t)n;
+    }
+    if (pos + 1 < bufLen) {
+        buf[pos++] = ']';
+    }
+    if (pos < bufLen) {
+        buf[pos] = '\0';
+    } else {
+        buf[bufLen - 1] = '\0';
+    }
+}
+
+void MotionClearLog() {
+    g_logHead = 0;
+    g_logCount = 0;
+}
+
+void MotionIncMovesRejected() {
+    g_movesRejected++;
+}
+
+const char *MotionMoveBatch(const RpcParams *p, uint16_t *acceptedOut) {
+    if (!p->hasMoves || p->movesCount == 0) {
+        return "moves array required";
+    }
+    for (uint8_t i = 0; i < p->movesCount; i++) {
+        const RpcParams *sub = &p->moves[i];
+        const char *err = nullptr;
+        if (sub->hasI && sub->hasJ) {
+            err = MotionMoveArc(sub, nullptr);
+        } else if (sub->hasSeconds) {
+            err = MotionDwell(sub, nullptr);
+        } else if (sub->hasX || sub->hasY || sub->hasZ || sub->hasA) {
+            err = MotionMoveLinear(sub, nullptr);
+        } else {
+            err = "empty move in batch";
+        }
+        if (err) {
+            *acceptedOut = i;
+            g_movesRejected++;
+            return err;
+        }
+    }
+    *acceptedOut = p->movesCount;
     return nullptr;
 }
 
@@ -1945,6 +2184,39 @@ const char *MotionWaitIdle(const RpcParams *p, ClearAiUrgentFn urgent) {
     return WaitLoop(timeout, true, urgent);
 }
 
+static void DecodeAlerts(uint32_t reg, char *out, size_t outLen) {
+    /* AlertRegMotor bits (MotorDriver.h): step/direction mode has 6 bits. */
+    static const char *const kNames[] = {
+        "motion_canceled_in_alert",
+        "motion_canceled_positive_limit",
+        "motion_canceled_negative_limit",
+        "motion_canceled_sensor_estop",
+        "motion_canceled_motor_disabled",
+        "motor_faulted",
+    };
+    size_t pos = 0;
+    out[0] = '\0';
+    for (uint8_t b = 0; b < 6; b++) {
+        if (!(reg & (1u << b))) {
+            continue;
+        }
+        const char *name = kNames[b];
+        size_t need = (pos == 0) ? strlen(name) + 2 : strlen(name) + 4;
+        if (pos + need + 1 >= outLen) {
+            break;
+        }
+        if (pos > 0) {
+            out[pos++] = ',';
+        }
+        out[pos++] = '"';
+        size_t n = strlen(name);
+        memcpy(out + pos, name, n);
+        pos += n;
+        out[pos++] = '"';
+        out[pos] = '\0';
+    }
+}
+
 void MotionGetNetworkConfig(uint8_t *mode, uint8_t ip[4], uint8_t netmask[4],
                             uint8_t gateway[4]) {
     if (mode) {
@@ -1991,14 +2263,18 @@ void MotionGetStatus(MotionStatus *out) {
     out->limitTrippedPos = g_limitTrippedPos;
     for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
         MotorDriver *m = MotorForAxis(a);
+        bool active = (g_axisMask >> a) & 1u;
         if (m) {
-            out->alertReg |= m->AlertReg().reg;
+            uint32_t reg = active ? m->AlertReg().reg : 0u;
+            out->alertReg |= reg;
+            out->alertRegAxis[a] = reg;
             out->hlfbPercent[a] = m->HlfbPercent();
         } else {
             out->hlfbPercent[a] = MotorDriver::HLFB_DUTY_UNKNOWN;
         }
         out->work[a] = FromInternal(a, WorkInternal(a));
     }
+    DecodeAlerts(out->alertReg, out->alertsDecoded, sizeof(out->alertsDecoded));
 }
 
 static void MotionFillInputsJson(char *buf, uint16_t bufLen, uint8_t startPin, uint8_t endPin) {
@@ -2658,7 +2934,9 @@ void MotionFillCapabilitiesJson(char *buf, uint16_t bufLen) {
              "\"home\",\"probe\",\"keepalive\","
              "\"read_analog\",\"write_analog\",\"write_pwm\","
              "\"subscribe_inputs\",\"unsubscribe_inputs\","
-             "\"configure_network\",\"restart\"],"
+             "\"configure_network\",\"restart\","
+             "\"jog_velocity\",\"jog_stop\",\"move_batch\","
+             "\"get_log\",\"clear_log\"],"
              "\"tcp\":%u,\"tel\":%u,\"discover\":%u}",
              CLEARAI_PROTOCOL_VERSION,
              (unsigned long)g_axisMask,
@@ -2808,11 +3086,15 @@ static void FillPoseObject(char *buf, uint16_t bufLen, bool withFlags) {
                  "{\"enabled\":%s,\"moving\":%s,\"hlfb\":%s,\"estop\":%s,\"hw_estop\":%s,"
                  "\"test_mode\":%s,\"alerts\":%s,"
                  "\"queue\":%u,\"queue_active\":%s,\"alert_reg\":%lu,"
+                 "\"alert_reg_axis\":[%lu,%lu,%lu,%lu],\"alerts_decoded\":[%s],"
                  "\"units\":\"%s\",\"units_a\":\"%s\",\"mode\":\"%s\","
                  "\"axis_mask\":%lu,\"x\":%.4f,\"y\":%.4f,\"z\":%.4f,\"a\":%.4f,"
                  "\"hlfb_percent\":%s,"
                  "\"watchdog_ms\":%lu,\"watchdog_tripped\":%s,\"limit_status\":%s,"
-                 "\"pwm_duty\":%s}",
+                 "\"pwm_duty\":%s,"
+                 "\"uptime_ms\":%lu,\"moves\":%lu,\"moves_rejected\":%lu,"
+                 "\"distance\":{\"x\":%.3f,\"y\":%.3f,\"z\":%.3f,\"a\":%.3f},"
+                 "\"arc_path\":%.3f}",
                  st.enabled ? "true" : "false",
                  st.moving ? "true" : "false",
                  st.hlfb ? "true" : "false",
@@ -2823,6 +3105,9 @@ static void FillPoseObject(char *buf, uint16_t bufLen, bool withFlags) {
                  (unsigned)st.queue,
                  st.queueActive ? "true" : "false",
                  (unsigned long)st.alertReg,
+                 (unsigned long)st.alertRegAxis[0], (unsigned long)st.alertRegAxis[1],
+                 (unsigned long)st.alertRegAxis[2], (unsigned long)st.alertRegAxis[3],
+                 st.alertsDecoded,
                  st.units == CLEARAI_UNITS_MM ? "mm" : "inch",
                  st.unitsA == CLEARAI_UNITS_A_REV ? "rev" : "deg",
                  st.mode == CLEARAI_MODE_ABS ? "abs" : "rel",
@@ -2832,7 +3117,15 @@ static void FillPoseObject(char *buf, uint16_t bufLen, bool withFlags) {
                  (unsigned long)st.watchdogMs,
                  st.watchdogTripped ? "true" : "false",
                  limitStatus,
-                 pwmDuty);
+                 pwmDuty,
+                 (unsigned long)(Milliseconds() - g_bootMs),
+                 (unsigned long)g_moveCount,
+                 (unsigned long)g_movesRejected,
+                 StepsToUserUnits(CLEARAI_AXIS_X, g_distanceSteps[0]),
+                 StepsToUserUnits(CLEARAI_AXIS_Y, g_distanceSteps[1]),
+                 StepsToUserUnits(CLEARAI_AXIS_Z, g_distanceSteps[2]),
+                 StepsToUserUnits(CLEARAI_AXIS_A, g_distanceSteps[3]),
+                 StepsToUserUnits(CLEARAI_AXIS_X, g_arcPathSteps));
     } else {
         snprintf(buf, bufLen,
                  "{\"units\":\"%s\",\"units_a\":\"%s\",\"mode\":\"%s\","

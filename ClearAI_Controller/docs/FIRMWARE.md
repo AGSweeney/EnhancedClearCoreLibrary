@@ -159,6 +159,30 @@ HLFB is configured for **measured torque** (`HLFB_MODE_HAS_BIPOLAR_PWM`). `get_s
 
 Coordinated XY moves queue in the planner (`MotionQueueCount`). `queue_status` returns `{queue, active}` (pending segment count and whether a move is executing); allowed during `wait_idle`. `queue_clear` decelerates the active coordinated segment to a stop and drops all pending segments (it zeroes the planner queue counts), then stops independent Z/A with `MoveStopDecel`. Motors stay enabled. Accepted during `wait_idle`/`dwell` (treated as a safety method, it interrupts the wait).
 
+### Jog-continuous velocity (`jog_velocity` / `jog_stop`)
+
+`jog_velocity` issues `MotorDriver::MoveVelocity` per axis (X and Y are **not** coordinated in this mode — the `CoordinatedMotionController` has no velocity API). Velocities are signed user-units/sec converted to steps/sec via `ToInternal(axis, v) * g_stepsPerMm[axis]` (A uses deg→steps). Hardware limit switches auto-stop a velocity move (alert bits `motion_canceled_positive_limit` / `motion_canceled_negative_limit`); **soft limits are not enforced** in velocity mode. `jog_stop` decelerates all axes to a stop and is allowed during blocking waits.
+
+### Motion log / last-error (`get_log` / `clear_log`)
+
+A RAM ring buffer (`g_log[16]`) records `ClearAiLogEntry { ms, method, reason, kind }` — `kind` 0 for rejected moves (logged at every motion-method error return) and 1 for info events (estop/stop/disable). `get_log` returns the ring as a JSON array most-recent-first; `clear_log` empties it. The buffer is cleared on reboot. Both are allowed during `wait_idle`.
+
+### Uptime / move counters / distance
+
+`get_status` reports `uptime_ms` (since boot), `moves` (accepted move count), `moves_rejected`, per-axis `distance` (cumulative `|Δ|` in user units for linear/jog moves), and `arc_path` (cumulative XY arc length in mm). Counters accumulate synchronously when a move is issued; distance is derived from `(target - start)` steps converted via `FromInternal`.
+
+### Batched moves (`move_batch`)
+
+`move_batch` parses a `moves` array (max 8 elements) of `move_linear`/`move_arc`/`dwell` param objects using a shared `ParseObjectParams` helper, then dispatches each to the corresponding motion function. It stops at the first rejected element and reports `accepted` and `failed_at`. A `dwell` element blocks the RPC thread (same as a standalone `dwell`).
+
+### Move timing
+
+`move_linear`/`move_arc` replies include `est_ms` — a rough cruise estimate (path length / cruise velocity, ignoring accel/decel ramps); treat as a lower bound. `wait_idle` replies include `elapsed_ms` (actual wall-clock wait).
+
+### Alert decoding
+
+`get_status` reports `alert_reg_axis` (per-axis raw `AlertReg`) and `alerts_decoded` (array of names decoded from the OR'd alert register: `motion_canceled_in_alert`, `motion_canceled_positive_limit`, `motion_canceled_negative_limit`, `motion_canceled_sensor_estop`, `motion_canceled_motor_disabled`, `motor_faulted`).
+
 ### Homing / zeroing (`home`)
 
 `home` seeks the hardware limit switch assigned for `axis`/`dir` (`pos_lim_<axis>`/`neg_lim_<axis>`) at a slow `feed`. The seek move bypasses soft limits (the physical limit is expected to stop it) and is commanded as a far relative target — coordinated `QueueLinear` for X/Y (other axis held), independent `Move` for Z/A. The poll loop watches the limit DI; on contact it decelerates everything to a stop, optionally retracts by `backoff`, and optionally sets the work origin to 0 (`zero`, default true) at the final position. Requires the limit DI to be configured; rejects if the switch is already active or never reached (`seek` max travel, default 1000 work units; `timeout_ms` default 30000). Blocking and interruptible by `estop`/`stop`/`queue_clear`.

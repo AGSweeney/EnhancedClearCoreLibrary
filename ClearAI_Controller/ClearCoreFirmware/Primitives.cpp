@@ -26,6 +26,8 @@
 #include "MotionBridge.h"
 #include "Transport.h"
 
+#include "ClearCore.h"
+#include <stdio.h>
 #include <string.h>
 
 static bool g_inWait = false;
@@ -47,6 +49,20 @@ static void ReplyOkQueued(const RpcId *id) {
     ReplyResult(id, "{\"ok\":true,\"queued\":true}");
 }
 
+static void ReplyOkQueuedEst(const RpcId *id, uint32_t estMs) {
+    char body[64];
+    snprintf(body, sizeof(body), "{\"ok\":true,\"queued\":true,\"est_ms\":%lu}",
+             (unsigned long)estMs);
+    ReplyResult(id, body);
+}
+
+static void ReplyOkElapsed(const RpcId *id, uint32_t elapsedMs) {
+    char body[64];
+    snprintf(body, sizeof(body), "{\"ok\":true,\"elapsed_ms\":%lu}",
+             (unsigned long)elapsedMs);
+    ReplyResult(id, body);
+}
+
 static void ReplyOk(const RpcId *id) {
     ReplyResult(id, "{\"ok\":true}");
 }
@@ -54,6 +70,7 @@ static void ReplyOk(const RpcId *id) {
 static bool IsSafetyMethod(const char *method) {
     return strcmp(method, "estop") == 0 ||
            strcmp(method, "stop") == 0 ||
+           strcmp(method, "jog_stop") == 0 ||
            strcmp(method, "disable") == 0 ||
            strcmp(method, "queue_clear") == 0 ||
            strcmp(method, "keepalive") == 0 ||
@@ -178,6 +195,7 @@ static void DispatchParsed(const RpcRequest *req) {
     }
     if (strcmp(method, "disable") == 0) {
         MotionDisable();
+        MotionLog("disable", "disabled", 1);
         ReplyOk(id);
         return;
     }
@@ -188,17 +206,20 @@ static void DispatchParsed(const RpcRequest *req) {
     }
     if (strcmp(method, "stop") == 0) {
         MotionStop();
+        MotionLog("stop", "stopped", 1);
         ReplyOk(id);
         return;
     }
     if (strcmp(method, "estop") == 0) {
         MotionEstop();
+        MotionLog("estop", "estop", 1);
         ReplyOk(id);
         return;
     }
     if (strcmp(method, "configure") == 0) {
         const char *err = MotionConfigure(p);
         if (err) {
+            MotionLog("configure", err, 0);
             ReplyError(id, JSONRPC_APP_ERROR, err);
         } else {
             ReplyOk(id);
@@ -252,29 +273,72 @@ static void DispatchParsed(const RpcRequest *req) {
         return;
     }
     if (strcmp(method, "move_linear") == 0) {
-        const char *err = MotionMoveLinear(p);
+        uint32_t estMs = 0;
+        const char *err = MotionMoveLinear(p, &estMs);
         if (err) {
+            MotionIncMovesRejected();
+            MotionLog("move_linear", err, 0);
             ReplyError(id, JSONRPC_APP_ERROR, err);
         } else {
-            ReplyOkQueued(id);
+            ReplyOkQueuedEst(id, estMs);
         }
         return;
     }
     if (strcmp(method, "move_arc") == 0) {
-        const char *err = MotionMoveArc(p);
+        uint32_t estMs = 0;
+        const char *err = MotionMoveArc(p, &estMs);
         if (err) {
+            MotionIncMovesRejected();
+            MotionLog("move_arc", err, 0);
             ReplyError(id, JSONRPC_APP_ERROR, err);
         } else {
-            ReplyOkQueued(id);
+            ReplyOkQueuedEst(id, estMs);
         }
         return;
     }
     if (strcmp(method, "jog") == 0) {
         const char *err = MotionJog(p);
         if (err) {
+            MotionIncMovesRejected();
+            MotionLog("jog", err, 0);
             ReplyError(id, JSONRPC_APP_ERROR, err);
         } else {
             ReplyOkQueued(id);
+        }
+        return;
+    }
+    if (strcmp(method, "jog_velocity") == 0) {
+        const char *err = MotionJogVelocity(p);
+        if (err) {
+            MotionIncMovesRejected();
+            MotionLog("jog_velocity", err, 0);
+            ReplyError(id, JSONRPC_APP_ERROR, err);
+        } else {
+            ReplyOk(id);
+        }
+        return;
+    }
+    if (strcmp(method, "jog_stop") == 0) {
+        MotionJogStop();
+        ReplyOk(id);
+        return;
+    }
+    if (strcmp(method, "move_batch") == 0) {
+        uint16_t accepted = 0;
+        const char *err = MotionMoveBatch(p, &accepted);
+        if (err) {
+            MotionIncMovesRejected();
+            MotionLog("move_batch", err, 0);
+            char body[CLEARAI_MAX_REPLY];
+            snprintf(body, sizeof(body),
+                      "{\"ok\":false,\"accepted\":%u,\"failed_at\":%u,\"error\":\"%s\"}",
+                      (unsigned)accepted, (unsigned)accepted, err);
+            ReplyResult(id, body);
+        } else {
+            char body[64];
+            snprintf(body, sizeof(body), "{\"ok\":true,\"queued\":true,\"accepted\":%u}",
+                     (unsigned)accepted);
+            ReplyResult(id, body);
         }
         return;
     }
@@ -293,12 +357,14 @@ static void DispatchParsed(const RpcRequest *req) {
     if (strcmp(method, "wait_idle") == 0) {
         g_inWait = true;
         g_safetyHit = false;
+        const uint32_t startMs = Milliseconds();
         const char *err = MotionWaitIdle(p, PrimitivesPollSafetyDuringWait);
         g_inWait = false;
         if (err) {
+            MotionLog("wait_idle", err, 0);
             ReplyError(id, JSONRPC_APP_ERROR, err);
         } else {
-            ReplyOk(id);
+            ReplyOkElapsed(id, Milliseconds() - startMs);
         }
         return;
     }
@@ -306,6 +372,17 @@ static void DispatchParsed(const RpcRequest *req) {
         char body[CLEARAI_MAX_REPLY];
         MotionFillQueueStatusJson(body, sizeof(body));
         ReplyResult(id, body);
+        return;
+    }
+    if (strcmp(method, "get_log") == 0) {
+        char body[CLEARAI_MAX_REPLY];
+        MotionGetLog(body, sizeof(body));
+        ReplyResult(id, body);
+        return;
+    }
+    if (strcmp(method, "clear_log") == 0) {
+        MotionClearLog();
+        ReplyOk(id);
         return;
     }
     if (strcmp(method, "queue_clear") == 0) {
@@ -320,6 +397,7 @@ static void DispatchParsed(const RpcRequest *req) {
         const char *err = MotionHome(p, body, sizeof(body), PrimitivesPollSafetyDuringWait);
         g_inWait = false;
         if (err) {
+            MotionLog("home", err, 0);
             ReplyError(id, JSONRPC_APP_ERROR, err);
         } else {
             ReplyResult(id, body);
@@ -333,6 +411,7 @@ static void DispatchParsed(const RpcRequest *req) {
         const char *err = MotionProbe(p, body, sizeof(body), PrimitivesPollSafetyDuringWait);
         g_inWait = false;
         if (err) {
+            MotionLog("probe", err, 0);
             ReplyError(id, JSONRPC_APP_ERROR, err);
         } else {
             ReplyResult(id, body);
@@ -383,6 +462,8 @@ bool PrimitivesPollSafetyDuringWait() {
         strcmp(req.method, "read_analog") == 0 ||
         strcmp(req.method, "configure_network") == 0 ||
         strcmp(req.method, "queue_status") == 0 ||
+        strcmp(req.method, "get_log") == 0 ||
+        strcmp(req.method, "clear_log") == 0 ||
         strcmp(req.method, "set_test_mode") == 0) {
         DispatchParsed(&req);
         return MotionInterrupted();

@@ -125,6 +125,17 @@ type configureNetworkArgs struct {
 	Gateway  *string `json:"gateway,omitempty" jsonschema:"static gateway a.b.c.d; 0.0.0.0 = none"`
 }
 
+type jogVelocityArgs struct {
+	X *float64 `json:"x,omitempty" jsonschema:"X velocity in user units/sec (signed)"`
+	Y *float64 `json:"y,omitempty" jsonschema:"Y velocity in user units/sec (signed)"`
+	Z *float64 `json:"z,omitempty" jsonschema:"Z velocity in user units/sec (signed)"`
+	A *float64 `json:"a,omitempty" jsonschema:"A velocity in user units/sec (signed)"`
+}
+
+type moveBatchArgs struct {
+	Moves []map[string]any `json:"moves" jsonschema:"array of move objects (linear/arc/dwell)"`
+}
+
 type homeArgs struct {
 	Axis      string   `json:"axis" jsonschema:"x, y, z, or a"`
 	Dir       string   `json:"dir" jsonschema:"pos or neg (which limit to seek)"`
@@ -360,6 +371,21 @@ func registerTools(server *mcp.Server, board *rpcClient) {
 	addRPC[emptyArgs](server, board, "restart",
 		"Reset the ClearCore board to apply pending network config (and re-run the application). The TCP connection will drop.",
 		"restart", 5*time.Second)
+	addRPC[jogVelocityArgs](server, board, "jog_velocity",
+		"Start continuous per-axis velocity jog (user units/sec, signed). Hardware limits auto-stop; soft limits are not enforced. Stop with jog_stop or stop.",
+		"jog_velocity", 5*time.Second)
+	addRPC[emptyArgs](server, board, "jog_stop",
+		"Decelerate-stop any active jog_velocity motion.",
+		"jog_stop", 5*time.Second)
+	addRPC[moveBatchArgs](server, board, "move_batch",
+		"Queue a batch of moves (array of linear/arc/dwell objects) in one round-trip. Stops at the first rejected element.",
+		"move_batch", 5*time.Second)
+	addRPC[emptyArgs](server, board, "get_log",
+		"Return the recent motion log (rejected moves and info events) as a JSON array, most-recent first.",
+		"get_log", 5*time.Second)
+	addRPC[emptyArgs](server, board, "clear_log",
+		"Clear the motion log ring buffer.",
+		"clear_log", 5*time.Second)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "dwell",
 		Description: "Wait seconds (max 600). Interruptible by estop.",

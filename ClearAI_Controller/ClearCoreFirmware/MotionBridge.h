@@ -37,6 +37,8 @@ struct MotionStatus {
     bool alerts;
     uint8_t queue;
     uint32_t alertReg;
+    uint32_t alertRegAxis[CLEARAI_AXIS_COUNT];
+    char alertsDecoded[128]; /* comma-separated decoded alert names */
     double work[CLEARAI_AXIS_COUNT];
     ClearAiUnits units;
     ClearAiUnitsA unitsA;
@@ -77,9 +79,16 @@ const char *MotionSetMode(const RpcParams *p);
 const char *MotionSetWorkOrigin(const RpcParams *p);
 const char *MotionResetConfig();
 void MotionFillConfigJson(char *buf, uint16_t bufLen);
-const char *MotionMoveLinear(const RpcParams *p);
-const char *MotionMoveArc(const RpcParams *p);
+const char *MotionMoveLinear(const RpcParams *p, uint32_t *estMsOut);
+const char *MotionMoveArc(const RpcParams *p, uint32_t *estMsOut);
 const char *MotionJog(const RpcParams *p);
+const char *MotionJogVelocity(const RpcParams *p);
+void MotionJogStop();
+void MotionLog(const char *method, const char *reason, uint8_t kind);
+void MotionGetLog(char *buf, uint16_t bufLen);
+void MotionClearLog();
+void MotionIncMovesRejected();
+const char *MotionMoveBatch(const RpcParams *p, uint16_t *acceptedOut);
 const char *MotionDwell(const RpcParams *p, ClearAiUrgentFn urgent);
 const char *MotionWaitIdle(const RpcParams *p, ClearAiUrgentFn urgent);
 const char *MotionHome(const RpcParams *p, char *body, uint16_t bufLen, ClearAiUrgentFn urgent);

@@ -63,7 +63,7 @@ Unsolicited notifications (no `id`):
 | Method | Params | Result |
 |--------|--------|--------|
 | `get_capabilities` | — | protocol version, axis mask, units, mode, `test_mode`, `nvm`, method list, ports |
-| `get_status` | — | enabled, moving, hlfb, estop, `hw_estop`, `test_mode`, alerts, queue, `queue_active`, `units_a`, `hlfb_percent` (per-axis % of peak torque, or null if unknown), `watchdog_ms`, `watchdog_tripped`, `limit_status` (`{tripped,axis,dir}` or `{tripped:false}`), `pwm_duty` (last commanded duty per IO-0…IO-5), pose |
+| `get_status` | — | enabled, moving, hlfb, estop, `hw_estop`, `test_mode`, alerts, queue, `queue_active`, `alert_reg` (OR'd), `alert_reg_axis` (per-axis), `alerts_decoded` (array of names: `motion_canceled_*`, `motor_faulted`), `units_a`, `hlfb_percent` (per-axis % of peak torque, or null if unknown), `watchdog_ms`, `watchdog_tripped`, `limit_status` (`{tripped,axis,dir}` or `{tripped:false}`), `pwm_duty` (last commanded duty per IO-0…IO-5), `uptime_ms`, `moves`, `moves_rejected`, `distance` (`{x,y,z,a}` in user units), `arc_path`, pose |
 | `get_pose` | — | work coordinates in active units (A in configured A units) |
 | `get_config` | — | live config + `nvm` / `nvm_valid` (axis_mask, test_mode, mechanics, vel/accel/decel, `units_a`, `limit_flags`, `limits_min`/`limits_max`, `pos_lim_di`/`neg_lim_di`, `vel_axis`/`accel_axis`/`decel_axis`, `watchdog_ms`, `out_power_on_state` (boot state per IO-0…IO-5), `out_power_on_mask`, `network_mode` (`dhcp`/`static`), `ip_address`, `netmask`, `gateway`, …) |
 | `enable` | — | `{ok:true}` after enable request (short HLFB wait) |
@@ -71,7 +71,7 @@ Unsolicited notifications (no `id`):
 | `clear_alerts` | — | clear motor alerts |
 | `stop` | — | decelerate |
 | `estop` | — | abrupt stop + disable |
-| `wait_idle` | `timeout_ms` (default 60000) | `{ok:true}` or timeout/estop error |
+| `wait_idle` | `timeout_ms` (default 60000) | `{ok:true,elapsed_ms:N}` or timeout/estop error |
 | `read_inputs` | optional `pin` (0–12); omit for all onboard pins | `{pins:[{pin,state,mode},…]}` — raw digital state; `mode` is `in`, `out`, `pwm`, `analog_in`, `analog_out`, or `other` |
 | `write_output` | `pin` (0–5 only), `state` (bool or 0/1) | `{ok:true}` — sets **OUTPUT_DIGITAL** then drives the pin |
 | `read_analog` | optional `pin` (9–12); omit for all analog inputs | `{pins:[{pin,volts,raw},…]}` — analog voltage (V) and raw ADC for A-9…A-12. Sets **INPUT_ANALOG** on read. Rejects pins reserved for hardware limits. Allowed during `wait_idle`. |
@@ -82,6 +82,8 @@ Unsolicited notifications (no `id`):
 | `configure_network` | optional `mode` (`dhcp`/`static`), `ip_address`/`netmask`/`gateway` (dotted-quad strings; gateway `0.0.0.0` = none) | `{network_mode,ip_address,netmask,gateway,applies_on:"restart"}` — persisted to NVM; applies on next boot. Static mode requires `ip_address`. Allowed while enabled. |
 | `restart` | — | `{ok:true}` then the board resets (TCP connection drops). Use to apply pending `configure_network` changes. |
 | `queue_status` | — | `{queue:N, active:bool}` — pending coordinated segments and active flag. Allowed during `wait_idle`. |
+| `get_log` | — | JSON array of recent log entries `{ms,method,reason,kind}` (most-recent first; `kind` 0=rejected move, 1=info). Allowed during `wait_idle`. |
+| `clear_log` | — | `{ok:true}` — clear the motion log ring buffer. Allowed during `wait_idle`. |
 | `queue_clear` | — | `{ok:true}` — decelerate the active move to a stop and drop pending queued segments. Motors stay enabled. Accepted during `wait_idle`/`dwell` (interrupts the wait). |
 | `home` | `axis` (`x`/`y`/`z`/`a`), `dir` (`pos`/`neg`), optional `feed`, `seek` (max travel, default 1000), `backoff`, `zero` (default true), `timeout_ms` (default 30000) | `{homed:true,axis,dir,pos,limit_pin}` — seek the configured hardware limit for `axis`/`dir`, decel-stop on contact, optional backoff, optional zero. Requires `pos_lim_<axis>`/`neg_lim_<axis>` DI configured. Blocking (interruptible by `estop`/`stop`/`queue_clear`). |
 | `probe` | `axis`, `dir`, `pin` (DI 1–12), optional `feed`, `seek`, `backoff`, `zero` (default false), `active` (`high`/`low`, default `high`), `timeout_ms` | `{probed:true,axis,dir,pos,pin}` — move at probe feed until the probe DI triggers, stop, report touch position. Blocking (interruptible). |
@@ -111,9 +113,12 @@ Feed is **units per minute** in the active linear unit (mm/min or inch/min).
 
 | Method | Params |
 |--------|--------|
-| `move_linear` | `x`,`y` optional `z`,`a`, `feed`, `rapid` (bool). XY uses coordinated `QueueLinear`. |
-| `move_arc` | `x`,`y`,`i`,`j`,`clockwise`,`feed`. I/J relative to start (G-code convention). XY only; `z`/`a` rejected. |
+| `move_linear` | `x`,`y` optional `z`,`a`, `feed`, `rapid` (bool). XY uses coordinated `QueueLinear`. Reply: `{ok:true,queued:true,est_ms:N}` (rough cruise estimate, ignores ramps). |
+| `move_arc` | `x`,`y`,`i`,`j`,`clockwise`,`feed`. I/J relative to start (G-code convention). XY only; `z`/`a` rejected. Reply: `{ok:true,queued:true,est_ms:N}`. |
 | `jog` | relative `x`,`y`,`z`,`a`,`feed` (ignores abs/rel mode) |
+| `jog_velocity` | per-axis velocity `x`,`y`,`z`,`a` in user units/sec (signed) | `{ok:true}` — starts continuous velocity motion. Hardware limits auto-stop; soft limits are NOT enforced. Stop with `jog_stop` or `stop`. |
+| `jog_stop` | — | `{ok:true}` — decelerate-stop any active `jog_velocity`. Allowed during blocking waits. |
+| `move_batch` | `moves` (array of linear/arc/dwell param objects) | `{ok:true,queued:true,accepted:N}` or `{ok:false,accepted:K,failed_at:i,error}` on the first rejected element. Dwell-in-batch blocks. |
 | `dwell` | `seconds` (max 600), interruptible by estop |
 
 ### Digital I/O
@@ -182,6 +187,36 @@ Both are **blocking** and interruptible by `estop` / `stop` / `queue_clear` (whi
 {"jsonrpc":"2.0","id":41,"method":"keepalive","params":{}}
 {"jsonrpc":"2.0","id":42,"method":"get_status","params":{}}
 ```
+
+## Jog velocity
+
+`jog_velocity` starts a continuous per-axis velocity move (`MotorDriver::MoveVelocity` per axis; XY is not coordinated in this mode). Provide signed velocities in user units/sec. Hardware limit switches auto-stop the move (alert bit `motion_canceled_positive_limit` / `motion_canceled_negative_limit`); **soft limits are not enforced** in velocity mode. Stop with `jog_stop` or `stop`.
+
+```json
+{"jsonrpc":"2.0","id":50,"method":"jog_velocity","params":{"x":5}}
+{"jsonrpc":"2.0","id":51,"method":"jog_stop","params":{}}
+```
+
+## Batched moves
+
+`move_batch` queues an array of move objects (each a `move_linear`/`move_arc`/`dwell` params set) in one round-trip. It stops at the first rejected element and reports `failed_at` (0-based index) plus `accepted` count. A `dwell` element blocks the RPC thread until it completes (matches single-`dwell` semantics). Max 8 elements.
+
+```json
+{"jsonrpc":"2.0","id":60,"method":"move_batch","params":{"moves":[{"x":10,"y":0,"feed":500},{"seconds":0.5},{"x":0,"y":0,"feed":500}]}}
+```
+
+## Motion log
+
+`get_log` returns a JSON array of recent log entries (RAM ring, most-recent first, 16 deep, cleared on reboot): `{ms,method,reason,kind}` where `kind` is `0` for a rejected move and `1` for an info event (estop/stop/disable). `clear_log` empties the buffer.
+
+```json
+{"jsonrpc":"2.0","id":70,"method":"get_log","params":{}}
+{"jsonrpc":"2.0","id":71,"method":"clear_log","params":{}}
+```
+
+## Move timing
+
+`move_linear`/`move_arc` replies include `est_ms` — a rough cruise-time estimate (path length / cruise velocity) that **ignores accel/decel ramps**; treat as a lower bound. `wait_idle` replies include `elapsed_ms` (actual wall-clock time spent waiting).
 
 ## Examples
 
