@@ -46,6 +46,8 @@ METHODS = (
     "write_pwm",
     "subscribe_inputs",
     "unsubscribe_inputs",
+    "configure_network",
+    "restart",
 )
 
 
@@ -137,6 +139,13 @@ def main(argv: Optional[list[str]] = None) -> int:
             sp.add_argument("--pin", type=int, nargs="+", required=True)
             sp.add_argument("--debounce-ms", type=int)
         if name == "unsubscribe_inputs":
+            pass
+        if name == "configure_network":
+            sp.add_argument("--mode", choices=("dhcp", "static"))
+            sp.add_argument("--ip", dest="ip_address")
+            sp.add_argument("--netmask")
+            sp.add_argument("--gateway")
+        if name == "restart":
             pass
         if name in ("home", "probe"):
             sp.add_argument("--axis", required=True, choices=("x", "y", "z", "a"))
@@ -293,6 +302,20 @@ def main(argv: Optional[list[str]] = None) -> int:
                 params["debounce_ms"] = args.debounce_ms
             timeout = 5.0
         elif args.cmd == "unsubscribe_inputs":
+            params = {}
+            timeout = 5.0
+        elif args.cmd == "configure_network":
+            params = {}
+            if args.mode is not None:
+                params["mode"] = args.mode
+            if args.ip_address is not None:
+                params["ip_address"] = args.ip_address
+            if args.netmask is not None:
+                params["netmask"] = args.netmask
+            if args.gateway is not None:
+                params["gateway"] = args.gateway
+            timeout = 5.0
+        elif args.cmd == "restart":
             params = {}
             timeout = 5.0
         elif args.cmd == "keepalive":

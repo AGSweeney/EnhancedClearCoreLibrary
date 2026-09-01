@@ -88,6 +88,8 @@ const char *MotionQueueClear();
 void MotionFillQueueStatusJson(char *buf, uint16_t bufLen);
 
 void MotionGetStatus(MotionStatus *out);
+void MotionGetNetworkConfig(uint8_t *mode, uint8_t ip[4], uint8_t netmask[4],
+                            uint8_t gateway[4]);
 void MotionFillCapabilitiesJson(char *buf, uint16_t bufLen);
 void MotionFillStatusJson(char *buf, uint16_t bufLen);
 void MotionFillPoseJson(char *buf, uint16_t bufLen);
@@ -101,5 +103,7 @@ const char *MotionWritePwm(const RpcParams *p);
 const char *MotionSubscribeInputs(const RpcParams *p, char *buf, uint16_t bufLen);
 const char *MotionUnsubscribeInputs();
 void MotionPollInputs();
+const char *MotionConfigureNetwork(const RpcParams *p, char *buf, uint16_t bufLen);
+void MotionRestart();
 
 #endif

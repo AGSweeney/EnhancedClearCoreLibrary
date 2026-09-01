@@ -143,6 +143,10 @@ DI-6…A-12 are read-only via `read_inputs`. Pins assigned as hardware limits ca
 
 `configure` accepts `out_power_on_0` … `out_power_on_5` (0/1 set, 255 = don't care / clear). At boot — after hardware-limit DI modes are applied — `ApplyOutputDefaults()` drives each IO-0…IO-5 with a set mask bit to its stored state. Default mask 0 leaves boot behavior unchanged. Reported by `get_config` as `out_power_on_state` / `out_power_on_mask`. May change while motors are enabled.
 
+### Network configuration (NVM v7)
+
+The board boots with DHCP by default (fallback `192.168.0.109` if DHCP fails). `configure_network` persists a static IP config to NVM: `netMode` (0=DHCP, 1=static) plus `ipOctets`/`netmaskOctets`/`gatewayOctets` (4 octets each). `TransportInitEthernet` reads `MotionGetNetworkConfig()` and, for static mode, sets `EthernetMgr.LocalIp`/`NetmaskIp`/`GatewayIp` (which only apply when `m_dhcp` is false, i.e. DHCP is not started) and skips `DhcpBegin()`; DHCP mode calls `DhcpBegin()` with the fallback on failure. Because `EthernetMgr.Setup()` runs once, network changes only apply after a reboot — the `restart` RPC calls `SysMgr.ResetBoard()` to apply them. `configure_network` validates dotted-quad strings (`ParseIpOctets`) and is allowed while enabled and during blocking waits. Reported by `get_config` as `network_mode` / `ip_address` / `netmask` / `gateway`. Older blobs (v1–v6) load with DHCP defaults (`ResetNetworkDefaults`).
+
 ### A-axis units (NVM v4)
 
 Axis A is rotary. The user-facing unit is configurable with `set_units_a` (`"deg"` or `"rev"`), persisted to NVM (blob v4). Internal storage stays **degrees** (motor A mechanical params use `UNIT_DEGREES`), so `ToInternal`/`FromInternal` convert revolutions ↔ 360°. `get_pose`, `get_status`, and soft limits all report/accept A values in the active A unit. Older NVM blobs (v1–v3) load with the default `deg`.

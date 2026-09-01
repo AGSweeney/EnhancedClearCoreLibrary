@@ -341,6 +341,15 @@ static void ApplyParam(const char *js, const jsmntok_t *key, const jsmntok_t *va
             }
             child += 1;
         }
+    } else if (TokenEq(js, key, "ip_address") && val->type == JSMN_STRING) {
+        TokenCopy(js, val, p->ipAddress, sizeof(p->ipAddress));
+        p->hasIpAddress = true;
+    } else if (TokenEq(js, key, "netmask") && val->type == JSMN_STRING) {
+        TokenCopy(js, val, p->netmask, sizeof(p->netmask));
+        p->hasNetmask = true;
+    } else if (TokenEq(js, key, "gateway") && val->type == JSMN_STRING) {
+        TokenCopy(js, val, p->gateway, sizeof(p->gateway));
+        p->hasGateway = true;
     } else if (TokenEq(js, key, "state")) {
         if (TokenBool(js, val, &b)) {
             p->hasIoState = true;

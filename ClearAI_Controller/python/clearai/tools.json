@@ -491,5 +491,34 @@
         "additionalProperties": false
       }
     }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "configure_network",
+      "description": "Configure network IP mode (dhcp or static) and static IP/netmask/gateway. Persisted to NVM; applies on next restart. Allowed while motors are enabled.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "mode": { "type": "string", "enum": ["dhcp", "static"], "description": "dhcp or static" },
+          "ip_address": { "type": "string", "description": "Static IP a.b.c.d; required for static" },
+          "netmask": { "type": "string", "description": "Static netmask a.b.c.d" },
+          "gateway": { "type": "string", "description": "Static gateway a.b.c.d; 0.0.0.0 = none" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "restart",
+      "description": "Reset the ClearCore board to apply pending network config (and re-run the application). The TCP connection will drop.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    }
   }
 ]

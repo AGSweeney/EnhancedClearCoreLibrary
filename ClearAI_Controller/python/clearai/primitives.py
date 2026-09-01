@@ -219,6 +219,31 @@ def unsubscribe_inputs() -> Any:
     return _c().call("unsubscribe_inputs", {})
 
 
+def configure_network(
+    mode: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    netmask: Optional[str] = None,
+    gateway: Optional[str] = None,
+) -> Any:
+    """Configure network IP mode (dhcp/static) and static IP/netmask/gateway.
+    Persisted to NVM; applies on next restart()."""
+    params: dict[str, Any] = {}
+    if mode is not None:
+        params["mode"] = mode
+    if ip_address is not None:
+        params["ip_address"] = ip_address
+    if netmask is not None:
+        params["netmask"] = netmask
+    if gateway is not None:
+        params["gateway"] = gateway
+    return _c().call("configure_network", params)
+
+
+def restart() -> Any:
+    """Reset the ClearCore board to apply pending network config."""
+    return _c().call("restart", {}, timeout=5.0)
+
+
 def queue_status() -> Any:
     return _c().call("queue_status")
 

@@ -106,7 +106,17 @@ void TransportInitEthernet() {
         return;
     }
     EthernetMgr.Setup();
-    if (!EthernetMgr.DhcpBegin()) {
+    uint8_t netMode = 0;
+    uint8_t ip[4] = {0};
+    uint8_t nm[4] = {0};
+    uint8_t gw[4] = {0};
+    MotionGetNetworkConfig(&netMode, ip, nm, gw);
+    if (netMode == 1) {
+        /* Static IP: set addresses before Setup-driven bring-up; skip DHCP. */
+        EthernetMgr.LocalIp(IpAddress(ip[0], ip[1], ip[2], ip[3]));
+        EthernetMgr.NetmaskIp(IpAddress(nm[0], nm[1], nm[2], nm[3]));
+        EthernetMgr.GatewayIp(IpAddress(gw[0], gw[1], gw[2], gw[3]));
+    } else if (!EthernetMgr.DhcpBegin()) {
         EthernetMgr.LocalIp(IpAddress(192, 168, 0, 109));
     }
     g_controlServer.Begin();

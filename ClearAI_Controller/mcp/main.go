@@ -118,6 +118,13 @@ type subscribeInputsArgs struct {
 	DebounceMs *int  `json:"debounce_ms,omitempty" jsonschema:"min ms between edges per pin; default 5"`
 }
 
+type configureNetworkArgs struct {
+	Mode     *string `json:"mode,omitempty" jsonschema:"dhcp or static"`
+	IpAddress *string `json:"ip_address,omitempty" jsonschema:"static IP a.b.c.d; required for static"`
+	Netmask  *string `json:"netmask,omitempty" jsonschema:"static netmask a.b.c.d"`
+	Gateway  *string `json:"gateway,omitempty" jsonschema:"static gateway a.b.c.d; 0.0.0.0 = none"`
+}
+
 type homeArgs struct {
 	Axis      string   `json:"axis" jsonschema:"x, y, z, or a"`
 	Dir       string   `json:"dir" jsonschema:"pos or neg (which limit to seek)"`
@@ -347,6 +354,12 @@ func registerTools(server *mcp.Server, board *rpcClient) {
 	addRPC[emptyArgs](server, board, "unsubscribe_inputs",
 		"Stop input edge notifications previously enabled by subscribe_inputs.",
 		"unsubscribe_inputs", 5*time.Second)
+	addRPC[configureNetworkArgs](server, board, "configure_network",
+		"Configure network IP mode (dhcp or static) and static IP/netmask/gateway. Persisted to NVM; applies on next restart. Allowed while motors are enabled.",
+		"configure_network", 5*time.Second)
+	addRPC[emptyArgs](server, board, "restart",
+		"Reset the ClearCore board to apply pending network config (and re-run the application). The TCP connection will drop.",
+		"restart", 5*time.Second)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "dwell",
 		Description: "Wait seconds (max 600). Interruptible by estop.",

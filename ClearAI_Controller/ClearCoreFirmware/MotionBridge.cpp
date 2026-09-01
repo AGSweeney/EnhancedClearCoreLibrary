@@ -39,12 +39,13 @@ static NvmManager &Nvm() {
 
 /* User-page blob at NVM_LOC_USER_START (416 bytes available before Teknic reserved). */
 static const uint32_t CLEARAI_NVM_MAGIC = 0x43414943u; /* 'CAIC' */
-static const uint16_t CLEARAI_NVM_VERSION = 6;
+static const uint16_t CLEARAI_NVM_VERSION = 7;
 static const uint16_t CLEARAI_NVM_VERSION_V1 = 1;
 static const uint16_t CLEARAI_NVM_VERSION_V2 = 2;
 static const uint16_t CLEARAI_NVM_VERSION_V3 = 3;
 static const uint16_t CLEARAI_NVM_VERSION_V4 = 4;
 static const uint16_t CLEARAI_NVM_VERSION_V5 = 5;
+static const uint16_t CLEARAI_NVM_VERSION_V6 = 6;
 
 #pragma pack(push, 1)
 struct ClearAiNvmConfigV1 {
@@ -168,6 +169,40 @@ struct ClearAiNvmConfigV5 {
     uint8_t nvmPad2[4];
 };
 
+struct ClearAiNvmConfigV6 {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t size;
+    uint32_t axisMask;
+    uint8_t testMode;
+    uint8_t units;
+    uint8_t mode;
+    uint8_t estopDi6;
+    uint32_t stepsPerRev[CLEARAI_AXIS_COUNT];
+    float pitchMm[CLEARAI_AXIS_COUNT];
+    float gear[CLEARAI_AXIS_COUNT];
+    uint32_t vel;
+    uint32_t accel;
+    uint32_t decel;
+    float feedMmPerMin;
+    uint8_t limitFlags;
+    uint8_t limitPad[3];
+    float limitMin[CLEARAI_AXIS_COUNT];
+    float limitMax[CLEARAI_AXIS_COUNT];
+    uint8_t posLimDi[CLEARAI_AXIS_COUNT];
+    uint8_t negLimDi[CLEARAI_AXIS_COUNT];
+    uint8_t unitsA;
+    uint8_t nvmPad[3];
+    uint32_t velAxis[CLEARAI_AXIS_COUNT];
+    uint32_t accelAxis[CLEARAI_AXIS_COUNT];
+    uint32_t decelAxis[CLEARAI_AXIS_COUNT];
+    uint32_t watchdogMs;
+    uint8_t nvmPad2[4];
+    uint8_t outPowerOnState[6];
+    uint8_t outPowerOnMask;
+    uint8_t nvmPad3[3];
+};
+
 struct ClearAiNvmConfig {
     uint32_t magic;
     uint16_t version;
@@ -200,6 +235,11 @@ struct ClearAiNvmConfig {
     uint8_t outPowerOnState[6];
     uint8_t outPowerOnMask;
     uint8_t nvmPad3[3];
+    uint8_t netMode;            /* 0 = DHCP, 1 = static */
+    uint8_t ipOctets[4];
+    uint8_t netmaskOctets[4];
+    uint8_t gatewayOctets[4];
+    uint8_t nvmPad4[3];
 };
 #pragma pack(pop)
 
@@ -249,6 +289,10 @@ static uint16_t g_inputSubMask = 0;          /* bits 0-12: subscribed input pins
 static uint16_t g_inputSubDebounceMs = CLEARAI_INPUT_DEBOUNCE_DEFAULT_MS;
 static uint16_t g_inputState[13] = {0};       /* last reported digital state per pin */
 static uint32_t g_inputLastEdgeMs[13] = {0}; /* last edge timestamp per pin */
+static uint8_t g_netMode = 0;               /* 0 = DHCP, 1 = static */
+static uint8_t g_ipOctets[4] = {0};
+static uint8_t g_netmaskOctets[4] = {0};
+static uint8_t g_gatewayOctets[4] = {0};
 
 static void ApplyLimits();
 
@@ -398,6 +442,15 @@ static void ConfigFillFromLive(ClearAiNvmConfig *cfg) {
     cfg->nvmPad3[0] = 0;
     cfg->nvmPad3[1] = 0;
     cfg->nvmPad3[2] = 0;
+    cfg->netMode = g_netMode;
+    for (uint8_t i = 0; i < 4; i++) {
+        cfg->ipOctets[i] = g_ipOctets[i];
+        cfg->netmaskOctets[i] = g_netmaskOctets[i];
+        cfg->gatewayOctets[i] = g_gatewayOctets[i];
+    }
+    cfg->nvmPad4[0] = 0;
+    cfg->nvmPad4[1] = 0;
+    cfg->nvmPad4[2] = 0;
 }
 
 static bool ConfigApplyCommon(const ClearAiNvmConfigV1 *cfg) {
@@ -535,6 +588,15 @@ static void ResetOutputDefaults() {
     g_outPowerOnMask = 0;
 }
 
+static void ResetNetworkDefaults() {
+    g_netMode = 0;
+    for (uint8_t i = 0; i < 4; i++) {
+        g_ipOctets[i] = 0;
+        g_netmaskOctets[i] = 0;
+        g_gatewayOctets[i] = 0;
+    }
+}
+
 static void ApplyOutputDefaults() {
     for (uint8_t i = 0; i < 6; i++) {
         if (!(g_outPowerOnMask & (1u << i))) {
@@ -565,6 +627,7 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         HwLimClearAll();
         ResetPerAxisDynamics();
         ResetOutputDefaults();
+        ResetNetworkDefaults();
         return true;
     }
     if (cfg->version == CLEARAI_NVM_VERSION_V2) {
@@ -584,6 +647,7 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         g_unitsA = CLEARAI_UNITS_A_DEG;
         ResetPerAxisDynamics();
         ResetOutputDefaults();
+        ResetNetworkDefaults();
         return true;
     }
     if (cfg->version == CLEARAI_NVM_VERSION_V3) {
@@ -604,6 +668,7 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         g_unitsA = CLEARAI_UNITS_A_DEG;
         ResetPerAxisDynamics();
         ResetOutputDefaults();
+        ResetNetworkDefaults();
         return true;
     }
     if (cfg->version == CLEARAI_NVM_VERSION_V4) {
@@ -624,6 +689,7 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         g_unitsA = (v4->unitsA == (uint8_t)CLEARAI_UNITS_A_REV) ? CLEARAI_UNITS_A_REV : CLEARAI_UNITS_A_DEG;
         ResetPerAxisDynamics();
         ResetOutputDefaults();
+        ResetNetworkDefaults();
         return true;
     }
     if (cfg->version == CLEARAI_NVM_VERSION_V5) {
@@ -650,6 +716,37 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         g_watchdogMs = v5->watchdogMs;
         g_lastKeepaliveMs = Milliseconds();
         ResetOutputDefaults();
+        ResetNetworkDefaults();
+        return true;
+    }
+    if (cfg->version == CLEARAI_NVM_VERSION_V6) {
+        if (cfg->size < sizeof(ClearAiNvmConfigV6)) {
+            return false;
+        }
+        const ClearAiNvmConfigV6 *v6 = (const ClearAiNvmConfigV6 *)cfg;
+        if (!ConfigApplyCommon((const ClearAiNvmConfigV1 *)v6)) {
+            return false;
+        }
+        g_limitFlags = v6->limitFlags;
+        for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+            g_limitMin[a] = (double)v6->limitMin[a];
+            g_limitMax[a] = (double)v6->limitMax[a];
+            g_posLimDi[a] = v6->posLimDi[a];
+            g_negLimDi[a] = v6->negLimDi[a];
+        }
+        g_unitsA = (v6->unitsA == (uint8_t)CLEARAI_UNITS_A_REV) ? CLEARAI_UNITS_A_REV : CLEARAI_UNITS_A_DEG;
+        for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+            g_velAxis[a] = v6->velAxis[a];
+            g_accelAxis[a] = v6->accelAxis[a];
+            g_decelAxis[a] = v6->decelAxis[a];
+        }
+        g_watchdogMs = v6->watchdogMs;
+        g_lastKeepaliveMs = Milliseconds();
+        for (uint8_t i = 0; i < 6; i++) {
+            g_outPowerOnState[i] = v6->outPowerOnState[i];
+        }
+        g_outPowerOnMask = v6->outPowerOnMask;
+        ResetNetworkDefaults();
         return true;
     }
     if (cfg->version != CLEARAI_NVM_VERSION) {
@@ -680,6 +777,12 @@ static bool ConfigApplyBlob(const ClearAiNvmConfig *cfg) {
         g_outPowerOnState[i] = cfg->outPowerOnState[i];
     }
     g_outPowerOnMask = cfg->outPowerOnMask;
+    g_netMode = cfg->netMode;
+    for (uint8_t i = 0; i < 4; i++) {
+        g_ipOctets[i] = cfg->ipOctets[i];
+        g_netmaskOctets[i] = cfg->netmaskOctets[i];
+        g_gatewayOctets[i] = cfg->gatewayOctets[i];
+    }
     return true;
 }
 
@@ -1110,6 +1213,7 @@ bool MotionInit() {
     g_nvmLoaded = false;
     ResetPerAxisDynamics();
     ResetOutputDefaults();
+    ResetNetworkDefaults();
     g_watchdogTripped = false;
     g_limitTrippedAxis = 0xff;
     g_limitTrippedPos = false;
@@ -1551,6 +1655,7 @@ const char *MotionResetConfig() {
     g_testMode = (CLEARAI_TEST_MODE_DEFAULT != 0);
     ResetPerAxisDynamics();
     ResetOutputDefaults();
+    ResetNetworkDefaults();
     g_watchdogTripped = false;
     g_limitTrippedAxis = 0xff;
     g_limitTrippedPos = false;
@@ -1838,6 +1943,28 @@ const char *MotionWaitIdle(const RpcParams *p, ClearAiUrgentFn urgent) {
         }
     }
     return WaitLoop(timeout, true, urgent);
+}
+
+void MotionGetNetworkConfig(uint8_t *mode, uint8_t ip[4], uint8_t netmask[4],
+                            uint8_t gateway[4]) {
+    if (mode) {
+        *mode = g_netMode;
+    }
+    if (ip) {
+        for (uint8_t i = 0; i < 4; i++) {
+            ip[i] = g_ipOctets[i];
+        }
+    }
+    if (netmask) {
+        for (uint8_t i = 0; i < 4; i++) {
+            netmask[i] = g_netmaskOctets[i];
+        }
+    }
+    if (gateway) {
+        for (uint8_t i = 0; i < 4; i++) {
+            gateway[i] = g_gatewayOctets[i];
+        }
+    }
 }
 
 void MotionGetStatus(MotionStatus *out) {
@@ -2154,6 +2281,83 @@ void MotionPollInputs() {
     }
 }
 
+static bool ParseIpOctets(const char *str, uint8_t out[4]) {
+    uint8_t parts = 0;
+    uint16_t acc = 0;
+    bool any = false;
+    for (const char *s = str; ; s++) {
+        char c = *s;
+        if (c >= '0' && c <= '9') {
+            acc = acc * 10 + (uint16_t)(c - '0');
+            any = true;
+            if (acc > 255) {
+                return false;
+            }
+        } else if (c == '.' || c == '\0') {
+            if (!any || parts >= 4) {
+                return false;
+            }
+            out[parts++] = (uint8_t)acc;
+            acc = 0;
+            any = false;
+            if (c == '\0') {
+                break;
+            }
+        } else {
+            return false;
+        }
+    }
+    return parts == 4;
+}
+
+const char *MotionConfigureNetwork(const RpcParams *p, char *buf, uint16_t bufLen) {
+    if (p->hasMode) {
+        if (strcmp(p->mode, "dhcp") == 0) {
+            g_netMode = 0;
+        } else if (strcmp(p->mode, "static") == 0) {
+            g_netMode = 1;
+        } else {
+            return "mode must be 'dhcp' or 'static'";
+        }
+    }
+    if (g_netMode == 1) {
+        if (p->hasIpAddress) {
+            if (!ParseIpOctets(p->ipAddress, g_ipOctets)) {
+                return "invalid ip_address";
+            }
+        } else if (!(g_ipOctets[0] | g_ipOctets[1] | g_ipOctets[2] | g_ipOctets[3])) {
+            return "static mode requires ip_address";
+        }
+        if (p->hasNetmask) {
+            if (!ParseIpOctets(p->netmask, g_netmaskOctets)) {
+                return "invalid netmask";
+            }
+        }
+        if (p->hasGateway) {
+            if (!ParseIpOctets(p->gateway, g_gatewayOctets)) {
+                return "invalid gateway";
+            }
+        }
+    }
+    ConfigSaveNvm();
+    snprintf(buf, bufLen,
+             "{\"network_mode\":\"%s\",\"ip_address\":\"%u.%u.%u.%u\","
+             "\"netmask\":\"%u.%u.%u.%u\",\"gateway\":\"%u.%u.%u.%u\","
+             "\"applies_on\":\"restart\"}",
+             g_netMode == 1 ? "static" : "dhcp",
+             (unsigned)g_ipOctets[0], (unsigned)g_ipOctets[1],
+             (unsigned)g_ipOctets[2], (unsigned)g_ipOctets[3],
+             (unsigned)g_netmaskOctets[0], (unsigned)g_netmaskOctets[1],
+             (unsigned)g_netmaskOctets[2], (unsigned)g_netmaskOctets[3],
+             (unsigned)g_gatewayOctets[0], (unsigned)g_gatewayOctets[1],
+             (unsigned)g_gatewayOctets[2], (unsigned)g_gatewayOctets[3]);
+    return nullptr;
+}
+
+void MotionRestart() {
+    SysMgr.ResetBoard();
+}
+
 const char *MotionQueueClear() {
     /* StopDecel() decelerates the active coordinated segment to a stop and
      * drops all pending queued segments (it zeros the planner queue counts). */
@@ -2453,7 +2657,8 @@ void MotionFillCapabilitiesJson(char *buf, uint16_t bufLen) {
              "\"read_inputs\",\"write_output\",\"queue_status\",\"queue_clear\","
              "\"home\",\"probe\",\"keepalive\","
              "\"read_analog\",\"write_analog\",\"write_pwm\","
-             "\"subscribe_inputs\",\"unsubscribe_inputs\"],"
+             "\"subscribe_inputs\",\"unsubscribe_inputs\","
+             "\"configure_network\",\"restart\"],"
              "\"tcp\":%u,\"tel\":%u,\"discover\":%u}",
              CLEARAI_PROTOCOL_VERSION,
              (unsigned long)g_axisMask,
@@ -2473,6 +2678,7 @@ void MotionFillConfigJson(char *buf, uint16_t bufLen) {
     Nvm().BlockRead(NvmManager::NVM_LOC_USER_START, (int)sizeof(stored), (uint8_t *)&stored);
     storedOk = (stored.magic == CLEARAI_NVM_MAGIC &&
                 (stored.version == CLEARAI_NVM_VERSION ||
+                 stored.version == CLEARAI_NVM_VERSION_V6 ||
                  stored.version == CLEARAI_NVM_VERSION_V5 ||
                  stored.version == CLEARAI_NVM_VERSION_V4 ||
                  stored.version == CLEARAI_NVM_VERSION_V3 ||
@@ -2508,7 +2714,11 @@ void MotionFillConfigJson(char *buf, uint16_t bufLen) {
              "\"decel_axis\":[%lu,%lu,%lu,%lu],"
              "\"watchdog_ms\":%lu,"
              "\"out_power_on_state\":[%u,%u,%u,%u,%u,%u],"
-             "\"out_power_on_mask\":%u}",
+             "\"out_power_on_mask\":%u,"
+             "\"network_mode\":\"%s\","
+             "\"ip_address\":\"%u.%u.%u.%u\","
+             "\"netmask\":\"%u.%u.%u.%u\","
+             "\"gateway\":\"%u.%u.%u.%u\"}",
              g_nvmLoaded ? "true" : "false",
              storedOk ? "true" : "false",
              (unsigned)(storedOk ? stored.version : 0),
@@ -2541,7 +2751,14 @@ void MotionFillConfigJson(char *buf, uint16_t bufLen) {
              (unsigned)g_outPowerOnState[0], (unsigned)g_outPowerOnState[1],
              (unsigned)g_outPowerOnState[2], (unsigned)g_outPowerOnState[3],
              (unsigned)g_outPowerOnState[4], (unsigned)g_outPowerOnState[5],
-             (unsigned)g_outPowerOnMask);
+             (unsigned)g_outPowerOnMask,
+             g_netMode == 1 ? "static" : "dhcp",
+             (unsigned)g_ipOctets[0], (unsigned)g_ipOctets[1],
+             (unsigned)g_ipOctets[2], (unsigned)g_ipOctets[3],
+             (unsigned)g_netmaskOctets[0], (unsigned)g_netmaskOctets[1],
+             (unsigned)g_netmaskOctets[2], (unsigned)g_netmaskOctets[3],
+             (unsigned)g_gatewayOctets[0], (unsigned)g_gatewayOctets[1],
+             (unsigned)g_gatewayOctets[2], (unsigned)g_gatewayOctets[3]);
 }
 
 static void FormatHlfbPercentArray(char *out, size_t outLen, const MotionStatus *st) {

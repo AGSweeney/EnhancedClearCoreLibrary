@@ -152,6 +152,21 @@ static void DispatchParsed(const RpcRequest *req) {
         ReplyOk(id);
         return;
     }
+    if (strcmp(method, "configure_network") == 0) {
+        char body[CLEARAI_MAX_REPLY];
+        const char *err = MotionConfigureNetwork(p, body, sizeof(body));
+        if (err) {
+            ReplyError(id, JSONRPC_APP_ERROR, err);
+        } else {
+            ReplyResult(id, body);
+        }
+        return;
+    }
+    if (strcmp(method, "restart") == 0) {
+        ReplyOk(id);
+        MotionRestart();  /* does not return; board resets */
+        return;
+    }
     if (strcmp(method, "enable") == 0) {
         const char *err = MotionEnable();
         if (err) {
@@ -366,6 +381,7 @@ bool PrimitivesPollSafetyDuringWait() {
         strcmp(req.method, "get_config") == 0 ||
         strcmp(req.method, "read_inputs") == 0 ||
         strcmp(req.method, "read_analog") == 0 ||
+        strcmp(req.method, "configure_network") == 0 ||
         strcmp(req.method, "queue_status") == 0 ||
         strcmp(req.method, "set_test_mode") == 0) {
         DispatchParsed(&req);

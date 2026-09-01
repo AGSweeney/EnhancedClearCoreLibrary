@@ -42,7 +42,7 @@ All tools mirror firmware methods unless noted. Motion tools are non-blocking; a
 | `get_capabilities` | Protocol version, axes, units, mode, method list, ports |
 | `get_status` | Enable/moving/HLFB/estop/test_mode/alerts/queue/`queue_active`/`units_a`/`hlfb_percent` (per-axis torque %)/`watchdog_ms`/`watchdog_tripped`/`limit_status`/`pwm_duty`/pose |
 | `get_pose` | Work coordinates x,y,z,a (A in configured A units) |
-| `get_config` | Live config + NVM validity (`axis_mask`, test_mode, mechanics, vel, `units_a`, soft limits, hw limit DIs, `vel_axis`/`accel_axis`/`decel_axis`, `watchdog_ms`, `out_power_on_state`/`out_power_on_mask`, …) |
+| `get_config` | Live config + NVM validity (`axis_mask`, test_mode, mechanics, vel, `units_a`, soft limits, hw limit DIs, `vel_axis`/`accel_axis`/`decel_axis`, `watchdog_ms`, `out_power_on_state`/`out_power_on_mask`, `network_mode`/`ip_address`/`netmask`/`gateway`, …) |
 | `enable` / `disable` | Enable or abrupt disable |
 | `clear_alerts` | Clear motor alert flags |
 | `stop` | Decelerate; motors stay enabled |
@@ -66,6 +66,8 @@ All tools mirror firmware methods unless noted. Motion tools are non-blocking; a
 | `write_pwm` | Drive IO-0…IO-5 as PWM (duty 0–255; fixed frequency) |
 | `subscribe_inputs` | Opt-in edge notifications for pins 0–12 (events on telemetry 9101) |
 | `unsubscribe_inputs` | Stop input edge notifications |
+| `configure_network` | Set network mode (dhcp/static) + static IP/netmask/gateway; persisted, applies on restart |
+| `restart` | Reset board to apply pending network config (connection drops) |
 | `queue_status` | Pending coordinated queue depth + active flag |
 | `queue_clear` | Decelerate active move + drop pending queued segments |
 | `home` | Seek configured hw limit for `axis`/`dir`, stop, optional backoff + zero |

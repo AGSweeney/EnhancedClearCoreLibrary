@@ -64,6 +64,7 @@ struct RpcParams {
     bool hasAnalogValue, hasMicroamps, hasDuty;
     bool hasOutPowerOn0, hasOutPowerOn1, hasOutPowerOn2, hasOutPowerOn3, hasOutPowerOn4, hasOutPowerOn5;
     bool hasPins, hasDebounceMs;
+    bool hasIpAddress, hasNetmask, hasGateway;
     double x, y, z, a;
     double i, j, feed, seconds;
     uint32_t timeoutMs;
@@ -103,6 +104,9 @@ struct RpcParams {
     uint8_t pins[13];
     uint8_t pinsCount;
     uint32_t debounceMs;
+    char ipAddress[20];
+    char netmask[20];
+    char gateway[20];
 };
 
 struct RpcRequest {
