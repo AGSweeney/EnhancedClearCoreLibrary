@@ -2390,7 +2390,7 @@ void MotionFillStatusJson(char *buf, uint16_t len) {
     snprintf(buf, len,
              "{\"enabled\":%s,\"moving\":%s,\"estop\":%s,\"fault\":%s,"
              "\"watchdog\":%s,\"test_mode\":%s,\"axis_mask\":%u,\"alert_reg\":%lu,"
-             "\"alerts\":\"%s\",\"travel_limit\":\"%s\",\"xrce\":\"%s\",\"last_cmd_seq\":%u,"
+             "\"alerts\":\"%s\",\"travel_limit\":\"%s\",\"xrce\":\"%s\",\"xrce_time\":\"%s\",\"last_cmd_seq\":%u,"
              "\"position\":[%.6f,%.6f,%.6f,%.6f],"
              "\"velocity\":[%.6f,%.6f,%.6f,%.6f],"
              "\"effort\":[%.4f,%.4f,%.4f,%.4f]}",
@@ -2403,6 +2403,7 @@ void MotionFillStatusJson(char *buf, uint16_t len) {
              (unsigned)st.axis_mask, (unsigned long)st.alert_reg, alerts,
              g_travelLimit[0] ? g_travelLimit : "none",
              XrceStateName(),
+             XrceTimeSynced() ? "synced" : "unsync",
              (unsigned)g_lastCmdSeq,
              st.position[0], st.position[1], st.position[2], st.position[3],
              st.velocity[0], st.velocity[1], st.velocity[2], st.velocity[3],

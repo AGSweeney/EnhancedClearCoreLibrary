@@ -28,6 +28,7 @@ static const uint32_t XRCE_RETRY_MS = 1000;
 static const uint32_t XRCE_PUBLISH_MS = 50;
 static const uint32_t XRCE_HEARTBEAT_MS = 1000;
 static const uint32_t XRCE_AGENT_LOST_MS = 3000;
+static const uint32_t XRCE_TIME_SYNC_MS = 1000;
 
 static const char kParticipantXml[] =
     "<dds><participant><rtps><name>clearcore_ros</name></rtps></participant></dds>";
@@ -79,6 +80,10 @@ static uint32_t g_lastSendMs = 0;
 static uint32_t g_lastPubMs = 0;
 static uint32_t g_lastRxMs = 0;
 static uint32_t g_lastHeartbeatMs = 0;
+static uint32_t g_lastTimeSyncMs = 0;
+static uint32_t g_timeSyncT1Ms = 0;
+static bool g_timeSynced = false;
+static int64_t g_rosOffsetNs = 0;
 static bool g_waiting = false;
 static uint8_t g_clientKey[4] = {0x43, 0x52, 0x4F, 0x53};
 
@@ -110,6 +115,30 @@ static void PutU32(XrceBuf *b, uint32_t v) {
 
 static void PutI16(XrceBuf *b, int16_t v) {
     PutU16(b, (uint16_t)v);
+}
+
+static void PutTime(XrceBuf *b, uint32_t ms) {
+    PutU32(b, ms / 1000u);
+    PutU32(b, (ms % 1000u) * 1000000u);
+}
+
+static int64_t TimeToNs(const uint8_t *p) {
+    const int32_t sec = (int32_t)(p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
+                                  ((uint32_t)p[3] << 24));
+    const uint32_t nsec = (uint32_t)p[4] | ((uint32_t)p[5] << 8) | ((uint32_t)p[6] << 16) |
+                          ((uint32_t)p[7] << 24);
+    return (int64_t)sec * 1000000000LL + (int64_t)nsec;
+}
+
+static int64_t BoardNs(uint32_t ms) {
+    return (int64_t)ms * 1000000LL;
+}
+
+static void ResetTimeSync() {
+    g_timeSynced = false;
+    g_rosOffsetNs = 0;
+    g_timeSyncT1Ms = 0;
+    g_lastTimeSyncMs = 0;
 }
 
 static void PutF64(XrceBuf *b, double v) {
@@ -200,6 +229,7 @@ static bool UdpSend(const uint8_t *data, uint16_t len) {
 }
 
 static void SendCreateClient() {
+    ResetTimeSync();
     uint8_t raw[64];
     XrceBuf b = {raw, 0, sizeof(raw)};
     /* CREATE_CLIENT is stamped with session_id & 0x80 (0x80 for this client).
@@ -275,11 +305,27 @@ static void SendJointState() {
     MotionFillState(&st);
     uint8_t raw[512];
     XrceBuf body = {raw, 0, sizeof(raw)};
-    /* Fast DDS adds the CDR encapsulation. Alignment is from the start of this body. */
+    /* Fast DDS adds the CDR encapsulation. Alignment is from the start of this body.
+     * Before TIMESTAMP_REPLY, stamp is {0, uptime_ns % 1e9} and frame_id is unsync.
+     * After it succeeds, stamp is agent_epoch_ns + (board_ms - t1_ms) * 1e6. */
     const uint32_t ms = st.time_ms;
-    PutU32(&body, ms / 1000u);
-    PutU32(&body, (ms % 1000u) * 1000000u);
-    PutStr(&body, "");
+    uint32_t sec = 0;
+    uint32_t nsec = 0;
+    const char *frameId = "unsync";
+    if (g_timeSynced) {
+        int64_t rosNs = g_rosOffsetNs + BoardNs(ms);
+        if (rosNs < 0) {
+            rosNs = 0;
+        }
+        sec = (uint32_t)(rosNs / 1000000000LL);
+        nsec = (uint32_t)(rosNs % 1000000000LL);
+        frameId = "";
+    } else {
+        nsec = (uint32_t)(BoardNs(ms) % 1000000000LL);
+    }
+    PutU32(&body, sec);
+    PutU32(&body, nsec);
+    PutStr(&body, frameId);
     PutU32(&body, 4);
     PutStr(&body, MotionJointName(0));
     PutStr(&body, MotionJointName(1));
@@ -314,6 +360,35 @@ static void SendJointState() {
         g_bestEffortSeq = (uint16_t)(g_bestEffortSeq + 1u);
         g_lastPubMs = Milliseconds();
     }
+}
+
+static void SendTimeSync() {
+    uint8_t raw[48];
+    XrceBuf b = {raw, 0, sizeof(raw)};
+    Header(&b, XRCE_STREAM_RELIABLE, g_reliableSeq);
+    const uint16_t sub = BeginSub(&b, 14, 0);
+    const uint32_t t1 = Milliseconds();
+    PutTime(&b, t1);
+    EndSub(&b, sub);
+    if (UdpSend(raw, b.n)) {
+        g_timeSyncT1Ms = t1;
+        g_lastTimeSyncMs = t1;
+        /* CREATE already shares this sequence with HEARTBEAT. TIMESTAMP does
+         * the same so a later heartbeat is not treated as a gap. */
+    }
+}
+
+static void OnTimestampReply(const uint8_t *p, uint16_t len) {
+    if (len < 24 || g_timeSyncT1Ms == 0) {
+        return;
+    }
+    const int64_t t1 = TimeToNs(p);
+    const int64_t t2 = TimeToNs(p + 8);
+    const int64_t t3 = TimeToNs(p + 16);
+    const int64_t t4 = BoardNs(Milliseconds());
+    g_rosOffsetNs = ((t2 - t1) + (t3 - t4)) / 2;
+    g_timeSynced = true;
+    g_timeSyncT1Ms = 0;
 }
 
 static void StartCreate(XrceState next, bool newRequest) {
@@ -374,6 +449,10 @@ static void OnPayload(uint8_t id, const uint8_t *p, uint16_t len) {
         if (req == g_waitRequest && (status == 0x00 || status == 0x01 || status == 0x82)) {
             Advance();
         }
+        return;
+    }
+    if (id == 15) {
+        OnTimestampReply(p, len);
     }
 }
 
@@ -451,6 +530,7 @@ const char *XrceConnect(const uint8_t ip[4], uint16_t port) {
     g_lastSendMs = 0;
     g_lastRxMs = 0;
     g_lastHeartbeatMs = 0;
+    ResetTimeSync();
     SendCreateClient();
     return nullptr;
 }
@@ -463,6 +543,7 @@ const char *XrceDisconnect() {
     }
     g_state = XRCE_OFF;
     g_waiting = false;
+    ResetTimeSync();
     return nullptr;
 }
 
@@ -488,6 +569,9 @@ void XrcePoll() {
         if (g_lastHeartbeatMs == 0 || (now - g_lastHeartbeatMs) >= XRCE_HEARTBEAT_MS) {
             SendReliableHeartbeat();
         }
+        if (g_lastTimeSyncMs == 0 || (now - g_lastTimeSyncMs) >= XRCE_TIME_SYNC_MS) {
+            SendTimeSync();
+        }
         if (g_lastPubMs == 0 || (now - g_lastPubMs) >= XRCE_PUBLISH_MS) {
             SendJointState();
         }
@@ -509,4 +593,8 @@ const char *XrceStateName() {
         case XRCE_OFF:
         default: return "off";
     }
+}
+
+bool XrceTimeSynced() {
+    return g_timeSynced;
 }

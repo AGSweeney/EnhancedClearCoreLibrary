@@ -17,7 +17,7 @@ Three host programs talk to the same firmware. Only one of them should own motio
 | First motor, no ROS | `host/ccros_cli.py` | The session on TCP 9200 | Nobody, unless you start an agent |
 | Python bridge | `clearcore_bridge` | `follow_joint_trajectory` on that node, over the session and the binary stream | The bridge, for joints in `axis_mask`. Stamps are host reception time. |
 | `ros2_control` | `clearcore_hardware` plus a controller | The controller's command interface, over the same session and stream | `joint_state_broadcaster`, if the launch starts it |
-| XRCE telemetry | `xrce_connect` and a micro-ROS agent | Nobody. This client only publishes. | The agent node `clearcore_ros`, all four joints, in metres and radians. The stamp is time since boot. |
+| XRCE telemetry | `xrce_connect` and a micro-ROS agent | Nobody. This client only publishes. | The agent node `clearcore_ros`, all four joints, in metres and radians. Until TIME_SYNC, `stamp.sec` is 0 and `frame_id` is `unsync`. After TIME_SYNC, the stamp is ROS time. |
 
 The session port accepts one TCP client. The bridge and the `ros2_control` plugin cannot both hold it. Stop the bridge and `joint_state_broadcaster` before treating `/joint_states` as the agent topic.
 
@@ -133,7 +133,7 @@ Timed tracking compares generated position with `q_latched + v_latched * (time_m
 
 ## XRCE-DDS
 
-`xrce-connect` publishes `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The board binds UDP 9203 and sends to the agent. X, Y, and Z are meters. A is radians. The stamp is time since boot. The body has no CDR encapsulation; Fast DDS adds it. Commands stay on the session and the binary stream.
+`xrce-connect` publishes `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The board binds UDP 9203 and sends to the agent. X, Y, and Z are meters. A is radians. Until TIME_SYNC, `header.stamp.sec` is 0, `nanosec` is uptime modulo 1 s, and `frame_id` is `unsync`. After TIME_SYNC the stamp is ROS time and `frame_id` is empty. `get_status` reports `xrce_time` as `unsync` or `synced`. The body has no CDR encapsulation; Fast DDS adds it. Commands stay on the session and the binary stream.
 
 ```powershell
 python host\xrce_check.py 9204

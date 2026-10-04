@@ -72,6 +72,19 @@ class Cdr:
         return raw.split(b"\x00", 1)[0].decode()
 
 
+def reply_timestamp(session: int, seq: int, t1_sec: int, t1_nsec: int) -> bytes:
+    """TIMESTAMP_REPLY: echoed client Time_t, then agent receive and transmit Time_t."""
+    header = bytes([session, 0x80, seq & 0xFF, (seq >> 8) & 0xFF])
+    now = time.time()
+    sec = int(now)
+    nsec = int((now - sec) * 1_000_000_000)
+    payload = struct.pack("<iIiIiI", t1_sec, t1_nsec, sec, nsec, sec, nsec)
+    sub = bytes([15, 1]) + struct.pack("<H", len(payload)) + payload
+    ack = reply_ack(session, seq)[4:]
+    body = sub + bytes((4 - (len(sub) % 4)) % 4) + ack
+    return header + body
+
+
 def joint_from_write(payload: bytes) -> str | None:
     """Decode WRITE_DATA. The first four bytes are the XRCE request and object id.
 
@@ -82,16 +95,18 @@ def joint_from_write(payload: bytes) -> str | None:
         return None
     cdr = Cdr(payload, 4)
     try:
-        _sec = cdr.u32()
-        _nsec = cdr.u32()
-        _frame = cdr.string()
+        sec = cdr.u32()
+        nsec = cdr.u32()
+        frame = cdr.string()
         count = cdr.u32()
         names = [cdr.string() for _ in range(count)]
         npos = cdr.u32()
         pos = [cdr.f64() for _ in range(npos)]
     except (struct.error, IndexError, UnicodeDecodeError):
         return None
-    return " ".join(f"{name}={value:.5f}" for name, value in zip(names, pos))
+    stamp = "unsync" if frame == "unsync" or sec == 0 else "synced"
+    joints = " ".join(f"{name}={value:.5f}" for name, value in zip(names, pos))
+    return f"{stamp} sec={sec} nsec={nsec} {joints}"
 
 
 def main() -> None:
@@ -102,8 +117,10 @@ def main() -> None:
     print(f"listening {port}", flush=True)
     deadline = time.time() + 20
     samples = 0
+    unsync = 0
+    synced = 0
     addr = None
-    while time.time() < deadline and samples < 3:
+    while time.time() < deadline and (synced < 1 or samples < 3):
         try:
             data, addr = sock.recvfrom(2048)
         except socket.timeout:
@@ -133,18 +150,28 @@ def main() -> None:
                 kind = payload[4] if len(payload) > 4 else 0
                 print(f"CREATE kind={kind} seq={seq}", flush=True)
                 reply = reply_status(0x81, seq, payload[0:2], payload[2:4])
+            elif mid == 14 and len(payload) >= 8:
+                t1_sec, t1_nsec = struct.unpack_from("<iI", payload, 0)
+                print("TIMESTAMP", t1_sec, t1_nsec, flush=True)
+                reply = reply_timestamp(0x81, seq, t1_sec, t1_nsec)
             elif mid == 11 and reply is None:
                 reply = reply_ack(0x81, seq)
             elif mid == 7:
                 text = joint_from_write(payload)
                 if text:
                     samples += 1
+                    if text.startswith("unsync"):
+                        unsync += 1
+                    else:
+                        synced += 1
                     print("JOINT", text, flush=True)
         if reply is not None:
             sock.sendto(reply, addr)
     if samples < 1:
         raise SystemExit("no JointState sample")
-    print(f"XRCE_OK samples={samples}", flush=True)
+    if synced < 1:
+        raise SystemExit("no TIMESTAMP_REPLY JointState")
+    print(f"XRCE_OK samples={samples} unsync={unsync} synced={synced}", flush=True)
 
 
 if __name__ == "__main__":

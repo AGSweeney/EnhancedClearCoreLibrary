@@ -63,7 +63,7 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 |--------|--------|--------|
 | `get_capabilities` | — | protocol, ports, joint names, units, `axis_mask`, `nvm` |
 | `get_config` | — | mechanics, watchdog, estop, test mode, `nvm` / `nvm_valid` / `nvm_version`, network, soft limits, limit-switch pins, `names`, `rotary`, `direction`, `gear`, `offset` |
-| `get_status` | — | flags, `alert_reg`, `alerts`, `travel_limit`, `xrce`, position/velocity/effort |
+| `get_status` | — | flags, `alert_reg`, `alerts`, `travel_limit`, `xrce`, `xrce_time`, position/velocity/effort |
 | `configure` | see below | `{"ok":true}` and the live configuration is written to NVM |
 | `reset_config` | — | compile defaults, and the NVM blob is cleared. Motors must be disabled. |
 | `configure_network` | `mode` `dhcp` or `static`, plus `ip_address`, `netmask`, `gateway` | saved network settings. `applies_on` is `restart` |
@@ -221,7 +221,11 @@ The board publishes the four joints to a micro-ROS agent. The ClearCore is an XR
 
 The client queues up to 12 inbound datagrams through lwIP. A real agent answers one request with several UDP packets. `EthernetUdp` keeps only the latest packet, so this socket does not use it. If the queue is full, a later datagram is dropped and the earlier ones are kept.
 
-The publish is `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The four names are the configured joint names. Position and velocity are joint units. The sample is the same generated-step state as the binary frame, after direction, gear, and offset. The stamp is time since boot, not a synchronized host clock. The body has no CDR encapsulation header. Fast DDS adds that header. A second encapsulation makes a ROS subscriber reject the sample.
+The publish is `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The four names are the configured joint names. Position and velocity are joint units. The sample is the same generated-step state as the binary frame, after direction, gear, and offset.
+
+The stamp is mapped from board milliseconds using XRCE `TIMESTAMP` / `TIMESTAMP_REPLY` (the TIME_SYNC round-trip). Until the first reply succeeds, `header.stamp.sec` is 0, `nanosec` is uptime modulo 1 s, and `frame_id` is `unsync`. That `sec` stays 0 so a fusion node can refuse the sample; `builtin_interfaces/Time` cannot hold a full uptime in `nanosec` after the first second. After that, `stamp` is agent epoch nanoseconds plus `(board_ms - t1_ms) * 1e6`, and `frame_id` is empty. A TIMESTAMP is sent about once a second on the reliable stream. `get_status` reports `xrce_time` as `unsync` or `synced`. Losing the agent and sending CREATE_CLIENT again drops the offset. Binary stream `time_ms` is still milliseconds since boot.
+
+The body has no CDR encapsulation header. Fast DDS adds that header. A second encapsulation makes a ROS subscriber reject the sample.
 
 A reliable heartbeat is sent about once a second. If no agent packet arrives for 3 s, the client drops the session and sends `CREATE_CLIENT` again. `get_status` reports `xrce` as `off`, `connecting`, `creating`, or `streaming`.
 

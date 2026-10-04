@@ -10,5 +10,6 @@ const char *XrceConnect(const uint8_t ip[4], uint16_t port);
 const char *XrceDisconnect();
 void XrcePoll();
 const char *XrceStateName();
+bool XrceTimeSynced();
 
 #endif
