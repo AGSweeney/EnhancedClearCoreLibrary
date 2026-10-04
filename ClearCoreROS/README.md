@@ -33,7 +33,7 @@ Output: `firmware/Debug/ClearCoreROS.bin`.
 
 Flashing this image replaces whatever firmware is on the board (ClearAI uses the same bootloader and a different application).
 
-Ports: session **9200**, joint stream **9201**, discovery **9202**.
+Ports: session **9200**, joint stream **9201**, discovery **9202**. `configure` and `test-mode` are saved in user NVM and restored on boot. `configure-network` saves DHCP or a static address; it takes effect after `restart`. `reset-config` restores the compile defaults and clears that blob. The board must be disabled for `reset-config`.
 
 ## Bench (one motor on M0)
 

@@ -63,6 +63,23 @@ def cmd_configure(args) -> None:
         client.close()
 
 
+def cmd_configure_network(args) -> None:
+    params = {}
+    if args.mode is not None:
+        params["mode"] = args.mode
+    if args.ip is not None:
+        params["ip_address"] = args.ip
+    if args.netmask is not None:
+        params["netmask"] = args.netmask
+    if args.gateway is not None:
+        params["gateway"] = args.gateway
+    client = _session(args)
+    try:
+        _print(client.call("configure_network", params))
+    finally:
+        client.close()
+
+
 def cmd_test_mode(args) -> None:
     client = _session(args)
     try:
@@ -167,6 +184,16 @@ def build_parser() -> argparse.ArgumentParser:
     cfg.add_argument("--watchdog-ms", type=int)
     cfg.add_argument("--estop-di6", type=int)
     cfg.set_defaults(func=cmd_configure)
+
+    net = sub.add_parser("configure-network", help="Persist DHCP or a static address. Applies on restart.")
+    net.add_argument("--mode", choices=("dhcp", "static"))
+    net.add_argument("--ip")
+    net.add_argument("--netmask")
+    net.add_argument("--gateway")
+    net.set_defaults(func=cmd_configure_network)
+
+    sub.add_parser("restart").set_defaults(func=lambda a: _simple(a, "restart"))
+    sub.add_parser("reset-config").set_defaults(func=lambda a: _simple(a, "reset_config"))
 
     test = sub.add_parser("test-mode")
     test.add_argument("--on", action="store_true")

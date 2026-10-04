@@ -15,6 +15,7 @@
 #include "MotionCore.h"
 
 #include "ClearCore.h"
+#include "NvmManager.h"
 #include "SysTiming.h"
 
 #include <stdio.h>
@@ -29,6 +30,11 @@ static uint32_t g_decel = CCROS_DEFAULT_DECEL_STEPS;
 static uint32_t g_watchdogMs = CCROS_DEFAULT_WATCHDOG_MS;
 static uint8_t g_estopDi6 = CCROS_DEFAULT_ESTOP_DI6;
 static bool g_testMode = false;
+static bool g_nvmLoaded = false;
+static uint8_t g_netMode = 0;
+static uint8_t g_ipOctets[4] = {0, 0, 0, 0};
+static uint8_t g_netmaskOctets[4] = {0, 0, 0, 0};
+static uint8_t g_gatewayOctets[4] = {0, 0, 0, 0};
 static bool g_enabled = false;
 static bool g_interrupted = false;
 static bool g_watchdogTripped = false;
@@ -143,6 +149,220 @@ static void ApplyMechanics() {
         }
     }
     ApplyDynamics();
+}
+
+/* User-page blob. Magic differs from ClearAI ('CAIC') so that blob is not applied. */
+static const uint32_t CCROS_NVM_MAGIC = 0x534F5243u; /* 'CROS' */
+static const uint16_t CCROS_NVM_VERSION = 1;
+
+#pragma pack(push, 1)
+struct CcrosNvmConfig {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t size;
+    uint32_t axisMask;
+    uint32_t stepsPerRev[CCROS_AXIS_COUNT];
+    float pitchMm[CCROS_AXIS_COUNT];
+    uint32_t vel;
+    uint32_t accel;
+    uint32_t decel;
+    uint32_t watchdogMs;
+    uint8_t estopDi6;
+    uint8_t testMode;
+    uint8_t netMode;
+    uint8_t ipOctets[4];
+    uint8_t netmaskOctets[4];
+    uint8_t gatewayOctets[4];
+};
+#pragma pack(pop)
+
+static_assert(sizeof(CcrosNvmConfig) <= 416, "ROS NVM blob exceeds the user page");
+
+static ClearCore::NvmManager &Nvm() {
+    return ClearCore::NvmManager::Instance();
+}
+
+static bool OctetsZero(const uint8_t o[4]) {
+    return (o[0] | o[1] | o[2] | o[3]) == 0;
+}
+
+static void ApplyCompileDefaults() {
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        g_stepsPerRev[a] = CCROS_DEFAULT_STEPS_PER_REV;
+        g_pitchMm[a] = CCROS_DEFAULT_PITCH_MM;
+    }
+    g_axisMask = CCROS_DEFAULT_AXIS_MASK;
+    g_vel = CCROS_DEFAULT_VEL_STEPS;
+    g_accel = CCROS_DEFAULT_ACCEL_STEPS;
+    g_decel = CCROS_DEFAULT_DECEL_STEPS;
+    g_watchdogMs = CCROS_DEFAULT_WATCHDOG_MS;
+    g_estopDi6 = CCROS_DEFAULT_ESTOP_DI6;
+    g_testMode = false;
+    g_netMode = 0;
+    memset(g_ipOctets, 0, sizeof(g_ipOctets));
+    memset(g_netmaskOctets, 0, sizeof(g_netmaskOctets));
+    memset(g_gatewayOctets, 0, sizeof(g_gatewayOctets));
+}
+
+static bool ConfigBlobOk(const CcrosNvmConfig *cfg) {
+    if (cfg->magic != CCROS_NVM_MAGIC || cfg->version != CCROS_NVM_VERSION ||
+        cfg->size != sizeof(CcrosNvmConfig)) {
+        return false;
+    }
+    if (cfg->axisMask == 0 || cfg->axisMask > 0x0f) {
+        return false;
+    }
+    if (cfg->vel == 0 || cfg->vel > 500000u || cfg->accel == 0 || cfg->accel > 5000000u ||
+        cfg->decel == 0 || cfg->decel > 5000000u || cfg->watchdogMs > 60000u) {
+        return false;
+    }
+    if (cfg->estopDi6 > 2 || cfg->testMode > 1 || cfg->netMode > 1) {
+        return false;
+    }
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        if (cfg->stepsPerRev[a] == 0 || cfg->stepsPerRev[a] > 1000000u) {
+            return false;
+        }
+        if (a != CCROS_AXIS_A && (cfg->pitchMm[a] < 0.01f || cfg->pitchMm[a] > 1000.f)) {
+            return false;
+        }
+    }
+    if (cfg->netMode == 1 && (OctetsZero(cfg->ipOctets) || OctetsZero(cfg->netmaskOctets))) {
+        return false;
+    }
+    return true;
+}
+
+static void ConfigApply(const CcrosNvmConfig *cfg) {
+    g_axisMask = cfg->axisMask;
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        g_stepsPerRev[a] = cfg->stepsPerRev[a];
+        g_pitchMm[a] = cfg->pitchMm[a];
+    }
+    g_vel = cfg->vel;
+    g_accel = cfg->accel;
+    g_decel = cfg->decel;
+    g_watchdogMs = cfg->watchdogMs;
+    g_estopDi6 = cfg->estopDi6;
+    g_testMode = cfg->testMode != 0;
+    g_netMode = cfg->netMode;
+    memcpy(g_ipOctets, cfg->ipOctets, 4);
+    memcpy(g_netmaskOctets, cfg->netmaskOctets, 4);
+    memcpy(g_gatewayOctets, cfg->gatewayOctets, 4);
+}
+
+static void ConfigFill(CcrosNvmConfig *cfg) {
+    memset(cfg, 0, sizeof(*cfg));
+    cfg->magic = CCROS_NVM_MAGIC;
+    cfg->version = CCROS_NVM_VERSION;
+    cfg->size = (uint16_t)sizeof(CcrosNvmConfig);
+    cfg->axisMask = g_axisMask;
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        cfg->stepsPerRev[a] = g_stepsPerRev[a];
+        cfg->pitchMm[a] = (float)g_pitchMm[a];
+    }
+    cfg->vel = g_vel;
+    cfg->accel = g_accel;
+    cfg->decel = g_decel;
+    cfg->watchdogMs = g_watchdogMs;
+    cfg->estopDi6 = g_estopDi6;
+    cfg->testMode = g_testMode ? 1u : 0u;
+    cfg->netMode = g_netMode;
+    memcpy(cfg->ipOctets, g_ipOctets, 4);
+    memcpy(cfg->netmaskOctets, g_netmaskOctets, 4);
+    memcpy(cfg->gatewayOctets, g_gatewayOctets, 4);
+}
+
+static bool ConfigWrite(const CcrosNvmConfig *cfg) {
+    CcrosNvmConfig existing;
+    memset(&existing, 0, sizeof(existing));
+    Nvm().BlockRead(ClearCore::NvmManager::NVM_LOC_USER_START, (int)sizeof(existing),
+                    (uint8_t *)&existing);
+    /* BlockWrite reports "unchanged" and "write failed" the same way. A failed
+     * write can leave the RAM cache matching cfg while the page is still dirty,
+     * so an unchanged cache is success only when the page write has finished. */
+    if (memcmp(&existing, cfg, sizeof(*cfg)) == 0 && Nvm().Synchonized()) {
+        return true;
+    }
+    if (memcmp(&existing, cfg, sizeof(*cfg)) == 0) {
+        CcrosNvmConfig nudge;
+        memset(&nudge, 0, sizeof(nudge));
+        nudge.magic = 1;
+        if (!Nvm().BlockWrite(ClearCore::NvmManager::NVM_LOC_USER_START, (int)sizeof(nudge),
+                              (const uint8_t *)&nudge)) {
+            return false;
+        }
+    }
+    if (!Nvm().BlockWrite(ClearCore::NvmManager::NVM_LOC_USER_START, (int)sizeof(*cfg),
+                          (const uint8_t *)cfg)) {
+        return false;
+    }
+    return Nvm().Synchonized();
+}
+
+static bool ConfigSave() {
+    CcrosNvmConfig cfg;
+    ConfigFill(&cfg);
+    if (!ConfigWrite(&cfg)) {
+        g_nvmLoaded = false;
+        return false;
+    }
+    g_nvmLoaded = true;
+    return true;
+}
+
+static bool ConfigClear() {
+    CcrosNvmConfig cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    if (!ConfigWrite(&cfg)) {
+        return false;
+    }
+    g_nvmLoaded = false;
+    return true;
+}
+
+static void ConfigLoad() {
+    CcrosNvmConfig cfg;
+    memset(&cfg, 0, sizeof(cfg));
+    Nvm().BlockRead(ClearCore::NvmManager::NVM_LOC_USER_START, (int)sizeof(cfg), (uint8_t *)&cfg);
+    if (!ConfigBlobOk(&cfg)) {
+        g_nvmLoaded = false;
+        return;
+    }
+    ConfigApply(&cfg);
+    g_nvmLoaded = true;
+}
+
+static bool ParseIpOctets(const char *str, uint8_t out[4]) {
+    if (!str) {
+        return false;
+    }
+    uint8_t parts = 0;
+    uint16_t acc = 0;
+    bool any = false;
+    for (const char *s = str;; s++) {
+        const char c = *s;
+        if (c >= '0' && c <= '9') {
+            acc = (uint16_t)(acc * 10u + (uint16_t)(c - '0'));
+            any = true;
+            if (acc > 255) {
+                return false;
+            }
+        } else if (c == '.' || c == '\0') {
+            if (!any || parts >= 4) {
+                return false;
+            }
+            out[parts++] = (uint8_t)acc;
+            acc = 0;
+            any = false;
+            if (c == '\0') {
+                break;
+            }
+        } else {
+            return false;
+        }
+    }
+    return parts == 4;
 }
 
 static void StopDecelAll() {
@@ -481,19 +701,11 @@ static const char *StorePosition(uint8_t mask, const float q[4], uint16_t seq, b
 }
 
 bool MotionInit() {
+    ApplyCompileDefaults();
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
-        g_stepsPerRev[a] = CCROS_DEFAULT_STEPS_PER_REV;
-        g_pitchMm[a] = CCROS_DEFAULT_PITCH_MM;
         g_goalValid[a] = false;
         g_velRos[a] = 0.f;
     }
-    g_axisMask = CCROS_DEFAULT_AXIS_MASK;
-    g_vel = CCROS_DEFAULT_VEL_STEPS;
-    g_accel = CCROS_DEFAULT_ACCEL_STEPS;
-    g_decel = CCROS_DEFAULT_DECEL_STEPS;
-    g_watchdogMs = CCROS_DEFAULT_WATCHDOG_MS;
-    g_estopDi6 = CCROS_DEFAULT_ESTOP_DI6;
-    g_testMode = false;
     g_enabled = false;
     g_interrupted = false;
     g_watchdogTripped = false;
@@ -508,6 +720,7 @@ bool MotionInit() {
     ConnectorM1.EnableRequest(false);
     ConnectorM2.EnableRequest(false);
     ConnectorM3.EnableRequest(false);
+    ConfigLoad();
     ApplyMechanics();
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
         MotorDriver *m = MotorFor(a);
@@ -622,7 +835,99 @@ const char *MotionConfigure(const MotionConfigPatch *patch) {
     } else if (patch->hasVel || patch->hasAccel || patch->hasDecel) {
         ApplyDynamics();
     }
+    if (!ConfigSave()) {
+        return "nvm write failed";
+    }
     return nullptr;
+}
+
+const char *MotionResetConfig() {
+    if (g_enabled) {
+        return "disable before reset_config";
+    }
+    if (!ConfigClear()) {
+        return "nvm write failed";
+    }
+    ApplyCompileDefaults();
+    ApplyMechanics();
+    return nullptr;
+}
+
+const char *MotionConfigureNetwork(const char *mode, bool hasMode, const char *ipAddress, bool hasIp,
+                                   const char *netmask, bool hasNetmask, const char *gateway,
+                                   bool hasGateway, char *buf, uint16_t bufLen) {
+    uint8_t netMode = g_netMode;
+    uint8_t ip[4];
+    uint8_t nm[4];
+    uint8_t gw[4];
+    memcpy(ip, g_ipOctets, 4);
+    memcpy(nm, g_netmaskOctets, 4);
+    memcpy(gw, g_gatewayOctets, 4);
+    if (hasMode) {
+        if (mode && strcmp(mode, "dhcp") == 0) {
+            netMode = 0;
+        } else if (mode && strcmp(mode, "static") == 0) {
+            netMode = 1;
+        } else {
+            return "mode must be dhcp or static";
+        }
+    }
+    if (hasIp && !ParseIpOctets(ipAddress, ip)) {
+        return "invalid ip_address";
+    }
+    if (hasNetmask && !ParseIpOctets(netmask, nm)) {
+        return "invalid netmask";
+    }
+    if (hasGateway && !ParseIpOctets(gateway, gw)) {
+        return "invalid gateway";
+    }
+    if (netMode == 1 && OctetsZero(ip)) {
+        return "static mode requires ip_address";
+    }
+    if (netMode == 1 && OctetsZero(nm)) {
+        return "static mode requires netmask";
+    }
+    g_netMode = netMode;
+    memcpy(g_ipOctets, ip, 4);
+    memcpy(g_netmaskOctets, nm, 4);
+    memcpy(g_gatewayOctets, gw, 4);
+    if (!ConfigSave()) {
+        return "nvm write failed";
+    }
+    snprintf(buf, bufLen,
+             "{\"network_mode\":\"%s\",\"ip_address\":\"%u.%u.%u.%u\","
+             "\"netmask\":\"%u.%u.%u.%u\",\"gateway\":\"%u.%u.%u.%u\","
+             "\"applies_on\":\"restart\"}",
+             g_netMode == 1 ? "static" : "dhcp",
+             (unsigned)g_ipOctets[0], (unsigned)g_ipOctets[1], (unsigned)g_ipOctets[2],
+             (unsigned)g_ipOctets[3], (unsigned)g_netmaskOctets[0], (unsigned)g_netmaskOctets[1],
+             (unsigned)g_netmaskOctets[2], (unsigned)g_netmaskOctets[3],
+             (unsigned)g_gatewayOctets[0], (unsigned)g_gatewayOctets[1],
+             (unsigned)g_gatewayOctets[2], (unsigned)g_gatewayOctets[3]);
+    return nullptr;
+}
+
+void MotionRestart() {
+    for (int i = 0; i < 10; i++) {
+        EthernetMgr.Refresh();
+        Delay_ms(5);
+    }
+    SysMgr.ResetBoard();
+}
+
+void MotionGetNetworkConfig(uint8_t *mode, uint8_t ip[4], uint8_t netmask[4], uint8_t gateway[4]) {
+    if (mode) {
+        *mode = g_netMode;
+    }
+    if (ip) {
+        memcpy(ip, g_ipOctets, 4);
+    }
+    if (netmask) {
+        memcpy(netmask, g_netmaskOctets, 4);
+    }
+    if (gateway) {
+        memcpy(gateway, g_gatewayOctets, 4);
+    }
 }
 
 const char *MotionSetTestMode(bool on) {
@@ -630,6 +935,9 @@ const char *MotionSetTestMode(bool on) {
     if (!on && HardwareEstop()) {
         AbruptDisable();
         g_interrupted = true;
+    }
+    if (!ConfigSave()) {
+        return "nvm write failed";
     }
     return nullptr;
 }
@@ -887,27 +1195,43 @@ void MotionFillCapabilitiesJson(char *buf, uint16_t len) {
              "\"stream_port\":%u,\"discover_port\":%u,\"stream_hz\":%u,"
              "\"joints\":[\"joint_x\",\"joint_y\",\"joint_z\",\"joint_a\"],"
              "\"joint_types\":[\"prismatic\",\"prismatic\",\"prismatic\",\"revolute\"],"
-             "\"units\":[\"m\",\"m\",\"m\",\"rad\"],\"axis_mask\":%lu}",
+             "\"units\":[\"m\",\"m\",\"m\",\"rad\"],\"axis_mask\":%lu,\"nvm\":%s}",
              CCROS_PROTOCOL_VERSION, CCROS_FIRMWARE_NAME,
              (unsigned)CCROS_TCP_SESSION_PORT, (unsigned)CCROS_TCP_STREAM_PORT,
              (unsigned)CCROS_UDP_DISCOVERY_PORT,
              (unsigned)(1000u / CCROS_STREAM_PERIOD_MS),
-             (unsigned long)g_axisMask);
+             (unsigned long)g_axisMask, g_nvmLoaded ? "true" : "false");
 }
 
 void MotionFillConfigJson(char *buf, uint16_t len) {
+    CcrosNvmConfig stored;
+    memset(&stored, 0, sizeof(stored));
+    Nvm().BlockRead(ClearCore::NvmManager::NVM_LOC_USER_START, (int)sizeof(stored),
+                    (uint8_t *)&stored);
+    const bool storedOk = ConfigBlobOk(&stored);
     snprintf(buf, len,
-             "{\"axis_mask\":%lu,\"steps_per_rev\":[%lu,%lu,%lu,%lu],"
+             "{\"nvm\":%s,\"nvm_valid\":%s,\"nvm_version\":%u,"
+             "\"axis_mask\":%lu,\"steps_per_rev\":[%lu,%lu,%lu,%lu],"
              "\"pitch_mm\":[%.4f,%.4f,%.4f,%.4f],\"vel_steps\":%lu,"
              "\"accel_steps\":%lu,\"decel_steps\":%lu,\"watchdog_ms\":%lu,"
-             "\"estop_di6\":%u,\"test_mode\":%s,\"enabled\":%s}",
+             "\"estop_di6\":%u,\"test_mode\":%s,\"enabled\":%s,"
+             "\"network_mode\":\"%s\",\"ip_address\":\"%u.%u.%u.%u\","
+             "\"netmask\":\"%u.%u.%u.%u\",\"gateway\":\"%u.%u.%u.%u\"}",
+             g_nvmLoaded ? "true" : "false", storedOk ? "true" : "false",
+             storedOk ? (unsigned)stored.version : 0u,
              (unsigned long)g_axisMask,
              (unsigned long)g_stepsPerRev[0], (unsigned long)g_stepsPerRev[1],
              (unsigned long)g_stepsPerRev[2], (unsigned long)g_stepsPerRev[3],
              g_pitchMm[0], g_pitchMm[1], g_pitchMm[2], g_pitchMm[3],
              (unsigned long)g_vel, (unsigned long)g_accel, (unsigned long)g_decel,
              (unsigned long)g_watchdogMs, (unsigned)g_estopDi6,
-             g_testMode ? "true" : "false", g_enabled ? "true" : "false");
+             g_testMode ? "true" : "false", g_enabled ? "true" : "false",
+             g_netMode == 1 ? "static" : "dhcp",
+             (unsigned)g_ipOctets[0], (unsigned)g_ipOctets[1], (unsigned)g_ipOctets[2],
+             (unsigned)g_ipOctets[3], (unsigned)g_netmaskOctets[0], (unsigned)g_netmaskOctets[1],
+             (unsigned)g_netmaskOctets[2], (unsigned)g_netmaskOctets[3],
+             (unsigned)g_gatewayOctets[0], (unsigned)g_gatewayOctets[1],
+             (unsigned)g_gatewayOctets[2], (unsigned)g_gatewayOctets[3]);
 }
 
 void MotionFillStatusJson(char *buf, uint16_t len) {

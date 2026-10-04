@@ -22,6 +22,14 @@ struct SessionReq {
     bool hasTest;
     bool hasJoint[CCROS_AXIS_COUNT];
     float joint[CCROS_AXIS_COUNT];
+    bool hasNetMode;
+    char netMode[8];
+    bool hasIp;
+    char ipAddress[16];
+    bool hasNetmask;
+    char netmask[16];
+    bool hasGateway;
+    char gateway[16];
 };
 
 static bool TokEq(const char *js, const jsmntok_t *t, const char *s) {
@@ -221,6 +229,36 @@ static void ApplyKey(const char *js, const jsmntok_t *toks, int ntok, int keyInd
         else if (TokEq(js, key, "a")) axis = 3;
         req->hasJoint[axis] = true;
         req->joint[axis] = (float)d;
+    } else if (TokEq(js, key, "mode") || TokEq(js, key, "ip_address") ||
+               TokEq(js, key, "netmask") || TokEq(js, key, "gateway")) {
+        if (val->type != JSMN_STRING) {
+            req->error = "network fields must be strings";
+            return;
+        }
+        const int n = val->end - val->start;
+        char *dst = req->netMode;
+        int cap = (int)sizeof(req->netMode);
+        bool *flag = &req->hasNetMode;
+        if (TokEq(js, key, "ip_address")) {
+            dst = req->ipAddress;
+            cap = (int)sizeof(req->ipAddress);
+            flag = &req->hasIp;
+        } else if (TokEq(js, key, "netmask")) {
+            dst = req->netmask;
+            cap = (int)sizeof(req->netmask);
+            flag = &req->hasNetmask;
+        } else if (TokEq(js, key, "gateway")) {
+            dst = req->gateway;
+            cap = (int)sizeof(req->gateway);
+            flag = &req->hasGateway;
+        }
+        if (n <= 0 || n >= cap) {
+            req->error = "network field too long";
+            return;
+        }
+        memcpy(dst, js + val->start, (size_t)n);
+        dst[n] = '\0';
+        *flag = true;
     }
 }
 
@@ -329,6 +367,21 @@ void SessionDispatch(const char *line) {
         if (!err) {
             snprintf(body, sizeof(body), "{\"ok\":true}");
         }
+    } else if (strcmp(req.method, "reset_config") == 0) {
+        err = MotionResetConfig();
+        if (!err) {
+            snprintf(body, sizeof(body), "{\"ok\":true}");
+        }
+    } else if (strcmp(req.method, "configure_network") == 0) {
+        err = MotionConfigureNetwork(req.netMode, req.hasNetMode, req.ipAddress, req.hasIp,
+                                     req.netmask, req.hasNetmask, req.gateway, req.hasGateway, body,
+                                     sizeof(body));
+    } else if (strcmp(req.method, "restart") == 0) {
+        snprintf(body, sizeof(body), "{\"ok\":true}");
+        ReplyResult(reply, sizeof(reply), &req, body);
+        TransportSendLine(reply);
+        MotionRestart();
+        return;
     } else if (strcmp(req.method, "set_test_mode") == 0) {
         if (!req.hasTest) {
             err = "missing on";

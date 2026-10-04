@@ -32,6 +32,13 @@ void MotionPoll();
 
 bool MotionIsEnabled();
 const char *MotionConfigure(const MotionConfigPatch *patch);
+const char *MotionResetConfig();
+const char *MotionConfigureNetwork(const char *mode, bool hasMode, const char *ipAddress,
+                                   bool hasIp, const char *netmask, bool hasNetmask,
+                                   const char *gateway, bool hasGateway, char *buf,
+                                   uint16_t bufLen);
+void MotionRestart();
+void MotionGetNetworkConfig(uint8_t *mode, uint8_t ip[4], uint8_t netmask[4], uint8_t gateway[4]);
 const char *MotionSetTestMode(bool on);
 const char *MotionEnable();
 const char *MotionDisable();

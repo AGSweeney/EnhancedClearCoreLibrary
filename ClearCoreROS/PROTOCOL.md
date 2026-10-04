@@ -26,7 +26,7 @@ Do not collide with ClearAI (9100–9102) or ClearCNC (8888, 8889, 10040).
 | **9201** | TCP binary | Joint state out, position/velocity/heartbeat in |
 | **9202** | UDP | Discovery |
 
-DHCP is used when the link is up. If DHCP fails, the address falls back to `192.168.0.109`. Static IP is not stored yet.
+The board boots from the saved network mode. DHCP is the default. If DHCP fails, the address falls back to `192.168.0.109`. A saved static address is applied instead of DHCP and takes effect on the next boot.
 
 Discovery request (ASCII, no newline required):
 
@@ -58,10 +58,13 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 
 | Method | Params | Result |
 |--------|--------|--------|
-| `get_capabilities` | — | protocol, ports, joint names, units, `axis_mask` |
-| `get_config` | — | mechanics, watchdog, estop mode, test mode |
+| `get_capabilities` | — | protocol, ports, joint names, units, `axis_mask`, `nvm` |
+| `get_config` | — | mechanics, watchdog, estop mode, test mode, `nvm` / `nvm_valid`, network |
 | `get_status` | — | flags, `alert_reg`, `alerts`, position/velocity/effort |
-| `configure` | see below | `{"ok":true}` |
+| `configure` | see below | `{"ok":true}` and the live configuration is written to NVM |
+| `reset_config` | — | compile defaults, and the NVM blob is cleared. Motors must be disabled. |
+| `configure_network` | `mode` `dhcp` or `static`, plus `ip_address`, `netmask`, `gateway` | saved network settings. `applies_on` is `restart` |
+| `restart` | — | resets the board so a saved address takes effect |
 | `set_test_mode` | `{"on":true}` | test mode skips DI-6 and the HLFB check |
 | `enable` / `disable` | — | enable waits up to 500 ms for HLFB on every masked axis. If HLFB is not asserted, enable fails and the motors are left disabled. Test mode skips that check. Enable also fails while a watchdog latch is set. |
 | `stop` | — | decelerate, drop the goal, stay enabled |
@@ -80,6 +83,10 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 | `vel_steps`, `accel_steps`, `decel_steps` | step generator limits. Applied immediately. |
 | `watchdog_ms` | `0` disables. Default 500. |
 | `estop_di6` | `0` off, `1` fault when DI-6 is low (default), `2` fault when DI-6 is high. |
+
+`configure`, `set_test_mode`, and `configure_network` write the same versioned blob (`magic` `CROS`, version 1) at `NvmManager` user offset 0. Boot reads it after the compile defaults. An unrecognized blob, including a ClearAI `CAIC` blob, is left untouched and the compile defaults stay in effect. A successful save replaces the bytes of that blob. `get_capabilities` reports `nvm` true after a blob has been loaded or saved. `nvm_valid` is true when the stored blob passes the version and range checks. NVM writes require a supply above the ClearCore undervoltage lockout; a low supply returns `nvm write failed`.
+
+`configure_network` with `mode:"static"` requires `ip_address` and `netmask` when none are already stored. `gateway` may be omitted. The running Ethernet stack is not changed in place. Call `restart` after saving. `mode:"dhcp"` is the boot default.
 
 Only axes in `axis_mask` are enabled and included in `alert_reg`. A disabled motor's `motor_disabled` alert is not reported, same as ClearAI.
 
@@ -173,7 +180,6 @@ The watchdog trips only while a goal is unfinished or a velocity command is nonz
 
 ## Not in this scaffold
 
-- NVM (static IP, saved mechanics). `configure` is RAM-only.
 - Soft travel limits and DI limit switches.
 - Homing, probing, arcs, and the XY coordinated planner. Joints move independently.
 - micro-ROS / XRCE-DDS. The joint mapping above is what a future XRCE transport would publish.
