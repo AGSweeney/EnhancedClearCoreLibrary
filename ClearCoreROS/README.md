@@ -128,7 +128,7 @@ source install/setup.bash
 
 ### Trajectory action
 
-`clearcore_bridge` connects, enables, publishes `/joint_states`, and serves `follow_joint_trajectory`. The action follows `time_from_start`, including point velocities and accelerations when they are set, and checks path tolerances while the arm is moving. Streaming error is generated position versus the received reference advanced to the board sample time, not versus the host clock. A second goal is rejected until the first finishes. Joint state stamps are the time the sample was received. A stale, disabled, faulted, or tripped sample is not a finished move. `enable` fails unless HLFB is asserted. Pass `test_mode:=true` on a bare motor.
+`clearcore_bridge` connects, enables, publishes `/joint_states`, and serves `follow_joint_trajectory`. The action follows `time_from_start`. Point velocities are spline boundaries. When accelerations are set they are quintic boundaries, not a cap on the feedforward. Path tolerance is generated position versus the time-advanced received reference in that state frame, not versus the host schedule. A second goal is rejected until the first finishes. Joint state stamps are the time the sample was received. A stale, disabled, faulted, or tripped sample is not a finished move. `enable` fails unless HLFB is asserted. Pass `test_mode:=true` on a bare motor. Launch always writes that parameter, including false, because test mode is stored in NVM.
 
 ```bash
 ros2 launch clearcore_bridge bridge.launch.py host:=172.16.82.114 axis_mask:=3

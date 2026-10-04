@@ -2,9 +2,10 @@
 
 The action samples the trajectory on time_from_start. Point velocities are
 boundary conditions when present; otherwise the segment slope is used.
-Accelerations, when non-zero, limit how fast the streamed velocity may change.
-Path tolerances are checked against the sample. One goal owns the motors until
-it finishes. A watchdog latch is not cleared here; call clear_alerts.
+When a waypoint also supplies acceleration, that segment is a quintic spline.
+Path tolerance uses generated position versus the time-advanced reference in
+the same state frame. One goal owns the motors until it finishes. A watchdog
+latch is not cleared here; call clear_alerts.
 """
 
 from __future__ import annotations
@@ -27,8 +28,8 @@ from clearcore_bridge.follow import (
     GoalGate,
     build_knots,
     is_immediate,
+    local_tracking_violation,
     motion_succeeded,
-    path_violation,
     sample_trajectory,
     state_block_reason,
 )
@@ -154,8 +155,7 @@ class ClearCoreBridge(Node):
                     "watchdog_ms": int(self.get_parameter("watchdog_ms").value),
                 },
             )
-            if bool(self.get_parameter("test_mode").value):
-                session.call("set_test_mode", {"on": True})
+            session.call("set_test_mode", {"on": bool(self.get_parameter("test_mode").value)})
             session.call("enable")
             stream = StreamClient(self._host, self._stream_port, 2.0)
         except Exception as exc:  # noqa: BLE001
@@ -308,19 +308,17 @@ class ClearCoreBridge(Node):
 
     def _stream_schedule(self, goal_handle, names, knots, path_tol) -> None:
         t0 = time.monotonic()
-        prev_vel = {name: 0.0 for name in names}
         while True:
             self._raise_if_stopped(goal_handle)
             elapsed = time.monotonic() - t0
-            pos, vel, done = sample_trajectory(knots, names, elapsed, prev_vel, self._period)
+            pos, vel, done = sample_trajectory(knots, names, elapsed)
             if done:
                 return
             state = self._require_live()
-            violated = path_violation(state, pos, path_tol)
+            violated = local_tracking_violation(state, path_tol)
             if violated:
                 raise _PathError(violated)
             self._send_track(names, pos, vel)
-            prev_vel = vel
             self._publish_feedback(goal_handle, names, pos, state)
             time.sleep(self._period)
 

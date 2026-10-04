@@ -58,7 +58,7 @@ int main() {
         return Fail("state fields");
     }
 
-    uint8_t junked[80];
+    uint8_t junked[CCROS_MAX_FRAME + 1];
     junked[0] = 0x00;
     memcpy(junked + 1, frame, (size_t)sn);
     uint16_t off = 0;

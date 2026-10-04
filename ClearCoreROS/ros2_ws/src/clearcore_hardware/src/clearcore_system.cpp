@@ -273,9 +273,12 @@ hardware_interface::CallbackReturn ClearCoreSystemHardware::on_activate(
    * activate, not of the realtime read loop. */
   const std::string test_mode = param("test_mode", "false");
   const bool skip_hlfb = test_mode == "true" || test_mode == "1";
+  /* test_mode is stored in NVM. Apply the launch value either way so a
+   * previous bypass does not stay active when this launch asks for false. */
+  const std::string test_body = skip_hlfb ? "{\"on\":true}" : "{\"on\":false}";
   if (!session_call("disable", "") || !session_call("clear_alerts", "") ||
       !session_call("configure", cfg.str()) ||
-      (skip_hlfb && !session_call("set_test_mode", "{\"on\":true}")) ||
+      !session_call("set_test_mode", test_body) ||
       !session_call("enable", ""))
   {
     RCLCPP_ERROR(rclcpp::get_logger("clearcore_system"), "enable/configure rejected");

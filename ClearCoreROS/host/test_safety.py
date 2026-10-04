@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / "ros2_ws" / "src" / "clearcore_bridge"))
 from clearcore_bridge.follow import (  # noqa: E402
     GoalGate,
     build_knots,
-    limit_step,
+    local_tracking_violation,
     motion_succeeded,
     path_violation,
     sample_trajectory,
@@ -106,7 +106,7 @@ def test_trajectory_uses_time_and_requested_velocity():
         {"t": 1.0, "positions": {"joint_x": 0.1}, "velocities": None, "accelerations": None},
     ]
     knots = build_knots(names, points, {"joint_x": 0.0})
-    pos, vel, done = sample_trajectory(knots, names, 0.5, {"joint_x": 0.0}, 0.02)
+    pos, vel, done = sample_trajectory(knots, names, 0.5)
     assert not done
     assert abs(pos["joint_x"] - 0.05) < 1e-6
     assert abs(vel["joint_x"] - 0.1) < 1e-6
@@ -116,14 +116,32 @@ def test_trajectory_uses_time_and_requested_velocity():
         {"t": 1.0, "positions": {"joint_x": 0.1}, "velocities": {"joint_x": 0.0}, "accelerations": None},
     ]
     shaped = build_knots(names, pointed, {"joint_x": 0.0})
-    _pos, shaped_vel, _done = sample_trajectory(shaped, names, 0.5, {"joint_x": 0.0}, 0.02)
+    _pos, shaped_vel, _done = sample_trajectory(shaped, names, 0.5)
     assert abs(shaped_vel["joint_x"] - 0.15) < 1e-6
 
-    limited = limit_step(0.0, 1.0, 1.0, 0.02)
-    assert abs(limited - 0.02) < 1e-9
+    quintic_points = [
+        {"t": 0.0, "positions": {"joint_x": 0.0}, "velocities": {"joint_x": 0.0},
+         "accelerations": {"joint_x": 0.0}},
+        {"t": 1.0, "positions": {"joint_x": 0.1}, "velocities": {"joint_x": 0.0},
+         "accelerations": {"joint_x": 0.0}},
+    ]
+    quintic = build_knots(names, quintic_points, {"joint_x": 0.0})
+    qpos, qvel, _qdone = sample_trajectory(quintic, names, 0.5)
+    assert abs(qpos["joint_x"] - 0.05) < 1e-9
+    assert abs(qvel["joint_x"] - 0.1875) < 1e-9
+
     state = _healthy(position=(0.0, 0.0, 0.0, 0.0))
     assert path_violation(state, {"joint_x": 0.05}, {"joint_x": 0.01}) == "joint_x"
     assert path_violation(state, {"joint_x": 0.05}, {}) is None
+    tracking = _healthy(position=(0.0, 0.0, 0.0, 0.0))
+    tracking["time_ms"] = 1010
+    tracking["track_mask"] = 0x01
+    tracking["target_position"] = (0.0, 0.0, 0.0, 0.0)
+    tracking["target_velocity"] = (1.0, 0.0, 0.0, 0.0)
+    tracking["target_latch_ms"] = (1000, 0, 0, 0)
+    assert local_tracking_violation(tracking, {"joint_x": 0.001}) == "joint_x"
+    tracking["position"] = (0.01, 0.0, 0.0, 0.0)
+    assert local_tracking_violation(tracking, {"joint_x": 0.001}) is None
 
 
 if __name__ == "__main__":

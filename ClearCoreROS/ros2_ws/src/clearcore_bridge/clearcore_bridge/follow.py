@@ -89,7 +89,11 @@ def motion_succeeded(state, age_s, names, targets, tolerances, default_tol, fres
 
 
 def path_violation(state, commanded, tolerances) -> str | None:
-    """Joint name whose tracking error exceeds its path tolerance, if any were set."""
+    """Reported position versus a host schedule sample.
+
+    The two arguments must already share one time base. The stream loop does
+    not use this: a just-computed schedule is ahead of the latest state frame.
+    """
     if not tolerances:
         return None
     for name, limit in tolerances.items():
@@ -101,16 +105,58 @@ def path_violation(state, commanded, tolerances) -> str | None:
     return None
 
 
-def limit_step(previous: float, desired: float, accel: float | None, dt: float) -> float:
-    if accel is None or accel <= 0.0 or dt <= 0.0:
-        return desired
-    delta = desired - previous
-    cap = accel * dt
-    if delta > cap:
-        return previous + cap
-    if delta < -cap:
-        return previous - cap
-    return desired
+def _board_dt_s(now_ms, latch_ms) -> float:
+    return ((int(now_ms) - int(latch_ms)) & 0xFFFFFFFF) / 1000.0
+
+
+def local_tracking_violation(state, tolerances) -> str | None:
+    """Generated position versus the time-advanced reference in this state frame.
+
+    q_ref = q_latched + v_latched * (time_ms - latch_ms), using only that sample.
+    Joints that are not in track_mask are skipped.
+    """
+    if not tolerances or state is None:
+        return None
+    mask = int(state.get("track_mask") or 0)
+    targets = state.get("target_position")
+    speeds = state.get("target_velocity")
+    latches = state.get("target_latch_ms")
+    if targets is None or speeds is None or latches is None:
+        return None
+    for name, limit in tolerances.items():
+        if name not in AXIS:
+            continue
+        axis = AXIS[name]
+        if (mask & (1 << axis)) == 0 or int(latches[axis]) == 0:
+            continue
+        q_ref = float(targets[axis]) + float(speeds[axis]) * _board_dt_s(state["time_ms"], latches[axis])
+        if abs(float(state["position"][axis]) - q_ref) > float(limit):
+            return name
+    return None
+
+
+def _quintic(p0, v0, a0, p1, v1, a1, dt, s):
+    """Position and velocity of the quintic with those endpoint boundaries."""
+    if dt <= 1e-9:
+        return p1, 0.0
+    t = s * dt
+    t2 = t * t
+    t3 = t2 * t
+    t4 = t3 * t
+    t5 = t4 * t
+    dt2 = dt * dt
+    dt3 = dt2 * dt
+    dt4 = dt3 * dt
+    dt5 = dt4 * dt
+    c0 = p0
+    c1 = v0
+    c2 = 0.5 * a0
+    c3 = (20.0 * p1 - 20.0 * p0 - (8.0 * v1 + 12.0 * v0) * dt - (3.0 * a0 - a1) * dt2) / (2.0 * dt3)
+    c4 = (30.0 * p0 - 30.0 * p1 + (14.0 * v1 + 16.0 * v0) * dt + (3.0 * a0 - 2.0 * a1) * dt2) / (2.0 * dt4)
+    c5 = (12.0 * p1 - 12.0 * p0 - 6.0 * (v0 + v1) * dt - (a0 - a1) * dt2) / (2.0 * dt5)
+    pos = c0 + c1 * t + c2 * t2 + c3 * t3 + c4 * t4 + c5 * t5
+    vel = c1 + 2.0 * c2 * t + 3.0 * c3 * t2 + 4.0 * c4 * t3 + 5.0 * c5 * t4
+    return pos, vel
 
 
 def _hermite(p0, v0, p1, v1, dt, s):
@@ -188,14 +234,12 @@ def is_immediate(knots) -> bool:
     return knots[-1]["t"] - knots[0]["t"] <= 1e-9
 
 
-def _accel_cap(knot, name):
+def _boundary_accel(knot, name):
+    """Signed waypoint acceleration, or None when the point does not supply one."""
     acc = knot.get("accelerations")
     if not acc or name not in acc or acc[name] is None:
         return None
-    value = abs(float(acc[name]))
-    if value <= 1e-12:
-        return None
-    return value
+    return float(acc[name])
 
 
 def _segment_index(knots, elapsed):
@@ -205,7 +249,7 @@ def _segment_index(knots, elapsed):
     return len(knots) - 2
 
 
-def sample_trajectory(knots, names, elapsed, prev_velocity, sample_dt):
+def sample_trajectory(knots, names, elapsed):
     """Return position dict, velocity dict, and whether the schedule is finished."""
     if elapsed >= knots[-1]["t"]:
         pos = dict(knots[-1]["positions"])
@@ -222,12 +266,18 @@ def sample_trajectory(knots, names, elapsed, prev_velocity, sample_dt):
     pos = {}
     vel = {}
     for name in names:
-        p, v = _hermite(
-            left["positions"][name], left["vel"][name],
-            right["positions"][name], right["vel"][name],
-            dt, s)
+        a0 = _boundary_accel(left, name)
+        a1 = _boundary_accel(right, name)
+        if a0 is not None or a1 is not None:
+            p, v = _quintic(
+                left["positions"][name], left["vel"][name], 0.0 if a0 is None else a0,
+                right["positions"][name], right["vel"][name], 0.0 if a1 is None else a1,
+                dt, s)
+        else:
+            p, v = _hermite(
+                left["positions"][name], left["vel"][name],
+                right["positions"][name], right["vel"][name],
+                dt, s)
         pos[name] = p
-        cap = _accel_cap(right, name) or _accel_cap(left, name)
-        previous = 0.0 if prev_velocity is None else float(prev_velocity.get(name, 0.0))
-        vel[name] = limit_step(previous, v, cap, sample_dt)
+        vel[name] = v
     return pos, vel, False

@@ -25,6 +25,8 @@ static const uint8_t XRCE_KIND_DATAWRITER = 0x05;
 static const uint16_t XRCE_MTU = 512;
 static const uint32_t XRCE_RETRY_MS = 1000;
 static const uint32_t XRCE_PUBLISH_MS = 50;
+static const uint32_t XRCE_HEARTBEAT_MS = 1000;
+static const uint32_t XRCE_AGENT_LOST_MS = 3000;
 
 static const char kParticipantXml[] =
     "<dds><participant><rtps><name>clearcore_ros</name></rtps></participant></dds>";
@@ -64,6 +66,8 @@ static uint16_t g_bestEffortSeq = 0;
 static uint16_t g_waitRequest = 0;
 static uint32_t g_lastSendMs = 0;
 static uint32_t g_lastPubMs = 0;
+static uint32_t g_lastRxMs = 0;
+static uint32_t g_lastHeartbeatMs = 0;
 static bool g_waiting = false;
 static uint8_t g_clientKey[4] = {0x43, 0x52, 0x4F, 0x53};
 
@@ -216,6 +220,21 @@ static void SendCreate(uint8_t kind, const uint8_t selfRaw[2], const uint8_t ref
     g_lastSendMs = Milliseconds();
 }
 
+static void SendReliableHeartbeat() {
+    uint8_t raw[32];
+    XrceBuf b = {raw, 0, sizeof(raw)};
+    Header(&b, XRCE_STREAM_RELIABLE, g_reliableSeq);
+    const uint16_t beat = BeginSub(&b, 11, 0);
+    PutU16(&b, 0);
+    PutU16(&b, g_reliableSeq);
+    PutU8(&b, XRCE_STREAM_RELIABLE);
+    EndSub(&b, beat);
+    if (UdpSend(raw, b.n)) {
+        g_reliableSeq = (uint16_t)(g_reliableSeq + 1u);
+        g_lastHeartbeatMs = Milliseconds();
+    }
+}
+
 static void SendJointState() {
     CcrosState st;
     MotionFillState(&st);
@@ -304,6 +323,8 @@ static void Advance() {
     } else if (g_state == XRCE_CREATE_WRITER) {
         g_state = XRCE_STREAM;
         g_lastPubMs = 0;
+        g_lastHeartbeatMs = Milliseconds();
+        g_lastRxMs = Milliseconds();
     }
 }
 
@@ -344,6 +365,7 @@ static void ReadReplies() {
         if (g_xrceUdp.PacketRead(buf, take) < 8) {
             return;
         }
+        g_lastRxMs = Milliseconds();
         uint16_t i = 4;
         if (buf[0] < 0x80) {
             i = 8;
@@ -386,6 +408,8 @@ const char *XrceConnect(const uint8_t ip[4], uint16_t port) {
     g_waiting = false;
     g_bestEffortSeq = 0;
     g_lastSendMs = 0;
+    g_lastRxMs = 0;
+    g_lastHeartbeatMs = 0;
     SendCreateClient();
     return nullptr;
 }
@@ -413,6 +437,15 @@ void XrcePoll() {
         return;
     }
     if (g_state == XRCE_STREAM) {
+        if (g_lastRxMs != 0 && (now - g_lastRxMs) >= XRCE_AGENT_LOST_MS) {
+            g_state = XRCE_WAIT_AGENT;
+            g_waiting = false;
+            SendCreateClient();
+            return;
+        }
+        if (g_lastHeartbeatMs == 0 || (now - g_lastHeartbeatMs) >= XRCE_HEARTBEAT_MS) {
+            SendReliableHeartbeat();
+        }
         if (g_lastPubMs == 0 || (now - g_lastPubMs) >= XRCE_PUBLISH_MS) {
             SendJointState();
         }

@@ -78,7 +78,7 @@ def latest_state(stream):
 
 
 def schedule_at(knots, t):
-    pos, vel, _done = sample_trajectory(knots, ["joint_x"], max(0.0, t), None, 0.02)
+    pos, vel, _done = sample_trajectory(knots, ["joint_x"], max(0.0, t))
     return pos["joint_x"], vel["joint_x"]
 
 
@@ -184,13 +184,12 @@ def run_ramp(session, stream, start_m, end_m, duration_s, label):
     t_sync_host = time.monotonic()
     t_sync_board = sync["time_ms"]
     samples = []
-    prev = {"joint_x": 0.0}
     t0 = time.monotonic()
     next_print = 0.0
     period = 0.02
     while True:
         host_elapsed = time.monotonic() - t0
-        pos, vel, done = sample_trajectory(knots, names, host_elapsed, prev, period)
+        pos, vel, done = sample_trajectory(knots, names, host_elapsed)
         if done:
             break
         stream.send_track(
@@ -198,7 +197,6 @@ def run_ramp(session, stream, start_m, end_m, duration_s, label):
             (pos["joint_x"], 0.0, 0.0, 0.0),
             (vel["joint_x"], 0.0, 0.0, 0.0),
         )
-        prev = vel
         state = latest_state(stream)
         if state is None or "target_position" not in state:
             time.sleep(period)

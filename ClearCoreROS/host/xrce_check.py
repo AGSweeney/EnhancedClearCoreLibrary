@@ -26,13 +26,19 @@ def reply_status_agent(session: int) -> bytes:
     return header + sub + bytes(pad4(len(header) + len(sub)) - (len(header) + len(sub)))
 
 
+def reply_ack(session: int, seq: int) -> bytes:
+    header = bytes([session, 0x80, seq & 0xFF, (seq >> 8) & 0xFF])
+    # ACKNACK: first unacked = seq+1, bitmap 0, stream 0x80.
+    ack_payload = struct.pack("<H", (seq + 1) & 0xFFFF) + bytes([0, 0, 0x80])
+    ack = bytes([10, 1]) + struct.pack("<H", len(ack_payload)) + ack_payload
+    return header + ack
+
+
 def reply_status(session: int, seq: int, request: bytes, obj: bytes) -> bytes:
     header = bytes([session, 0x80, seq & 0xFF, (seq >> 8) & 0xFF])
     payload = request + obj + bytes([0, 0])
     sub = bytes([5, 1]) + struct.pack("<H", len(payload)) + payload
-    # ACKNACK: first unacked = seq+1, bitmap 0, stream 0x80.
-    ack_payload = struct.pack("<H", (seq + 1) & 0xFFFF) + bytes([0, 0, 0x80])
-    ack = bytes([10, 1]) + struct.pack("<H", len(ack_payload)) + ack_payload
+    ack = reply_ack(session, seq)[4:]
     body = sub + bytes((4 - (len(sub) % 4)) % 4) + ack
     return header + body
 
@@ -103,6 +109,9 @@ def main() -> None:
         stream = data[1]
         seq = data[2] | (data[3] << 8)
         i = 4 if session >= 0x80 else 8
+        # One reply datagram. The ClearCore UDP port keeps a single packet, so a
+        # second sendto in this burst would replace STATUS before the board reads it.
+        reply = None
         while i + 4 <= len(data):
             while i % 4 and i < len(data):
                 i += 1
@@ -114,16 +123,20 @@ def main() -> None:
             i += 4 + length
             if mid == 0:
                 print("CREATE_CLIENT", payload[:4], flush=True)
-                sock.sendto(reply_status_agent(0x81), addr)
+                reply = reply_status_agent(0x81)
             elif mid == 1 and len(payload) >= 4:
                 kind = payload[4] if len(payload) > 4 else 0
                 print(f"CREATE kind={kind} seq={seq}", flush=True)
-                sock.sendto(reply_status(0x81, seq, payload[0:2], payload[2:4]), addr)
+                reply = reply_status(0x81, seq, payload[0:2], payload[2:4])
+            elif mid == 11 and reply is None:
+                reply = reply_ack(0x81, seq)
             elif mid == 7:
                 text = joint_from_write(payload)
                 if text:
                     samples += 1
                     print("JOINT", text, flush=True)
+        if reply is not None:
+            sock.sendto(reply, addr)
     if samples < 1:
         raise SystemExit("no JointState sample")
     print(f"XRCE_OK samples={samples}", flush=True)
