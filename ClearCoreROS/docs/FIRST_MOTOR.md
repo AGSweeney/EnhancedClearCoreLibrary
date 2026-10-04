@@ -2,7 +2,7 @@
 
 Get one ClearPath moving on connector M0. This uses the released firmware and `host/ccros_cli.py`. It does not use ROS, `ros2_control`, or the XRCE publisher.
 
-This exercise uses the released image. M0 is `joint_x`, a linear axis in meters. That download does not accept a joint name, rotary flag, direction, gear, or offset. Current sources do, through `configure` (`name_x`, `rotary_x`, `direction_x`, `gear_x`, `offset_x`, and the same keys for `y`, `z`, and `a`); change those only while the motors are disabled. On this exercise, a reversed shaft is an MSP or cable change.
+This exercise uses the released image and the defaults. M0 is `joint_x`, a linear axis in meters, direction `+1`, gear `1`, and offset `0`. The image can rename an axis and set `rotary_*`, `direction_*`, `gear_*`, and `offset_*`. Change direction, gear, rotary, or offset only while the motors are disabled. A reversed shaft can be fixed in MSP, in the cable, or with `configure --direction-x -1` while disabled. Leave the defaults in place for this exercise.
 
 Reported position is generated steps (`PositionRefCommanded`), not a shaft encoder. `0.01` in a status position is 0.01 m, which is 10 mm.
 
@@ -10,7 +10,7 @@ Reported position is generated steps (`PositionRefCommanded`), not a shaft encod
 
 - A ClearCore and one ClearPath motor.
 - Python 3.10 or newer on the computer that will talk to the board.
-- This repository at git `fb52394`, or any later revision that still lists firmware `0.1.0` in [../releases/README.md](../releases/README.md).
+- This repository at a revision that lists firmware `0.1.1` in [../releases/README.md](../releases/README.md). The firmware sources for that image are git `0bf5dbf`.
 - The motor's power supply, and a way to stop the shaft if it runs the wrong direction. Keep a physical estop in the circuit.
 
 The computer and the ClearCore must be on the same Ethernet network. USB is only for flashing and for the serial log.
@@ -33,21 +33,21 @@ DI-6 is the estop input. The default (`estop_di6` 1) treats DI-6 **low** as esto
 
 ## 3. Flash
 
-The file is [../releases/ClearCoreROS-0.1.0.bin](../releases/ClearCoreROS-0.1.0.bin). Confirm the SHA-256 in [../releases/README.md](../releases/README.md) before flashing. Flashing replaces the application on the board. User NVM is kept. A ClearAI configuration blob is not applied.
+The file is [../releases/ClearCoreROS-0.1.1.bin](../releases/ClearCoreROS-0.1.1.bin). Confirm the SHA-256 in [../releases/README.md](../releases/README.md) before flashing. Flashing replaces the application on the board. User NVM is kept, including a version 1 or version 2 blob. A ClearAI configuration blob is not applied. The first `configure` after an older blob saves version 3 and keeps the network settings and limits you do not change.
 
 The running board is USB VID `2890`, PID `8022`. The bootloader is PID `0022`. The application is written at offset `0x4000`.
 
 On Windows, from the repository root:
 
 ```powershell
-.\Tools\flash_clearcore.cmd .\ClearCoreROS\releases\ClearCoreROS-0.1.0.bin
+.\Tools\flash_clearcore.cmd .\ClearCoreROS\releases\ClearCoreROS-0.1.1.bin
 ```
 
 On Linux, install `bossac` (the BOSSA command-line tool), then enter the bootloader and write the image. The USB port name changes when the bootloader enumerates. If the first command is aimed at the running application, it drops the port; wait, then run the write against the bootloader port.
 
 ```bash
 bossac --info --debug --port=/dev/ttyACM0 --arduino-erase
-bossac --info --debug --port=/dev/ttyACM0 --usb-port --write --erase --verify --offset=0x4000 --reset ClearCoreROS/releases/ClearCoreROS-0.1.0.bin
+bossac --info --debug --port=/dev/ttyACM0 --usb-port --write --erase --verify --offset=0x4000 --reset ClearCoreROS/releases/ClearCoreROS-0.1.1.bin
 ```
 
 The Windows script was the one used on the bench. The Linux lines are the same `bossac` invocation.
@@ -83,7 +83,7 @@ python3 host/ccros_cli.py --host 192.168.1.50 configure --axis-mask 1 --steps-pe
 python3 host/ccros_cli.py --host 192.168.1.50 config
 ```
 
-`pitch_mm` must match the mechanics. A 5 mm lead and 800 steps/rev is 160 steps per millimetre. `config` shows `axis_mask` 1 and those values. Change `axis_mask`, `steps_per_rev`, or `pitch_mm` only while the motors are disabled.
+`pitch_mm` must match the mechanics. A 5 mm lead and 800 steps/rev is 160 steps per millimetre. `config` shows `axis_mask` 1, those mechanics, and the default map: names `joint_x` through `joint_a`, `rotary` only on A, `direction` 1, `gear` 1, and `offset` 0. Change `axis_mask`, `steps_per_rev`, `pitch_mm`, `rotary_*`, `direction_*`, `gear_*`, or `offset_*` only while the motors are disabled. A joint name can change while enabled.
 
 This is saved in NVM and restored on the next boot.
 
@@ -126,7 +126,7 @@ python3 host/ccros_cli.py --host 192.168.1.50 move --x 0.01
 
 `enable` waits for HLFB. If it fails, MSP HLFB is not asserting. Do not turn test mode on to skip that.
 
-`move` prints a line about twice a second. A completed 10 mm move looks like:
+`move` prints a position line about ten times a second until the axis is in position. A completed 10 mm move looks like:
 
 ```text
 pos=['0.0100', '0.0000', '0.0000', '0.0000'] err=0.00000 moving=False watchdog=False
@@ -151,7 +151,7 @@ The first position is about `0.0000`. `enabled` is false.
 | `estop` true | DI-6 is low and the default check is on, or the latch from an earlier low is still set. `clear-alerts` clears that latch once DI-6 is high or `estop_di6` is 0. |
 | `enable` fails mentioning HLFB | MSP HLFB is not the ASG-Position setting above, or the HLFB wire is open. |
 | `fault` true | Read `alerts` in the status JSON. `clear-alerts` is the recovery after the cause is gone. |
-| Position counts the opposite direction | Change direction in MSP. The firmware cannot reverse an axis. |
+| Position counts the opposite direction | Reverse it in MSP or the cable, or, with the motor disabled, `configure --direction-x -1`. This exercise leaves direction at `+1`. |
 | `axis_mask` is 3 and enable fails | M1 is in the mask and has no motor. Use `--axis-mask 1`. |
 
 ROS, `ros2_control`, and XRCE are separate setups. See [../README.md](../README.md).
