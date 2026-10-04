@@ -8,9 +8,10 @@
 #include "XrceClient.h"
 
 #include "ClearCore.h"
-#include "EthernetUdp.h"
 #include "MotionCore.h"
 #include "RosConfig.h"
+
+#include "lwip/udp.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -55,7 +56,17 @@ struct XrceBuf {
     uint16_t cap;
 };
 
-static EthernetUdp g_xrceUdp;
+/* A micro-ROS agent answers one request with several UDP datagrams. The
+ * ClearCore UDP port keeps a single packet, so the client copies arrivals
+ * into this queue from the lwIP callback. */
+static const uint8_t XRCE_RX_SLOTS = 12;
+static const uint16_t XRCE_RX_MAX = 768;
+static struct udp_pcb *g_pcb = nullptr;
+static uint8_t g_rxBuf[XRCE_RX_SLOTS][XRCE_RX_MAX];
+static uint16_t g_rxLen[XRCE_RX_SLOTS];
+static volatile uint8_t g_rxHead = 0;
+static volatile uint8_t g_rxTail = 0;
+static volatile uint8_t g_rxCount = 0;
 static bool g_udpOpen = false;
 static XrceState g_state = XRCE_OFF;
 static uint8_t g_agent[4];
@@ -152,27 +163,51 @@ static void EndSub(XrceBuf *b, uint16_t at) {
     Align(b, 4);
 }
 
+static void XrceRecv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port) {
+    (void)arg;
+    (void)pcb;
+    (void)addr;
+    (void)port;
+    if (p == nullptr) {
+        return;
+    }
+    if (g_rxCount < XRCE_RX_SLOTS && p->tot_len > 0 && p->tot_len <= XRCE_RX_MAX) {
+        __disable_irq();
+        pbuf_copy_partial(p, g_rxBuf[g_rxTail], p->tot_len, 0);
+        g_rxLen[g_rxTail] = (uint16_t)p->tot_len;
+        g_rxTail = (uint8_t)((g_rxTail + 1u) % XRCE_RX_SLOTS);
+        g_rxCount++;
+        __enable_irq();
+    }
+    pbuf_free(p);
+}
+
 static bool UdpSend(const uint8_t *data, uint16_t len) {
-    if (!g_udpOpen) {
+    if (!g_udpOpen || g_pcb == nullptr) {
         return false;
     }
-    if (!g_xrceUdp.Connect(IpAddress(g_agent[0], g_agent[1], g_agent[2], g_agent[3]), g_agentPort)) {
+    struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, len, PBUF_RAM);
+    if (p == nullptr) {
         return false;
     }
-    if (g_xrceUdp.PacketWrite(data, len) != len) {
-        return false;
-    }
-    return g_xrceUdp.PacketSend();
+    memcpy(p->payload, data, len);
+    ip_addr_t dest;
+    IP4_ADDR(&dest, g_agent[0], g_agent[1], g_agent[2], g_agent[3]);
+    const err_t err = udp_sendto(g_pcb, p, &dest, g_agentPort);
+    pbuf_free(p);
+    EthernetMgr.Refresh();
+    return err == ERR_OK;
 }
 
 static void SendCreateClient() {
     uint8_t raw[64];
     XrceBuf b = {raw, 0, sizeof(raw)};
-    /* Login header uses session id with the key bit cleared, and carries the key. */
-    PutU8(&b, (uint8_t)(XRCE_SESSION & 0x7fu));
+    /* CREATE_CLIENT is stamped with session_id & 0x80 (0x80 for this client).
+     * That is the none-session without a header key. The real session id and
+     * the client key are in the payload. A header of 0x01 is ignored by the agent. */
+    PutU8(&b, (uint8_t)(XRCE_SESSION & 0x80u));
     PutU8(&b, 0);
     PutU16(&b, 0);
-    PutRaw(&b, g_clientKey, 4);
     const uint16_t sub = BeginSub(&b, 0, 0);
     PutRaw(&b, "XRCE", 4);
     PutU8(&b, 1);
@@ -240,11 +275,7 @@ static void SendJointState() {
     MotionFillState(&st);
     uint8_t raw[512];
     XrceBuf body = {raw, 0, sizeof(raw)};
-    /* CDR encapsulation, then alignment from the start of this buffer. */
-    PutU8(&body, 0x00);
-    PutU8(&body, 0x01);
-    PutU8(&body, 0x00);
-    PutU8(&body, 0x00);
+    /* Fast DDS adds the CDR encapsulation. Alignment is from the start of this body. */
     const uint32_t ms = st.time_ms;
     PutU32(&body, ms / 1000u);
     PutU32(&body, (ms % 1000u) * 1000000u);
@@ -350,20 +381,17 @@ static void ReadReplies() {
     if (!g_udpOpen) {
         return;
     }
-    for (;;) {
-        const uint16_t n = g_xrceUdp.PacketParse();
-        if (n == 0) {
-            return;
-        }
-        if (n < 8) {
-            uint8_t discard[8];
-            g_xrceUdp.PacketRead(discard, 8);
+    EthernetMgr.Refresh();
+    while (g_rxCount > 0) {
+        uint8_t buf[XRCE_RX_MAX];
+        __disable_irq();
+        const uint16_t take = g_rxLen[g_rxHead];
+        memcpy(buf, g_rxBuf[g_rxHead], take);
+        g_rxHead = (uint8_t)((g_rxHead + 1u) % XRCE_RX_SLOTS);
+        g_rxCount--;
+        __enable_irq();
+        if (take < 8) {
             continue;
-        }
-        uint8_t buf[768];
-        const uint16_t take = n < sizeof(buf) ? n : (uint16_t)sizeof(buf);
-        if (g_xrceUdp.PacketRead(buf, take) < 8) {
-            return;
         }
         g_lastRxMs = Milliseconds();
         uint16_t i = 4;
@@ -393,16 +421,29 @@ const char *XrceConnect(const uint8_t ip[4], uint16_t port) {
     if (port == 0) {
         return "agent port required";
     }
-    if (g_udpOpen) {
-        g_xrceUdp.End();
+    if (g_udpOpen && g_pcb != nullptr) {
+        udp_remove(g_pcb);
+        g_pcb = nullptr;
         g_udpOpen = false;
     }
     memcpy(g_agent, ip, 4);
     g_agentPort = port;
-    if (!g_xrceUdp.Begin(CCROS_XRCE_LOCAL_PORT)) {
+    g_rxHead = 0;
+    g_rxTail = 0;
+    g_rxCount = 0;
+    g_pcb = udp_new();
+    if (g_pcb == nullptr) {
         g_state = XRCE_OFF;
         return "xrce udp bind failed";
     }
+    ip_addr_t local = IPADDR4_INIT(uint32_t(EthernetMgr.LocalIp()));
+    if (udp_bind(g_pcb, &local, CCROS_XRCE_LOCAL_PORT) != ERR_OK) {
+        udp_remove(g_pcb);
+        g_pcb = nullptr;
+        g_state = XRCE_OFF;
+        return "xrce udp bind failed";
+    }
+    udp_recv(g_pcb, XrceRecv, nullptr);
     g_udpOpen = true;
     g_state = XRCE_WAIT_AGENT;
     g_waiting = false;
@@ -415,8 +456,9 @@ const char *XrceConnect(const uint8_t ip[4], uint16_t port) {
 }
 
 const char *XrceDisconnect() {
-    if (g_udpOpen) {
-        g_xrceUdp.End();
+    if (g_udpOpen && g_pcb != nullptr) {
+        udp_remove(g_pcb);
+        g_pcb = nullptr;
         g_udpOpen = false;
     }
     g_state = XRCE_OFF;
