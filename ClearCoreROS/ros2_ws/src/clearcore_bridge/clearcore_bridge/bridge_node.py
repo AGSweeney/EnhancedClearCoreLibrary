@@ -33,7 +33,8 @@ from clearcore_bridge.follow import (
     sample_trajectory,
     state_block_reason,
 )
-from clearcore_bridge.wire import AXIS, JOINTS, ROTARY, SessionClient, StreamClient, apply_joint_map
+from clearcore_bridge.session_bringup import bring_up_session
+from clearcore_bridge.wire import AXIS, JOINTS, ROTARY, SessionClient, StreamClient
 
 
 class ClearCoreBridge(Node):
@@ -142,25 +143,16 @@ class ClearCoreBridge(Node):
         stream = None
         try:
             session = SessionClient(self._host, self._session_port, 2.0)
-            session.call("disable")
-            session.call("clear_alerts")
-            session.call(
-                "configure",
-                {
-                    "axis_mask": self._mask,
-                    "steps_per_rev": int(self.get_parameter("steps_per_rev").value),
-                    "pitch_mm": float(self.get_parameter("pitch_mm").value),
-                    "vel_steps": int(self.get_parameter("vel_steps").value),
-                    "accel_steps": int(self.get_parameter("accel_steps").value),
-                    "decel_steps": int(self.get_parameter("accel_steps").value),
-                    "watchdog_ms": int(self.get_parameter("watchdog_ms").value),
-                },
+            bring_up_session(
+                session,
+                axis_mask=self._mask,
+                steps_per_rev=int(self.get_parameter("steps_per_rev").value),
+                pitch_mm=float(self.get_parameter("pitch_mm").value),
+                vel_steps=int(self.get_parameter("vel_steps").value),
+                accel_steps=int(self.get_parameter("accel_steps").value),
+                watchdog_ms=int(self.get_parameter("watchdog_ms").value),
+                test_mode=bool(self.get_parameter("test_mode").value),
             )
-            session.call("set_test_mode", {"on": bool(self.get_parameter("test_mode").value)})
-            cfg = session.call("get_config")
-            if isinstance(cfg, dict):
-                apply_joint_map(cfg.get("names"), cfg.get("rotary"))
-            session.call("enable")
             stream = StreamClient(self._host, self._stream_port, 2.0)
         except Exception as exc:  # noqa: BLE001
             if stream is not None:

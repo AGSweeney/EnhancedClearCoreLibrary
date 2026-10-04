@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 import threading
 from pathlib import Path
@@ -87,6 +86,7 @@ def test_cached_faulted_state_is_not_success():
 
 
 def test_second_goal_is_rejected_and_cancel_is_not_shared():
+    """Unit: GoalGate ownership. Cancellation completion is test_bridge_sim."""
     gate = GoalGate()
     assert gate.try_reserve()
     assert not gate.try_reserve()
@@ -145,50 +145,10 @@ def test_trajectory_uses_time_and_requested_velocity():
     assert local_tracking_violation(tracking, {"joint_x": 0.001}) is None
 
 
-def test_cancel_releases_the_gate_and_does_not_count_as_success():
-    """Simulated Python-bridge cancellation: only the owner may cancel."""
-    gate = GoalGate()
-    assert gate.try_reserve()
-    assert gate.claim("goal-a")
-    assert gate.accepts_cancel("goal-a")
-    assert not gate.accepts_cancel("goal-b")
-    gate.release("goal-a")
-    assert not gate.busy()
-
-
-def test_watchdog_blocks_until_clear_alerts_not_keepalive():
-    """Simulated recovery: watchdog stays a block until the latch is gone."""
-    tripped = _healthy(watchdog=True)
-    assert state_block_reason(tripped, 0.0) == "watchdog tripped; call clear_alerts"
-    assert motion_succeeded(tripped, 0.0, ["joint_x"], [0.01], {}, 0.001) is False
-    recovered = _healthy(watchdog=False)
-    assert state_block_reason(recovered, 0.0) is None
-    assert motion_succeeded(recovered, 0.0, ["joint_x"], [0.01], {}, 0.001) is True
-
-
-def test_host_restart_needs_a_fresh_state_sample():
-    """Simulated host restart: a missing or stale cache is not a finished move."""
-    assert state_block_reason(None, 0.0) == "no state"
-    assert motion_succeeded(_healthy(), 1.0, ["joint_x"], [0.01], {}, 0.001) is False
-
-
-def test_home_is_a_session_method_not_a_trajectory_success():
-    """Simulated homing contract: home is JSON-RPC, not FollowJointTrajectory."""
-    req = json.dumps(
-        {"jsonrpc": "2.0", "id": 1, "method": "home", "params": {"axis": "x", "dir": "neg"}}
-    )
-    assert '"method": "home"' in req
-    assert "follow_joint_trajectory" not in req
-
-
 if __name__ == "__main__":
     test_track_frame_roundtrip()
     test_stream_eof_is_disconnect()
     test_cached_faulted_state_is_not_success()
     test_second_goal_is_rejected_and_cancel_is_not_shared()
     test_trajectory_uses_time_and_requested_velocity()
-    test_cancel_releases_the_gate_and_does_not_count_as_success()
-    test_watchdog_blocks_until_clear_alerts_not_keepalive()
-    test_host_restart_needs_a_fresh_state_sample()
-    test_home_is_a_session_method_not_a_trajectory_success()
     print("safety ok")

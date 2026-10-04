@@ -26,15 +26,16 @@ Earlier firmware rows keep the image that was on the bench.
 
 | Scenario | Expected behavior | Path | Firmware | Host | Result | Evidence |
 |----------|-------------------|------|----------|------|--------|----------|
-| Cancellation | Second goal rejected; only the owner may cancel; cancel is not `motion_succeeded` | `GoalGate` / `host/test_safety.py` | n/a (host) | 0.1.0 | `automated-sim` | `test_second_goal_is_rejected_and_cancel_is_not_shared`, `test_cancel_releases_the_gate_and_does_not_count_as_success` |
+| Cancellation | Second goal rejected; only the owner may cancel | `GoalGate` / `host/test_safety.py` | n/a (host) | 0.1.0 | `automated-sim` | `test_second_goal_is_rejected_and_cancel_is_not_shared` |
+| Cancellation completion | Cancelled execute calls session `stop` and `goal_handle.canceled()` | `ClearCoreBridge._execute` / `test/test_bridge_sim.py` | n/a | 0.1.0 | `automated-sim` | `test_bridge_reconnect_home_recovery_and_cancel` |
 | Cancellation on hardware | Cancel in-flight `follow_joint_trajectory` stops motion and does not report success | `clearcore_bridge` action | 0.1.0+ | 0.1.0 | `not-tested` | No recorded cancel-during-move on the bench |
 | Connection loss | Stream EOF is `ConnectionError`, not an empty update | `StreamClient.read` / `test_safety.py` | n/a | 0.1.0 | `automated-sim` | `test_stream_eof_is_disconnect` |
 | Connection loss on hardware | Dropped TCP 9201 mid-move stops immediately | binary stream | 0.1.3 | 0.1.0 | `not-tested` | Documented in PROTOCOL.md; no captured disconnect log |
-| Board/host restart | Missing or stale state is not a finished move; reconnect `disable` / `clear_alerts` / `configure` / `enable` | `test_safety.py` + `bridge_node._ensure_connected` | n/a | 0.1.0 | `automated-sim` | `test_host_restart_needs_a_fresh_state_sample` |
+| Board/host restart | Reconnect repeats `disable` / `clear_alerts` / `configure` / `enable` | `bring_up_session` / `test_session_bringup.py` | n/a | 0.1.0 | `automated-sim` | `test_reconnect_repeats_bring_up`; bridge `_close` then `_ensure_connected` in `test_bridge_sim.py` |
 | Board restart on hardware | Flash keeps NVM; session answers after reboot | `get_status` after flash | 0.1.3 | 0.1.0 | `hardware-bench` | After 0.1.3 flash: `axis_mask` 3, static `172.16.82.114`, motors disabled, `test_mode` false |
-| Homing | `home` is a session method, not the trajectory action | JSON-RPC encode / `test_safety.py` | n/a | 0.1.0 | `automated-sim` | `test_home_is_a_session_method_not_a_trajectory_success` |
+| Homing | SessionClient sends JSON-RPC `home` | `SessionClient.call` / `test_session_bringup.py` | n/a | 0.1.0 | `automated-sim` | `test_home_is_session_call`; bridge `_call("home")` in `test_bridge_sim.py` |
 | Homing on hardware | Seek a limit, optional zero | session `home` | 0.1.3 | 0.1.0 | `not-tested` | API exists; no bench seek recorded in this matrix |
-| Recovery | Watchdog blocks success until `clear_alerts`; keepalive is not recovery | `state_block_reason` / `test_safety.py` | n/a | 0.1.0 | `automated-sim` | `test_watchdog_blocks_until_clear_alerts_not_keepalive` |
+| Recovery | `recover_watchdog` / Trigger `clear_alerts` send `clear_alerts`; keepalive is a different RPC | `session_bringup.py`, `test_session_bringup.py`, `test_bridge_sim.py` | n/a | 0.1.0 | `automated-sim` | `test_recovery_sends_clear_alerts_not_keepalive`; `_trigger("clear_alerts")` |
 | Recovery on hardware | After a tripped watchdog, `clear_alerts` then `enable` | session | 0.1.3 | 0.1.0 | `not-tested` | No captured watchdog trip |
 | Two-axis `follow_joint_trajectory` out and back | Result `error_code` 0 | Python bridge | 0.1.0 | 0.1.0 | `hardware-bench` | releases/README 0.1.0 row; feedback is not the 0.05 mm local tracking residual |
 | `/joint_states` effort empty, `/hlfb_duty` published | Names and stamps match; effort array empty on `/joint_states` | mocked `ClearCoreBridge._publish_state` | n/a | 0.1.0 | `automated-sim` | Review of `4eeab56`; code in `bridge_node.py` |
@@ -43,14 +44,14 @@ Earlier firmware rows keep the image that was on the bench.
 
 | Scenario | Expected behavior | Path | Firmware | Host | Result | Evidence |
 |----------|-------------------|------|----------|------|--------|----------|
-| Cancellation | `GoalStatus.STATUS_CANCELED` is failure even when `error_code` is 0 | `send_trajectory_goal.py` / `test_hardware_sim.py` | n/a | 0.1.0 | `automated-sim` | `test_canceled_jtc_result_is_failure_even_if_error_code_is_zero`; commit `22b30ba` |
+| Cancellation | `GoalStatus.STATUS_CANCELED` is failure even when `error_code` is 0 | `jtc_result.goal_succeeded` used by `send_trajectory_goal.py` | n/a | 0.1.0 | `automated-sim` | `test_canceled_jtc_result_is_failure_even_if_error_code_is_zero`; commit `22b30ba` |
 | Cancellation on hardware | Cancel an in-flight JTC goal | `joint_trajectory_controller` | 0.1.1+ | 0.1.0 | `not-tested` | Bench goal was run to completion, not canceled |
-| Connection loss | Closed stream refuses `write`; `recv` 0 is `ERROR` | plugin `drain_stream` / `test_hardware_sim.py` | n/a | 0.1.0 | `automated-sim` | `test_stream_eof_is_a_read_error` |
+| Connection loss | Closed stream makes plugin `read` return `ERROR` | `ClearCoreSystemHardware` / `test_clearcore_system.cpp` | n/a | 0.1.0 | `automated-sim` | gtest `ActivateWatchdogEofAndReconnect` |
 | Connection loss on hardware | Unplug host Ethernet mid-move | plugin | 0.1.3 | 0.1.0 | `not-tested` | |
-| Board/host restart | Deactivate `disable`; activate `disable`, `clear_alerts`, `configure`, `set_test_mode`, `enable` | `test_hardware_sim.py` | n/a | 0.1.0 | `automated-sim` | `test_host_restart_is_deactivate_then_activate` |
-| Homing | Plugin activate does not call `home` | `PLUGIN_ACTIVATE_METHODS` | n/a | 0.1.0 | `automated-sim` | `test_home_is_not_a_plugin_activate_step` |
+| Board/host restart | Deactivate `disable`; activate `disable`, `clear_alerts`, `configure`, `set_test_mode`, `enable` | plugin vs localhost JSON-RPC | n/a | 0.1.0 | `automated-sim` | gtest `ActivateWatchdogEofAndReconnect` |
+| Homing | Plugin activate does not call `home` | recorded session methods | n/a | 0.1.0 | `automated-sim` | gtest asserts `home` count is 0 |
 | Homing on hardware | Session `home` while the plugin is down | session | 0.1.3 | 0.1.0 | `not-tested` | |
-| Recovery | Watchdog flag latches; writes blocked until next activate `clear_alerts` | packed state frame / `test_hardware_sim.py` | n/a | 0.1.0 | `automated-sim` | `test_watchdog_frame_latches_and_blocks_write` |
+| Recovery | Watchdog flag latches; writes blocked until next activate `clear_alerts` | plugin `drain_stream` / gtest | n/a | 0.1.0 | `automated-sim` | gtest sets `CCROS_FLAG_WATCHDOG` then reactivates |
 | Recovery on hardware | Trip watchdog, reactivate | plugin | 0.1.3 | 0.1.0 | `not-tested` | |
 | Two-axis JTC goal (0.03, 0.03) m then origin | `error_code` 0, peak \|Y−X\| 0.013 mm, end −0.09 mm | `trajectory.launch.py`, `send_trajectory_goal.py` | 0.1.1 | 0.1.0 | `hardware-bench` | releases/README 0.1.1; motors left disabled |
 | colcon build on Jazzy | `clearcore_hardware` and `clearcore_bridge` compile | GitHub Actions | n/a | 0.1.0 | `automated-sim` | `.github/workflows/clearcore-ros-jazzy.yml` |
@@ -74,4 +75,4 @@ Earlier firmware rows keep the image that was on the bench.
 
 ## How CI reports
 
-`host/run_ci_tests.py` prints `CI label: automated with simulated hardware` and `HOST_CI_OK`. The workflow copies that distinction into the GitHub job summary. Mapping, 10 mm, and JTC hardware rows were not re-run on 0.1.3; the motion path did not change after 0.1.1.
+`host/run_ci_tests.py` prints `CI label: automated with simulated hardware` and `HOST_CI_OK`. Colcon also runs `test_clearcore_system` (C++ plugin vs localhost sockets) and `test_bridge_sim.py` (bridge methods vs simulated session). The workflow copies that distinction into the GitHub job summary. Mapping, 10 mm, and JTC hardware rows were not re-run on 0.1.3; the motion path did not change after 0.1.1.

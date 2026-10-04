@@ -9,6 +9,9 @@ A canceled Jazzy goal can still carry error_code 0.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import rclpy
 from action_msgs.msg import GoalStatus
@@ -17,6 +20,17 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectoryPoint
+
+from jtc_result import (
+    RESULT_SUCCESSFUL,
+    STATUS_CANCELED,
+    STATUS_SUCCEEDED,
+    goal_succeeded,
+)
+
+assert STATUS_SUCCEEDED == GoalStatus.STATUS_SUCCEEDED
+assert STATUS_CANCELED == GoalStatus.STATUS_CANCELED
+assert RESULT_SUCCESSFUL == FollowJointTrajectory.Result.SUCCESSFUL
 
 
 class GoalSender(Node):
@@ -90,7 +104,7 @@ class GoalSender(Node):
                     end_y * 1000.0,
                 )
             )
-        return 0 if _goal_succeeded(status, code) else 1
+        return 0 if goal_succeeded(status, code) else 1
 
     def _feedback(self, feedback) -> None:
         point = feedback.feedback.actual
@@ -106,13 +120,6 @@ class GoalSender(Node):
                 desired[1] * 1000.0 if len(desired) > 1 else float("nan"),
             )
         )
-
-
-def _goal_succeeded(status: int, error_code: int) -> bool:
-    return (
-        status == GoalStatus.STATUS_SUCCEEDED
-        and error_code == FollowJointTrajectory.Result.SUCCESSFUL
-    )
 
 
 def _status_name(status: int) -> str:

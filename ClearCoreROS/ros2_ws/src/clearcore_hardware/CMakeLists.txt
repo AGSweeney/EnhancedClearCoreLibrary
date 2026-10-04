@@ -33,7 +33,25 @@ install(TARGETS clearcore_system
   RUNTIME DESTINATION bin)
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY config launch urdf DESTINATION share/${PROJECT_NAME})
-install(PROGRAMS scripts/send_trajectory_goal.py DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS
+  scripts/send_trajectory_goal.py
+  scripts/jtc_result.py
+  DESTINATION lib/${PROJECT_NAME})
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_clearcore_system test/test_clearcore_system.cpp
+    SKIP_LINKING_MAIN_LIBRARIES)
+  target_include_directories(test_clearcore_system PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../firmware)
+  target_link_libraries(test_clearcore_system clearcore_system gtest)
+  ament_target_dependencies(test_clearcore_system
+    hardware_interface
+    pluginlib
+    rclcpp
+    rclcpp_lifecycle)
+endif()
 
 ament_export_include_directories(include)
 ament_export_libraries(clearcore_system)

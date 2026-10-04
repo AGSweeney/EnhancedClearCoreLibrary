@@ -14,6 +14,7 @@ HOST = Path(__file__).resolve().parent
 SCRIPTS = (
     "test_wire.py",
     "test_safety.py",
+    "test_session_bringup.py",
     "test_hardware_sim.py",
     "test_xrce_payloads.py",
 )
