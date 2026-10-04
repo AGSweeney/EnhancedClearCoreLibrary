@@ -25,6 +25,7 @@ Do not collide with ClearAI (9100–9102) or ClearCNC (8888, 8889, 10040).
 | **9200** | TCP JSONL | Session, one client |
 | **9201** | TCP binary | Joint state out, position/velocity/heartbeat in |
 | **9202** | UDP | Discovery |
+| **9203** | UDP | XRCE-DDS client bind. The micro-ROS agent port is on the host. |
 
 The board boots from the saved network mode. DHCP is the default. If DHCP fails, the address falls back to `192.168.0.109`. A saved static address is applied instead of DHCP and takes effect on the next boot.
 
@@ -59,8 +60,8 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 | Method | Params | Result |
 |--------|--------|--------|
 | `get_capabilities` | — | protocol, ports, joint names, units, `axis_mask`, `nvm` |
-| `get_config` | — | mechanics, watchdog, estop mode, test mode, `nvm` / `nvm_valid`, network |
-| `get_status` | — | flags, `alert_reg`, `alerts`, position/velocity/effort |
+| `get_config` | — | mechanics, watchdog, estop, test mode, `nvm` / `nvm_valid` / `nvm_version`, network, soft limits, limit-switch pins |
+| `get_status` | — | flags, `alert_reg`, `alerts`, `travel_limit`, `xrce`, position/velocity/effort |
 | `configure` | see below | `{"ok":true}` and the live configuration is written to NVM |
 | `reset_config` | — | compile defaults, and the NVM blob is cleared. Motors must be disabled. |
 | `configure_network` | `mode` `dhcp` or `static`, plus `ip_address`, `netmask`, `gateway` | saved network settings. `applies_on` is `restart` |
@@ -121,7 +122,7 @@ Little-endian. Every frame:
 
 | Type | Value | Payload |
 |------|-------|---------|
-| state | 1 | 60 bytes, firmware → host, every 20 ms |
+| state | 1 | 128 bytes, firmware → host, every 20 ms |
 | position | 2 | 20 bytes, absolute joint command |
 | velocity | 3 | 20 bytes, joint velocity command |
 | heartbeat | 4 | 2 bytes, refreshes the watchdog only |
@@ -191,11 +192,13 @@ A bad magic byte is skipped. A known type with the wrong length is skipped. The 
 - A `track` frame is the timed-execution path: velocity is feedforward and the position error adds a bounded correction. A later absolute `position` frame leaves tracking and uses the settled-move path.
 - `clearcore_bridge` samples `FollowJointTrajectory` against `time_from_start` and sends `track` frames. Specified point velocities are the spline boundary conditions. Omitted velocities use the segment slope. A non-zero acceleration limits the change in the streamed velocity. Path tolerances are checked against the sample. The bridge accepts one goal at a time. In `stream_mode:=velocity`, the hardware plugin sends the same `track` frame while the command is changing, then a position hold.
 
-The watchdog trips only while a goal is unfinished or a velocity command is nonzero and the host has been silent for `watchdog_ms`. Reaching the target and then going quiet does not trip. A stream disconnect mid-move trips immediately. `keepalive` does not clear the latch, and hosts must not do it automatically. `clear_alerts` is the recovery; until then position and velocity commands are ignored. The hardware plugin also latches the trip and refuses further writes until the controller activates again, which calls `clear_alerts` before `enable`.
+The watchdog trips only while a goal is unfinished or a velocity command is nonzero and the host has been silent for `watchdog_ms`. Reaching the target and then going quiet does not trip. A stream disconnect mid-move trips immediately. `keepalive` does not clear the latch, and hosts must not do it automatically. `clear_alerts` is the recovery; until then position and velocity commands are ignored. It also clears `travel_limit`. The hardware plugin latches a watchdog trip and refuses further writes until the controller activates again, which calls `clear_alerts` before `enable`.
+
+`wait_idle`, `home`, and `probe` block inside the session call and refresh the host timer while they run, so a long move is not treated as a lost host. A later `stop` on that same connection is not read until the call returns. Hardware estop still aborts the seek.
 
 ## Coordinated XY, homing, and probing
 
-`move_linear` takes absolute `x`,`y`,`z`,`a` in meters and radians. When both X and Y are in `axis_mask` and enabled, those two axes run on the coordinated planner so the path is one straight line. Otherwise each named axis moves independently. Z and A are always independent. Optional `feed_mps` is the path speed; omitted, the move uses `vel_steps`. `move_arc` is XY only: `x` and `y` are the end point, `i` and `j` are the center offset from the start in meters, and `cw` selects direction. It requires both X and Y. Both calls return `est_ms` and do not wait. `wait_idle` blocks until motion has been still for 20 ms, or until `timeout_ms` (default 60000).
+`move_linear` takes absolute `x`,`y`,`z`,`a` in meters and radians. When both X and Y are in `axis_mask` and enabled, those two axes run on the coordinated planner so the path is one straight line. Otherwise each named axis moves on its own trapezoid. Z and A are always independent. Two independent trapezoids are not a circular arc: constant cruise speeds draw a straight line, and the accel and decel ramps only bend that line. A circular arc is `move_arc`, which locks X and Y to one radius. `x` and `y` are the end point, `i` and `j` are the center offset from the start in meters, and `cw` selects direction. It requires both X and Y. Both calls return `est_ms` and `coordinated`, and they do not wait. `wait_idle` blocks until motion has been still for 20 ms, or until `timeout_ms` (default 60000). `feed_mps` is the path speed in meters per second. Omitted, the move uses `vel_steps`.
 
 `home` seeks the limit switch configured for `axis` (`x`,`y`,`z`,`a`) and `dir` (`pos` or `neg`). `seek` and `backoff` are in that joint's units (meters or radians). Defaults are a 1 m / 1 rad seek, no backoff, and a 30 s timeout. `zero` defaults to true and sets that joint's generated position to 0 after the seek. The seek ignores soft limits. It still reads the switch when test mode is on.
 

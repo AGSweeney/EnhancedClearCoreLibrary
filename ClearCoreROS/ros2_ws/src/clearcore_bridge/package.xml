@@ -3,7 +3,7 @@
 <package format="3">
   <name>clearcore_bridge</name>
   <version>0.1.0</version>
-  <description>JointState publisher and FollowJointTrajectory action for ClearCoreROS.</description>
+  <description>JointState publisher and timed FollowJointTrajectory action for ClearCoreROS.</description>
   <maintainer email="agsweeney@gmail.com">Adam G. Sweeney</maintainer>
   <license>MIT</license>
 

@@ -3,7 +3,7 @@
 <package format="3">
   <name>clearcore_hardware</name>
   <version>0.1.0</version>
-  <description>ros2_control system interface for ClearCoreROS firmware.</description>
+  <description>ros2_control system interface for the ClearCoreROS joint stream.</description>
   <maintainer email="agsweeney@gmail.com">Adam G. Sweeney</maintainer>
   <license>MIT</license>
 
