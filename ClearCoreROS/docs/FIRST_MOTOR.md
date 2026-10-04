@@ -95,16 +95,23 @@ Put a soft limit a short distance past the move you are about to command, in met
 python3 host/ccros_cli.py --host 192.168.1.50 configure --min-x 0 --max-x 0.02
 ```
 
+Flashing keeps NVM, so a previous session can still have `test_mode` true. Turn it off before checking estop or enabling. Without `--on`, this saves false and restores the HLFB, estop, and limit-switch checks.
+
+```bash
+python3 host/ccros_cli.py --host 192.168.1.50 test-mode
+```
+
 Check estop before enabling:
 
 ```bash
 python3 host/ccros_cli.py --host 192.168.1.50 status
 ```
 
-If `estop` is true and you have no switch, turn the DI-6 check off and read status again:
+If `estop` is true and you have no switch, turn the DI-6 check off. DI-6 going low latches estop. Setting `estop_di6` to 0 removes the input and leaves that latch set, so clear alerts before reading status again:
 
 ```bash
 python3 host/ccros_cli.py --host 192.168.1.50 configure --estop-di6 0
+python3 host/ccros_cli.py --host 192.168.1.50 clear-alerts
 python3 host/ccros_cli.py --host 192.168.1.50 status
 ```
 
@@ -141,7 +148,7 @@ The first position is about `0.0000`. `enabled` is false.
 
 | What you see | What it means |
 |--------------|----------------|
-| `estop` true | DI-6 is low and the default check is on. |
+| `estop` true | DI-6 is low and the default check is on, or the latch from an earlier low is still set. `clear-alerts` clears that latch once DI-6 is high or `estop_di6` is 0. |
 | `enable` fails mentioning HLFB | MSP HLFB is not the ASG-Position setting above, or the HLFB wire is open. |
 | `fault` true | Read `alerts` in the status JSON. `clear-alerts` is the recovery after the cause is gone. |
 | Position counts the opposite direction | Change direction in MSP. The firmware cannot reverse an axis. |
