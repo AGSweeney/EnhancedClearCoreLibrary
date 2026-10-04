@@ -67,6 +67,17 @@ void MotionNotePosition(uint16_t seq, uint8_t mask, const float q[4]);
 void MotionNoteVelocity(uint16_t seq, uint8_t mask, const float v[4]);
 void MotionNoteTrack(uint16_t seq, uint8_t mask, const float q[4], const float v[4]);
 
+const char *MotionMoveLinear(uint8_t mask, const float q[4], bool hasFeed, double feedMps, char *buf, uint16_t len);
+const char *MotionMoveArc(bool hasX, float x, bool hasY, float y, float iOff, float jOff, bool clockwise,
+                          bool hasFeed, double feedMps, char *buf, uint16_t len);
+const char *MotionWaitIdle(uint32_t timeoutMs, char *buf, uint16_t len);
+const char *MotionHome(const char *axisName, const char *dir, bool hasSeek, double seek, bool hasBackoff,
+                       double backoff, bool hasTimeout, uint32_t timeoutMs, bool hasZero, bool zeroOn,
+                       char *buf, uint16_t len);
+const char *MotionProbe(const char *axisName, const char *dir, uint8_t pin, bool activeHigh, bool hasSeek,
+                        double seek, bool hasBackoff, double backoff, bool hasTimeout, uint32_t timeoutMs,
+                        bool hasZero, bool zeroOn, char *buf, uint16_t len);
+
 void MotionFillState(CcrosState *out);
 void MotionFillCapabilitiesJson(char *buf, uint16_t len);
 void MotionFillConfigJson(char *buf, uint16_t len);

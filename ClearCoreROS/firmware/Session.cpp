@@ -30,6 +30,30 @@ struct SessionReq {
     char netmask[16];
     bool hasGateway;
     char gateway[16];
+    bool hasI;
+    bool hasJ;
+    float arcI;
+    float arcJ;
+    bool hasCw;
+    bool cw;
+    bool hasAxisName;
+    char axisName[8];
+    bool hasDirName;
+    char dirName[8];
+    bool hasPin;
+    uint8_t pin;
+    bool hasActive;
+    bool activeHigh;
+    bool hasSeek;
+    double seek;
+    bool hasBackoff;
+    double backoff;
+    bool hasTimeout;
+    uint32_t timeoutMs;
+    bool hasZero;
+    bool zeroOn;
+    bool hasFeed;
+    double feedMps;
 };
 
 static bool TokEq(const char *js, const jsmntok_t *t, const char *s) {
@@ -292,6 +316,98 @@ static void ApplyKey(const char *js, const jsmntok_t *toks, int ntok, int keyInd
             req->cfg.hasNegLim[axis] = true;
             req->cfg.negLim[axis] = (uint8_t)d;
         }
+    } else if (TokEq(js, key, "i") || TokEq(js, key, "j")) {
+        double d = 0;
+        if (!ParseDouble(js, val, &d)) {
+            req->error = "arc offset must be a number";
+            return;
+        }
+        if (TokEq(js, key, "i")) {
+            req->hasI = true;
+            req->arcI = (float)d;
+        } else {
+            req->hasJ = true;
+            req->arcJ = (float)d;
+        }
+    } else if (TokEq(js, key, "cw") || TokEq(js, key, "zero")) {
+        bool on = false;
+        if (!ParseBool(js, val, &on)) {
+            req->error = "expected a boolean";
+            return;
+        }
+        if (TokEq(js, key, "cw")) {
+            req->hasCw = true;
+            req->cw = on;
+        } else {
+            req->hasZero = true;
+            req->zeroOn = on;
+        }
+    } else if (TokEq(js, key, "axis") || TokEq(js, key, "dir") || TokEq(js, key, "active")) {
+        if (val->type != JSMN_STRING) {
+            req->error = "expected a string";
+            return;
+        }
+        const int n = val->end - val->start;
+        char *dst = req->axisName;
+        int cap = (int)sizeof(req->axisName);
+        if (TokEq(js, key, "dir")) {
+            dst = req->dirName;
+            cap = (int)sizeof(req->dirName);
+        } else if (TokEq(js, key, "active")) {
+            dst = req->netMode;
+            cap = (int)sizeof(req->netMode);
+        }
+        if (n <= 0 || n >= cap) {
+            req->error = "string too long";
+            return;
+        }
+        memcpy(dst, js + val->start, (size_t)n);
+        dst[n] = '\0';
+        if (TokEq(js, key, "axis")) {
+            req->hasAxisName = true;
+        } else if (TokEq(js, key, "dir")) {
+            req->hasDirName = true;
+        } else if (strcmp(dst, "high") == 0) {
+            req->hasActive = true;
+            req->activeHigh = true;
+        } else if (strcmp(dst, "low") == 0) {
+            req->hasActive = true;
+            req->activeHigh = false;
+        } else {
+            req->error = "active must be high or low";
+            return;
+        }
+    } else if (TokEq(js, key, "pin") || TokEq(js, key, "seek") || TokEq(js, key, "backoff") ||
+               TokEq(js, key, "timeout_ms") || TokEq(js, key, "feed_mps")) {
+        double d = 0;
+        if (!ParseDouble(js, val, &d)) {
+            req->error = "expected a number";
+            return;
+        }
+        if (TokEq(js, key, "pin")) {
+            if (d < 0.0 || d > 255.0) {
+                req->error = "pin must be 1-12";
+                return;
+            }
+            req->hasPin = true;
+            req->pin = (uint8_t)d;
+        } else if (TokEq(js, key, "seek")) {
+            req->hasSeek = true;
+            req->seek = d;
+        } else if (TokEq(js, key, "backoff")) {
+            req->hasBackoff = true;
+            req->backoff = d;
+        } else if (TokEq(js, key, "timeout_ms")) {
+            if (d < 0.0) {
+                req->error = "timeout_ms out of range";
+                return;
+            }
+            req->hasTimeout = true;
+            req->timeoutMs = (uint32_t)d;
+        } else {
+            req->hasFeed = true;
+            req->feedMps = d;
+        }
     } else if (TokEq(js, key, "mode") || TokEq(js, key, "ip_address") ||
                TokEq(js, key, "netmask") || TokEq(js, key, "gateway")) {
         if (val->type != JSMN_STRING) {
@@ -500,6 +616,38 @@ void SessionDispatch(const char *line) {
             if (!err) {
                 snprintf(body, sizeof(body), "{\"ok\":true}");
             }
+        }
+    } else if (strcmp(req.method, "move_linear") == 0) {
+        uint8_t mask = 0;
+        float q[CCROS_AXIS_COUNT] = {0, 0, 0, 0};
+        for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+            if (req.hasJoint[a]) {
+                mask = (uint8_t)(mask | (1u << a));
+                q[a] = req.joint[a];
+            }
+        }
+        err = MotionMoveLinear(mask, q, req.hasFeed, req.feedMps, body, sizeof(body));
+    } else if (strcmp(req.method, "move_arc") == 0) {
+        if (!req.hasI || !req.hasJ) {
+            err = "arc requires i and j";
+        } else {
+            err = MotionMoveArc(req.hasJoint[0], req.joint[0], req.hasJoint[1], req.joint[1], req.arcI,
+                                req.arcJ, req.hasCw && req.cw, req.hasFeed, req.feedMps, body, sizeof(body));
+        }
+    } else if (strcmp(req.method, "wait_idle") == 0) {
+        err = MotionWaitIdle(req.hasTimeout ? req.timeoutMs : 60000u, body, sizeof(body));
+    } else if (strcmp(req.method, "home") == 0) {
+        err = MotionHome(req.hasAxisName ? req.axisName : nullptr, req.hasDirName ? req.dirName : nullptr,
+                         req.hasSeek, req.seek, req.hasBackoff, req.backoff, req.hasTimeout, req.timeoutMs,
+                         req.hasZero, req.zeroOn, body, sizeof(body));
+    } else if (strcmp(req.method, "probe") == 0) {
+        if (!req.hasPin) {
+            err = "pin required";
+        } else {
+            err = MotionProbe(req.hasAxisName ? req.axisName : nullptr, req.hasDirName ? req.dirName : nullptr,
+                              req.pin, req.hasActive ? req.activeHigh : true, req.hasSeek, req.seek,
+                              req.hasBackoff, req.backoff, req.hasTimeout, req.timeoutMs, req.hasZero,
+                              req.zeroOn, body, sizeof(body));
         }
     } else {
         ReplyErr(reply, sizeof(reply), &req, -32601, "method not found");

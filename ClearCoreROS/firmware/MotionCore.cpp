@@ -18,6 +18,7 @@
 #include "NvmManager.h"
 #include "SysTiming.h"
 
+#include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -43,6 +44,9 @@ static uint8_t g_posLimDi[CCROS_AXIS_COUNT];
 static uint8_t g_negLimDi[CCROS_AXIS_COUNT];
 static char g_limitErr[40];
 static char g_travelLimit[48];
+static CoordinatedMotionController g_xy;
+static bool g_xyReady = false;
+static bool g_seekActive = false;
 static bool g_enabled = false;
 static bool g_interrupted = false;
 static bool g_watchdogTripped = false;
@@ -157,6 +161,12 @@ static void ApplyMechanics() {
         }
     }
     ApplyDynamics();
+    if (g_xyReady) {
+        g_xy.SetMechanicalParamsX(g_stepsPerRev[CCROS_AXIS_X], g_pitchMm[CCROS_AXIS_X], UNIT_MM, 1.0);
+        g_xy.SetMechanicalParamsY(g_stepsPerRev[CCROS_AXIS_Y], g_pitchMm[CCROS_AXIS_Y], UNIT_MM, 1.0);
+        g_xy.ArcVelMax(g_vel);
+        g_xy.ArcAccelMax(g_accel);
+    }
 }
 
 /* User-page blob. Magic differs from ClearAI ('CAIC') so that blob is not applied.
@@ -458,7 +468,14 @@ static bool ParseIpOctets(const char *str, uint8_t out[4]) {
 
 static bool StepsActive(MotorDriver *m);
 
+static bool PlannerBusy() {
+    return g_xyReady && (g_xy.IsActive() || g_xy.MotionQueueCount() != 0);
+}
+
 static void StopDecelAll() {
+    if (g_xyReady) {
+        g_xy.StopDecel();
+    }
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
         MotorDriver *m = MotorFor(a);
         if (m) {
@@ -491,6 +508,9 @@ static bool LimitMaxEn(uint8_t axis) {
 }
 
 static void HaltAxis(uint8_t axis) {
+    if (g_xyReady && (axis == CCROS_AXIS_X || axis == CCROS_AXIS_Y)) {
+        g_xy.StopDecel();
+    }
     MotorDriver *m = MotorFor(axis);
     if (m) {
         m->MoveStopDecel(g_decel);
@@ -605,6 +625,9 @@ static const char *RejectVelocity(uint8_t axis, float vel) {
 /* Stop this axis when its generated position has crossed a soft limit in the
  * direction of travel, or a hardware switch is active in that direction. */
 static bool PollTravel(uint8_t axis) {
+    if (g_seekActive) {
+        return false;
+    }
     MotorDriver *m = MotorFor(axis);
     if (!m) {
         return false;
@@ -644,6 +667,9 @@ static bool PollTravel(uint8_t axis) {
 }
 
 static void AbruptDisable() {
+    if (g_xyReady) {
+        g_xy.Stop();
+    }
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
         MotorDriver *m = MotorFor(a);
         if (!m) {
@@ -709,6 +735,9 @@ static bool AxisFaulted(uint8_t axis) {
 }
 
 static bool AnyMoving() {
+    if (PlannerBusy()) {
+        return true;
+    }
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
         if (AxisOn(a) && StepsActive(MotorFor(a))) {
             return true;
@@ -1021,6 +1050,11 @@ bool MotionInit() {
     ConnectorM3.EnableRequest(false);
     ConfigLoad();
     ApplyHwLimitInputs();
+    if (!g_xy.Initialize(&ConnectorM0, &ConnectorM1)) {
+        return false;
+    }
+    g_xy.StopAtQueueEnd(true);
+    g_xyReady = true;
     ApplyMechanics();
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
         MotorDriver *m = MotorFor(a);
@@ -1028,6 +1062,7 @@ bool MotionInit() {
             m->PositionRefSet(0);
         }
     }
+    g_xy.SetPosition(0, 0);
     return true;
 }
 
@@ -1054,6 +1089,9 @@ void MotionPoll() {
             continue;
         }
         if (PollTravel(a)) {
+            continue;
+        }
+        if (PlannerBusy() && (a == CCROS_AXIS_X || a == CCROS_AXIS_Y)) {
             continue;
         }
         if (g_axisTrack[a]) {
@@ -1427,6 +1465,503 @@ void MotionStreamLost() {
         ClearGoals();
         g_watchdogTripped = true;
     }
+}
+
+static const char *GateMotion() {
+    if (g_interrupted) {
+        return "estop active";
+    }
+    if (g_watchdogTripped) {
+        return "watchdog tripped; call clear_alerts";
+    }
+    if (!g_enabled) {
+        return "motor not enabled";
+    }
+    return nullptr;
+}
+
+static void ReleaseAxis(uint8_t axis) {
+    g_goalValid[axis] = false;
+    g_absIssued[axis] = false;
+    g_absRetried[axis] = false;
+    g_axisVelMode[axis] = false;
+    g_axisTrack[axis] = false;
+    g_trackDirty[axis] = false;
+    g_velGoal[axis] = 0.f;
+    g_velLatched[axis] = false;
+    g_velCmd[axis] = 0;
+}
+
+static bool AxisFromName(const char *name, uint8_t *axis) {
+    if (!name || name[0] == '\0' || name[1] != '\0') {
+        return false;
+    }
+    if (name[0] == 'x') *axis = CCROS_AXIS_X;
+    else if (name[0] == 'y') *axis = CCROS_AXIS_Y;
+    else if (name[0] == 'z') *axis = CCROS_AXIS_Z;
+    else if (name[0] == 'a') *axis = CCROS_AXIS_A;
+    else return false;
+    return true;
+}
+
+static void ApplyFeed(uint8_t mask, bool hasFeed, double feedMps) {
+    if (g_xyReady) {
+        g_xy.ArcAccelMax(g_accel);
+    }
+    if (!hasFeed || !(feedMps > 0.0)) {
+        if (g_xyReady) {
+            g_xy.ArcVelMax(g_vel);
+        }
+        return;
+    }
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        if ((mask & (1u << a)) == 0) {
+            continue;
+        }
+        MotorDriver *m = MotorFor(a);
+        const double spu = StepsPerUnit(a);
+        if (!m || spu <= 0.0) {
+            continue;
+        }
+        double sps = feedMps * spu;
+        if (sps > (double)g_vel) {
+            sps = (double)g_vel;
+        }
+        if (sps < 1.0) {
+            sps = 1.0;
+        }
+        m->VelMax((uint32_t)sps);
+    }
+    if (g_xyReady && (mask & 0x3u) != 0) {
+        g_xy.FeedRateMMPerMin(feedMps * 60000.0);
+        const double spu = StepsPerUnit(CCROS_AXIS_X);
+        double sps = (spu > 0.0) ? feedMps * spu : (double)g_vel;
+        if (sps > (double)g_vel) {
+            sps = (double)g_vel;
+        }
+        if (sps < 1.0) {
+            sps = 1.0;
+        }
+        g_xy.ArcVelMax((uint32_t)sps);
+    }
+}
+
+static const char *MoveAxisAbs(uint8_t axis, int32_t steps) {
+    MotorDriver *m = MotorFor(axis);
+    if (!m) {
+        return "axis missing";
+    }
+    ReleaseAxis(axis);
+    if (!m->Move(steps, StepGenerator::MOVE_TARGET_ABSOLUTE)) {
+        return "move rejected";
+    }
+    return nullptr;
+}
+
+static const char *IssueXyOrIndependent(int32_t tx, int32_t ty, bool hasX, bool hasY) {
+    if (hasX && hasY && AxisOn(CCROS_AXIS_X) && AxisOn(CCROS_AXIS_Y) && g_xyReady) {
+        ReleaseAxis(CCROS_AXIS_X);
+        ReleaseAxis(CCROS_AXIS_Y);
+        g_xy.SetPosition(ConnectorM0.PositionRefCommanded(), ConnectorM1.PositionRefCommanded());
+        if (!g_xy.QueueLinear(tx, ty)) {
+            return "xy queue rejected";
+        }
+        return nullptr;
+    }
+    if (hasX && AxisOn(CCROS_AXIS_X)) {
+        const char *err = MoveAxisAbs(CCROS_AXIS_X, tx);
+        if (err) {
+            return err;
+        }
+    }
+    if (hasY && AxisOn(CCROS_AXIS_Y)) {
+        const char *err = MoveAxisAbs(CCROS_AXIS_Y, ty);
+        if (err) {
+            return err;
+        }
+    }
+    return nullptr;
+}
+
+static const char *WaitIdleMs(uint32_t timeoutMs) {
+    const uint32_t start = Milliseconds();
+    uint32_t idleSince = 0;
+    for (;;) {
+        /* The host is blocked inside this call, so the silence timer stays armed. */
+        g_lastHostMs = Milliseconds();
+        MotionPoll();
+        if (g_interrupted) {
+            return "estop active";
+        }
+        if (!AnyMoving()) {
+            if (idleSince == 0) {
+                idleSince = Milliseconds();
+            }
+            if ((Milliseconds() - idleSince) >= 20u) {
+                return nullptr;
+            }
+        } else {
+            idleSince = 0;
+        }
+        if (timeoutMs != 0 && (Milliseconds() - start) >= timeoutMs) {
+            return "wait_idle timeout";
+        }
+        Delay_ms(1);
+    }
+}
+
+const char *MotionMoveLinear(uint8_t mask, const float q[4], bool hasFeed, double feedMps, char *buf, uint16_t len) {
+    const char *err = GateMotion();
+    if (err) {
+        return err;
+    }
+    const uint8_t use = (uint8_t)(mask & (uint8_t)g_axisMask);
+    if (use == 0) {
+        return "no joints in axis_mask";
+    }
+    int32_t target[CCROS_AXIS_COUNT];
+    int32_t start[CCROS_AXIS_COUNT];
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        MotorDriver *m = MotorFor(a);
+        start[a] = m ? m->PositionRefCommanded() : 0;
+        target[a] = start[a];
+        if ((use & (1u << a)) == 0) {
+            continue;
+        }
+        const double spu = StepsPerUnit(a);
+        if (spu <= 0.0) {
+            return "axis is not configured";
+        }
+        target[a] = RoundToI32((double)q[a] * spu);
+        err = RejectSteps(a, target[a]);
+        if (err) {
+            return err;
+        }
+    }
+    ApplyFeed(use, hasFeed, feedMps);
+    err = IssueXyOrIndependent(target[CCROS_AXIS_X], target[CCROS_AXIS_Y],
+                              (use & 0x1u) != 0, (use & 0x2u) != 0);
+    if (err) {
+        return err;
+    }
+    if ((use & 0x4u) != 0) {
+        err = MoveAxisAbs(CCROS_AXIS_Z, target[CCROS_AXIS_Z]);
+        if (err) {
+            return err;
+        }
+    }
+    if ((use & 0x8u) != 0) {
+        err = MoveAxisAbs(CCROS_AXIS_A, target[CCROS_AXIS_A]);
+        if (err) {
+            return err;
+        }
+    }
+    double seconds = 0.0;
+    const double speed = (hasFeed && feedMps > 0.0) ? feedMps : 0.0;
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        if ((use & (1u << a)) == 0) {
+            continue;
+        }
+        const double spu = StepsPerUnit(a);
+        if (spu <= 0.0) {
+            continue;
+        }
+        const double dist = fabs((double)(target[a] - start[a]) / spu);
+        const double sps = (speed > 0.0) ? speed : ((double)g_vel / spu);
+        if (sps > 0.0 && dist / sps > seconds) {
+            seconds = dist / sps;
+        }
+    }
+    snprintf(buf, len, "{\"ok\":true,\"coordinated\":%s,\"est_ms\":%lu}",
+             ((use & 0x3u) == 0x3u && g_xyReady) ? "true" : "false",
+             (unsigned long)(seconds * 1000.0));
+    return nullptr;
+}
+
+const char *MotionMoveArc(bool hasX, float x, bool hasY, float y, float iOff, float jOff, bool clockwise,
+                          bool hasFeed, double feedMps, char *buf, uint16_t len) {
+    const char *err = GateMotion();
+    if (err) {
+        return err;
+    }
+    if (!AxisOn(CCROS_AXIS_X) || !AxisOn(CCROS_AXIS_Y) || !g_xyReady) {
+        return "arc requires x and y";
+    }
+    if (!hasX && !hasY) {
+        return "arc requires x or y";
+    }
+    const double spuX = StepsPerUnit(CCROS_AXIS_X);
+    const double spuY = StepsPerUnit(CCROS_AXIS_Y);
+    if (spuX <= 0.0 || spuY <= 0.0) {
+        return "axis is not configured";
+    }
+    const int32_t sx = ConnectorM0.PositionRefCommanded();
+    const int32_t sy = ConnectorM1.PositionRefCommanded();
+    const int32_t ex = hasX ? RoundToI32((double)x * spuX) : sx;
+    const int32_t ey = hasY ? RoundToI32((double)y * spuY) : sy;
+    err = RejectSteps(CCROS_AXIS_X, ex);
+    if (err) {
+        return err;
+    }
+    err = RejectSteps(CCROS_AXIS_Y, ey);
+    if (err) {
+        return err;
+    }
+    const int32_t cx = sx + RoundToI32((double)iOff * spuX);
+    const int32_t cy = sy + RoundToI32((double)jOff * spuY);
+    const double dx = (double)sx - (double)cx;
+    const double dy = (double)sy - (double)cy;
+    const double radius = sqrt(dx * dx + dy * dy);
+    if (radius < 1.0) {
+        return "arc radius too small";
+    }
+    const double startAngle = atan2(dy, dx);
+    const double endAngle = atan2((double)ey - (double)cy, (double)ex - (double)cx);
+    ApplyFeed(0x3u, hasFeed, feedMps);
+    ReleaseAxis(CCROS_AXIS_X);
+    ReleaseAxis(CCROS_AXIS_Y);
+    g_xy.SetPosition(sx, sy);
+    if (!g_xy.QueueArc(cx, cy, RoundToI32(radius), startAngle, endAngle, clockwise)) {
+        return "arc queue rejected";
+    }
+    double swept = endAngle - startAngle;
+    const double twoPi = 2.0 * 3.14159265358979323846;
+    if (swept < 0.0) {
+        swept += twoPi;
+    }
+    swept = clockwise ? (twoPi - swept) : swept;
+    if (swept < 1.0e-6) {
+        swept = twoPi;
+    }
+    const double meters = (radius / spuX) * swept;
+    const double speed = (hasFeed && feedMps > 0.0) ? feedMps : ((double)g_vel / spuX);
+    const unsigned long est = (speed > 0.0) ? (unsigned long)(meters / speed * 1000.0) : 0ul;
+    snprintf(buf, len, "{\"ok\":true,\"coordinated\":true,\"est_ms\":%lu}", est);
+    return nullptr;
+}
+
+const char *MotionWaitIdle(uint32_t timeoutMs, char *buf, uint16_t len) {
+    const uint32_t start = Milliseconds();
+    const char *err = WaitIdleMs(timeoutMs == 0 ? 60000u : timeoutMs);
+    if (err) {
+        return err;
+    }
+    snprintf(buf, len, "{\"ok\":true,\"elapsed_ms\":%lu}",
+             (unsigned long)(Milliseconds() - start));
+    return nullptr;
+}
+
+static bool SwitchIsHigh(uint8_t pin) {
+    Connector *input = LimitConnector(pin);
+    return input && input->State() != 0;
+}
+
+static const char *SeekAxis(uint8_t axis, bool positive, int32_t seekSteps) {
+    if (seekSteps <= 0) {
+        return "seek invalid";
+    }
+    MotorDriver *m = MotorFor(axis);
+    if (!m) {
+        return "axis missing";
+    }
+    const int32_t cur = m->PositionRefCommanded();
+    const int32_t far = cur + (positive ? seekSteps : -seekSteps);
+    if ((axis == CCROS_AXIS_X || axis == CCROS_AXIS_Y) && AxisOn(CCROS_AXIS_X) && AxisOn(CCROS_AXIS_Y)) {
+        const int32_t tx = (axis == CCROS_AXIS_X) ? far : ConnectorM0.PositionRefCommanded();
+        const int32_t ty = (axis == CCROS_AXIS_Y) ? far : ConnectorM1.PositionRefCommanded();
+        return IssueXyOrIndependent(tx, ty, true, true);
+    }
+    return MoveAxisAbs(axis, far);
+}
+
+static int SeekUntil(uint8_t axis, bool positive, bool useLimit, uint8_t pin, bool activeHigh, uint32_t timeoutMs) {
+    const uint32_t start = Milliseconds();
+    for (;;) {
+        g_lastHostMs = Milliseconds();
+        MotionPoll();
+        if (g_interrupted) {
+            return -1;
+        }
+        bool tripped = false;
+        if (useLimit) {
+            tripped = SwitchIsHigh(positive ? g_posLimDi[axis] : g_negLimDi[axis]);
+        } else {
+            const bool high = SwitchIsHigh(pin);
+            tripped = activeHigh ? high : !high;
+        }
+        if (tripped) {
+            StopDecelAll();
+            const uint32_t stopStart = Milliseconds();
+            while (AnyMoving() && (Milliseconds() - stopStart) < 5000u) {
+                MotionPoll();
+                Delay_ms(1);
+            }
+            return 0;
+        }
+        if (!AnyMoving()) {
+            if ((Milliseconds() - start) < 30u) {
+                Delay_ms(1);
+                continue;
+            }
+            return 1;
+        }
+        if (timeoutMs != 0 && (Milliseconds() - start) >= timeoutMs) {
+            StopDecelAll();
+            return -2;
+        }
+        Delay_ms(1);
+    }
+}
+
+static void ZeroAxis(uint8_t axis) {
+    MotorDriver *m = MotorFor(axis);
+    if (m) {
+        m->PositionRefSet(0);
+    }
+    if (g_xyReady) {
+        g_xy.SetPosition(ConnectorM0.PositionRefCommanded(), ConnectorM1.PositionRefCommanded());
+    }
+}
+
+static const char *RunSeek(uint8_t axis, bool positive, bool useLimit, uint8_t pin, bool activeHigh,
+                           bool hasSeek, double seek, bool hasBackoff, double backoff,
+                           bool hasTimeout, uint32_t timeoutMs, bool zero, char *buf, uint16_t len,
+                           bool homing) {
+    const double spu = StepsPerUnit(axis);
+    if (spu <= 0.0) {
+        return "axis is not configured";
+    }
+    const double seekUnits = hasSeek ? seek : 1.0;
+    if (!(seekUnits > 0.0)) {
+        return "seek invalid";
+    }
+    const int32_t seekSteps = RoundToI32(seekUnits * spu);
+    ApplyFeed(1u << axis, false, 0.0);
+    g_seekActive = true;
+    const char *err = SeekAxis(axis, positive, seekSteps);
+    if (err) {
+        g_seekActive = false;
+        return err;
+    }
+    const uint32_t timeout = hasTimeout ? timeoutMs : 30000u;
+    const int rc = SeekUntil(axis, positive, useLimit, pin, activeHigh, timeout);
+    if (rc != 0) {
+        g_seekActive = false;
+        if (rc == -1) {
+            return homing ? "estop during home" : "estop during probe";
+        }
+        if (rc == -2) {
+            return homing ? "home timeout" : "probe timeout";
+        }
+        return homing ? "limit not reached" : "probe not reached";
+    }
+    const double backUnits = hasBackoff ? backoff : 0.0;
+    if (backUnits > 0.0) {
+        const int32_t backSteps = RoundToI32(backUnits * spu);
+        err = SeekAxis(axis, !positive, backSteps);
+        if (err) {
+            g_seekActive = false;
+            return err;
+        }
+        err = WaitIdleMs(5000u);
+        if (err) {
+            g_seekActive = false;
+            return err;
+        }
+    }
+    g_seekActive = false;
+    if (zero) {
+        ZeroAxis(axis);
+    }
+    MotorDriver *m = MotorFor(axis);
+    const double pos = (m && spu > 0.0) ? ((double)m->PositionRefCommanded() / spu) : 0.0;
+    if (homing) {
+        const uint8_t lim = positive ? g_posLimDi[axis] : g_negLimDi[axis];
+        snprintf(buf, len, "{\"homed\":true,\"axis\":\"%s\",\"dir\":\"%s\",\"pos\":%.6f,\"limit_pin\":%u}",
+                 AxisName(axis), positive ? "pos" : "neg", pos, (unsigned)lim);
+    } else {
+        snprintf(buf, len, "{\"probed\":true,\"axis\":\"%s\",\"dir\":\"%s\",\"pos\":%.6f,\"pin\":%u}",
+                 AxisName(axis), positive ? "pos" : "neg", pos, (unsigned)pin);
+    }
+    return nullptr;
+}
+
+const char *MotionHome(const char *axisName, const char *dir, bool hasSeek, double seek, bool hasBackoff,
+                       double backoff, bool hasTimeout, uint32_t timeoutMs, bool hasZero, bool zeroOn,
+                       char *buf, uint16_t len) {
+    const char *err = GateMotion();
+    if (err) {
+        return err;
+    }
+    uint8_t axis = 0;
+    if (!AxisFromName(axisName, &axis)) {
+        return "axis must be x, y, z, or a";
+    }
+    if (!AxisOn(axis)) {
+        return "axis not in axis_mask";
+    }
+    bool positive = false;
+    if (dir && strcmp(dir, "pos") == 0) {
+        positive = true;
+    } else if (dir && strcmp(dir, "neg") == 0) {
+        positive = false;
+    } else {
+        return "dir must be pos or neg";
+    }
+    const uint8_t lim = positive ? g_posLimDi[axis] : g_negLimDi[axis];
+    if (lim == 0) {
+        return "limit not configured for this axis/dir";
+    }
+    if (SwitchIsHigh(lim)) {
+        return "limit already active; back off first";
+    }
+    const bool zero = hasZero ? zeroOn : true;
+    return RunSeek(axis, positive, true, 0, true, hasSeek, seek, hasBackoff, backoff, hasTimeout, timeoutMs,
+                   zero, buf, len, true);
+}
+
+const char *MotionProbe(const char *axisName, const char *dir, uint8_t pin, bool activeHigh, bool hasSeek,
+                        double seek, bool hasBackoff, double backoff, bool hasTimeout, uint32_t timeoutMs,
+                        bool hasZero, bool zeroOn, char *buf, uint16_t len) {
+    const char *err = GateMotion();
+    if (err) {
+        return err;
+    }
+    uint8_t axis = 0;
+    if (!AxisFromName(axisName, &axis)) {
+        return "axis must be x, y, z, or a";
+    }
+    if (!AxisOn(axis)) {
+        return "axis not in axis_mask";
+    }
+    bool positive = false;
+    if (dir && strcmp(dir, "pos") == 0) {
+        positive = true;
+    } else if (dir && strcmp(dir, "neg") == 0) {
+        positive = false;
+    } else {
+        return "dir must be pos or neg";
+    }
+    if (pin == 0 || pin > 12) {
+        return "pin must be 1-12";
+    }
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        if (g_posLimDi[a] == pin || g_negLimDi[a] == pin) {
+            return "pin reserved for limit";
+        }
+    }
+    Connector *probe = LimitConnector(pin);
+    if (!probe) {
+        return "pin missing";
+    }
+    probe->Mode(Connector::INPUT_DIGITAL);
+    const bool already = activeHigh ? (probe->State() != 0) : (probe->State() == 0);
+    if (already) {
+        return "probe already active";
+    }
+    const bool zero = hasZero ? zeroOn : false;
+    return RunSeek(axis, positive, false, pin, activeHigh, hasSeek, seek, hasBackoff, backoff, hasTimeout,
+                   timeoutMs, zero, buf, len, false);
 }
 
 const char *MotionSetJoints(uint8_t mask, const float q[4]) {

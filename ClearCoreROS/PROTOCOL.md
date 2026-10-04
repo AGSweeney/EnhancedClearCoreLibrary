@@ -72,6 +72,11 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 | `clear_alerts` | — | `ClearAlerts()` and the only call that clears a watchdog latch. Estop stays if DI-6 is still faulted. |
 | `keepalive` | — | refreshes the host timer. A tripped watchdog stays tripped. |
 | `set_joints` | `x`,`y`,`z`,`a` in meters / radians | absolute goal for the named joints |
+| `move_linear` | absolute `x`,`y`,`z`,`a`, optional `feed_mps` | straight line; XY are coordinated when both are enabled |
+| `move_arc` | end `x`,`y`, center offset `i`,`j`, optional `cw`, `feed_mps` | XY arc. Requires both axes |
+| `wait_idle` | optional `timeout_ms` | blocks until motion is still |
+| `home` | `axis`, `dir`, optional `seek`, `backoff`, `timeout_ms`, `zero` | seek that axis's limit switch |
+| `probe` | `axis`, `dir`, `pin`, optional `active`, `seek`, `backoff`, `zero` | seek until the probe input trips |
 
 `configure` fields:
 
@@ -186,7 +191,14 @@ A bad magic byte is skipped. A known type with the wrong length is skipped. The 
 
 The watchdog trips only while a goal is unfinished or a velocity command is nonzero and the host has been silent for `watchdog_ms`. Reaching the target and then going quiet does not trip. A stream disconnect mid-move trips immediately. `keepalive` does not clear the latch, and hosts must not do it automatically. `clear_alerts` is the recovery; until then position and velocity commands are ignored. The hardware plugin also latches the trip and refuses further writes until the controller activates again, which calls `clear_alerts` before `enable`.
 
+## Coordinated XY, homing, and probing
+
+`move_linear` takes absolute `x`,`y`,`z`,`a` in meters and radians. When both X and Y are in `axis_mask` and enabled, those two axes run on the coordinated planner so the path is one straight line. Otherwise each named axis moves independently. Z and A are always independent. Optional `feed_mps` is the path speed; omitted, the move uses `vel_steps`. `move_arc` is XY only: `x` and `y` are the end point, `i` and `j` are the center offset from the start in meters, and `cw` selects direction. It requires both X and Y. Both calls return `est_ms` and do not wait. `wait_idle` blocks until motion has been still for 20 ms, or until `timeout_ms` (default 60000).
+
+`home` seeks the limit switch configured for `axis` (`x`,`y`,`z`,`a`) and `dir` (`pos` or `neg`). `seek` and `backoff` are in that joint's units (meters or radians). Defaults are a 1 m / 1 rad seek, no backoff, and a 30 s timeout. `zero` defaults to true and sets that joint's generated position to 0 after the seek. The seek ignores soft limits. It still reads the switch when test mode is on.
+
+`probe` seeks until digital input `pin` (1..12) reads `active` (`high` by default, or `low`). The pin cannot be one already assigned as a limit. `zero` defaults to false. A hit stops that axis. Hardware estop aborts the seek. The call blocks, so a following `stop` is not read until it returns.
+
 ## Not in this scaffold
 
-- Homing, probing, arcs, and the XY coordinated planner. Joints move independently.
 - micro-ROS / XRCE-DDS. The joint mapping above is what a future XRCE transport would publish.
