@@ -49,7 +49,7 @@ Zero is the pose at boot, or the pose after `home` with `zero` true. `0.01` m is
 
 ## Firmware
 
-The first-motor image is [releases/ClearCoreROS-0.1.2.bin](releases/ClearCoreROS-0.1.2.bin). Flash instructions and the tested-revision list are in [releases/README.md](releases/README.md) and [docs/FIRST_MOTOR.md](docs/FIRST_MOTOR.md). `0.1.1` is the previous image with the joint map. `0.1.0` has no joint map.
+The first-motor image is [releases/ClearCoreROS-0.1.3.bin](releases/ClearCoreROS-0.1.3.bin). Flash instructions and the tested-revision list are in [releases/README.md](releases/README.md) and [docs/FIRST_MOTOR.md](docs/FIRST_MOTOR.md). `0.1.2` withholds XRCE until TIMESTAMP_REPLY but still puts HLFB in `JointState.effort`. `0.1.1` is the joint-map image. `0.1.0` has no joint map.
 
 To build instead of using that file, open `firmware/ClearCoreROS.atsln` in Microchip Studio 7 and flash with `Tools/flash_clearcore.cmd`. Command-line build from the Debug directory, same toolchain as ClearAI:
 
@@ -109,7 +109,7 @@ python host\ccros_cli.py --host 172.16.82.114 --timeout 20 call wait_idle --para
 
 `move_arc` requires both X and Y, both linear, with the same gear. `i` and `j` are the center offset from the start, in joint units. Two independent joint moves are not that arc. `feed_mps` is joint units per second along the path. `est_ms` is the longer axis component at that feed, not the path duration.
 
-`configure` also takes `--name-x`, `--rotary-x`, `--direction-x`, `--gear-x`, and `--offset-x`, and the same suffixes for `y`, `z`, and `a`. The bridge reads `names` from `get_config`. Release `0.1.1` and `0.1.2` have these fields. Release `0.1.0` does not.
+`configure` also takes `--name-x`, `--rotary-x`, `--direction-x`, `--gear-x`, and `--offset-x`, and the same suffixes for `y`, `z`, and `a`. The bridge reads `names` from `get_config`. Release `0.1.1` and later have these fields. Release `0.1.0` does not.
 
 On the bench, flashing the joint-map image kept the saved static address `172.16.82.114` and the stored limits from the version 2 blob. With the motors disabled, M0 was set to the name `shoulder`, direction `-1`, gear `2`, and offset `0.01` m. Status reported `0.010` m at zero steps. After enable, a move to `0.012` m and back to `0.010` m matched those positions. The map was then restored to `joint_x` through `joint_a`, direction `+1`, gear `1`, and offset `0`, and status reported `0`.
 
