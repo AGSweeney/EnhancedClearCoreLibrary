@@ -193,99 +193,103 @@ def main():
     saved = None
     mutated = False
     test_error = None
-    try:
-        saved = session.call("get_config")
-        show(
-            "saved",
-            {key: saved[key] for key in ("axis_mask", "test_mode", "names", "limit_flags", "ip_address")},
-        )
-        problems = map_problems(saved)
-        if problems:
-            print_map_help(host, problems)
-            test_error = "joint map is not the default linear map"
-        else:
-            session.call("disable")
-            mutated = True
-            session.call("set_test_mode", {"on": False})
-            session.call("clear_alerts")
-            show(
-                "configure M0",
-                session.call(
-                    "configure",
-                    {
-                        "axis_mask": 1,
-                        "steps_per_rev": 800,
-                        "pitch_mm": 5,
-                        "min_x": 0,
-                        "max_x": 0.02,
-                    },
-                ),
-            )
-            show("enable", session.call("enable"))
-            show("move to 10 mm", session.call("set_joints", {"x": 0.01}))
-            at_10 = wait_x(session, 0.01)
-            show("status at 10 mm", at_10)
-            show("return to 0", session.call("set_joints", {"x": 0.0}))
-            at_0 = wait_x(session, 0.0)
-            show("status home", at_0)
-
-            stream = StreamClient(host, 9201, 3.0)
-            seen = None
-            try:
-                stream.send_position(0x01, (0.005, 0.0, 0.0, 0.0))
-                deadline = time.time() + 8.0
-                while time.time() < deadline:
-                    stream.send_heartbeat()
-                    for frame in stream.read(0.2):
-                        if frame["type"] != "state":
-                            continue
-                        seen = frame
-                        print(
-                            "  stream x=%.4f moving=%s enabled=%s"
-                            % (frame["position"][0], frame["moving"], frame["enabled"])
-                        )
-                    if seen and abs(seen["position"][0] - 0.005) <= 0.0005 and not seen["moving"]:
-                        break
-                stream.send_position(0x01, (0.0, 0.0, 0.0, 0.0))
-                deadline = time.time() + 8.0
-                while time.time() < deadline:
-                    stream.send_heartbeat()
-                    for frame in stream.read(0.2):
-                        if frame["type"] == "state":
-                            seen = frame
-                    if seen and abs(seen["position"][0]) <= 0.0005 and not seen["moving"]:
-                        break
-                print("== stream returned x=%.5f" % (seen["position"][0] if seen else 999))
-            finally:
-                stream.close()
-
-            session.call("disable")
-            final = session.call("get_status")
-            show("final", final)
-            if not motion_ok(at_10, at_0, seen, final):
-                test_error = "motion did not match 10 mm"
-                print("==", test_error)
-    except Exception as exc:
-        test_error = str(exc)
-        print("== test failed:", exc)
     restore_error = None
-    if mutated and saved is not None:
+    try:
         try:
-            restored, status = restore(session, saved)
-            print(
-                "== restored mask=%s test=%s enabled=%s flags=%s pos=%s"
-                % (
-                    restored["axis_mask"],
-                    restored["test_mode"],
-                    status["enabled"],
-                    restored["limit_flags"],
-                    ["%.4f" % p for p in status["position"]],
-                )
+            saved = session.call("get_config")
+            show(
+                "saved",
+                {key: saved[key] for key in ("axis_mask", "test_mode", "names", "limit_flags", "ip_address")},
             )
+            problems = map_problems(saved)
+            if problems:
+                print_map_help(host, problems)
+                test_error = "joint map is not the default linear map"
+            else:
+                session.call("disable")
+                mutated = True
+                session.call("set_test_mode", {"on": False})
+                session.call("clear_alerts")
+                show(
+                    "configure M0",
+                    session.call(
+                        "configure",
+                        {
+                            "axis_mask": 1,
+                            "steps_per_rev": 800,
+                            "pitch_mm": 5,
+                            "min_x": 0,
+                            "max_x": 0.02,
+                        },
+                    ),
+                )
+                show("enable", session.call("enable"))
+                show("move to 10 mm", session.call("set_joints", {"x": 0.01}))
+                at_10 = wait_x(session, 0.01)
+                show("status at 10 mm", at_10)
+                show("return to 0", session.call("set_joints", {"x": 0.0}))
+                at_0 = wait_x(session, 0.0)
+                show("status home", at_0)
+
+                stream = StreamClient(host, 9201, 3.0)
+                seen = None
+                try:
+                    stream.send_position(0x01, (0.005, 0.0, 0.0, 0.0))
+                    deadline = time.time() + 8.0
+                    while time.time() < deadline:
+                        stream.send_heartbeat()
+                        for frame in stream.read(0.2):
+                            if frame["type"] != "state":
+                                continue
+                            seen = frame
+                            print(
+                                "  stream x=%.4f moving=%s enabled=%s"
+                                % (frame["position"][0], frame["moving"], frame["enabled"])
+                            )
+                        if seen and abs(seen["position"][0] - 0.005) <= 0.0005 and not seen["moving"]:
+                            break
+                    stream.send_position(0x01, (0.0, 0.0, 0.0, 0.0))
+                    deadline = time.time() + 8.0
+                    while time.time() < deadline:
+                        stream.send_heartbeat()
+                        for frame in stream.read(0.2):
+                            if frame["type"] == "state":
+                                seen = frame
+                        if seen and abs(seen["position"][0]) <= 0.0005 and not seen["moving"]:
+                            break
+                    print("== stream returned x=%.5f" % (seen["position"][0] if seen else 999))
+                finally:
+                    stream.close()
+
+                session.call("disable")
+                final = session.call("get_status")
+                show("final", final)
+                if not motion_ok(at_10, at_0, seen, final):
+                    test_error = "motion did not match 10 mm"
+                    print("==", test_error)
         except Exception as exc:
-            restore_error = str(exc)
-            print("== restore failed:", exc)
-    session.close()
+            test_error = str(exc)
+            print("== test failed:", exc)
+    finally:
+        try:
+            if mutated and saved is not None:
+                try:
+                    restored, status = restore(session, saved)
+                    print(
+                        "== restored mask=%s test=%s enabled=%s flags=%s pos=%s"
+                        % (
+                            restored["axis_mask"],
+                            restored["test_mode"],
+                            status["enabled"],
+                            restored["limit_flags"],
+                            ["%.4f" % p for p in status["position"]],
+                        )
+                    )
+                except Exception as exc:
+                    restore_error = str(exc)
+                    print("== restore failed:", exc)
+        finally:
+            session.close()
     if test_error or restore_error:
         raise SystemExit(1)
     print("M0_OK")
