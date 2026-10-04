@@ -106,7 +106,7 @@ Timed tracking compares generated position with `q_latched + v_latched * (time_m
 
 ## XRCE-DDS
 
-`xrce-connect` publishes `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The board binds UDP 9203 and sends to the agent. The stamp is time since boot. Commands stay on the session and the binary stream.
+`xrce-connect` publishes `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The board binds UDP 9203 and sends to the agent. X, Y, and Z are meters. A is radians. The stamp is time since boot. The body has no CDR encapsulation; Fast DDS adds it. Commands stay on the session and the binary stream.
 
 ```powershell
 python host\xrce_check.py 9204
@@ -114,7 +114,9 @@ python host\ccros_cli.py --host 172.16.82.114 xrce-connect --ip 172.16.82.199 --
 python host\ccros_cli.py --host 172.16.82.114 xrce-disconnect
 ```
 
-`xrce_check.py` answers the XRCE session and prints the joint sample. A micro-ROS agent on port 8888 is what places that topic on a ROS graph. `get_status` reports `xrce` as `off`, `connecting`, `creating`, or `streaming`. The agent address is not stored in NVM.
+`xrce_check.py` answers the XRCE session and prints the joint sample. It is not a DDS bridge. A micro-ROS agent places `/joint_states` on the ROS graph from the node `clearcore_ros`. The login header uses session id `0x80`, and the client queues the agent's reply datagrams. `get_status` reports `xrce` as `off`, `connecting`, `creating`, or `streaming`. The agent address is not stored in NVM.
+
+With the bridge and `joint_state_broadcaster` stopped, that agent topic followed both axes from 0 to 0.030 m and back to 0. The board endpoints matched and there were no alerts. Positions on this topic are meters, not millimeters.
 
 ## ROS 2
 
@@ -128,7 +130,9 @@ source install/setup.bash
 
 ### Trajectory action
 
-`clearcore_bridge` connects, enables, publishes `/joint_states`, and serves `follow_joint_trajectory`. The action follows `time_from_start`. Point velocities are spline boundaries. When accelerations are set they are quintic boundaries, not a cap on the feedforward. Path tolerance is generated position versus the time-advanced received reference in that state frame, not versus the host schedule. A second goal is rejected until the first finishes. Joint state stamps are the time the sample was received. A stale, disabled, faulted, or tripped sample is not a finished move. `enable` fails unless HLFB is asserted. Pass `test_mode:=true` on a bare motor. Launch always writes that parameter, including false, because test mode is stored in NVM.
+`clearcore_bridge` connects, enables, publishes `/joint_states`, and serves `follow_joint_trajectory`. The action follows `time_from_start`. Point velocities are spline boundaries. When accelerations are set they are quintic boundaries, not a cap on the feedforward. Path tolerance is generated position versus the time-advanced received reference in that state frame, not versus the host schedule. Action feedback pairs the current host schedule sample with the latest received position, so that gap is not the 0.05 mm local tracking result. A second goal is rejected until the first finishes. A result `error_code` of 0 is `SUCCESSFUL`. Joint state stamps are the time the sample was received. A stale, disabled, faulted, or tripped sample is not a finished move. `enable` fails unless HLFB is asserted. Pass `test_mode:=true` on a bare motor. Launch always writes that parameter, including false, because test mode is stored in NVM.
+
+A two-axis goal on the bench ran out and back to the origin. X and Y stayed within about 0.01 mm of each other in the feedback printout. The action returned success. That run does not exercise the XRCE publisher.
 
 ```bash
 ros2 launch clearcore_bridge bridge.launch.py host:=172.16.82.114 axis_mask:=3

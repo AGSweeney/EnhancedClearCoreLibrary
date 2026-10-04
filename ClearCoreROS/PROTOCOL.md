@@ -152,7 +152,7 @@ The local streaming diagnostic is tracking relative to the received reference, n
 
 `q_ref(time_ms) = q_latched + v_latched * (time_ms - latch_time)`
 
-Compare generated position with `q_ref` at that same `time_ms`. Host-schedule synchronization and physical shaft position during the move are separate measurements.
+Compare generated position with `q_ref` at that same `time_ms`. Host-schedule synchronization and physical shaft position during the move are separate measurements. `follow_joint_trajectory` feedback is also separate: it pairs the host's current schedule sample with the latest received generated position, and those two values are not from the same instant.
 
 On the 80 mm, 4 s ramp the peak of that comparison was 0.05 mm in both directions, about eight generated steps. Latch time is a whole millisecond. At 30 mm/s, 1 ms is 0.03 mm, so 0.05 mm is about 1.67 ms — larger than one timestamp tick. Whole-millisecond timestamps make the timing uncertainty significant, but they do not show that the whole residual is a timestamp artifact. The residual is too close to that resolution to justify changing `Kp` from this measurement alone. Finer timestamps would separate timing quantization from tracking error.
 
@@ -190,7 +190,7 @@ A bad magic byte is skipped. A known type with the wrong length is skipped. The 
 - A goal that stays unchanged for 40 ms becomes **one** absolute `Move()` at `vel_steps` / `accel_steps`. `set_joints` and `forward_command_controller` use this path.
 - A goal that is still changing is followed with `MoveVelocity()`. Each new integer steps/s value is applied. There is no percentage deadband.
 - A `track` frame is the timed-execution path: velocity is feedforward and the position error adds a bounded correction. A later absolute `position` frame leaves tracking and uses the settled-move path.
-- `clearcore_bridge` samples `FollowJointTrajectory` against `time_from_start` and sends `track` frames. Specified point velocities are the spline boundary conditions. Omitted velocities use the segment slope. When a waypoint also supplies acceleration, that segment is a quintic spline so the feedforward velocity matches the position. Path tolerance is the local diagnostic above, generated position versus `q_ref` in that same state frame. It is not a comparison with the host schedule. The bridge accepts one goal at a time. In `stream_mode:=velocity`, the hardware plugin sends the same `track` frame while the command is changing, then a position hold.
+- `clearcore_bridge` samples `FollowJointTrajectory` against `time_from_start` and sends `track` frames. Specified point velocities are the spline boundary conditions. Omitted velocities use the segment slope. When a waypoint also supplies acceleration, that segment is a quintic spline so the feedforward velocity matches the position. Path tolerance is the local diagnostic above, generated position versus `q_ref` in that same state frame. It is not a comparison with the host schedule. Action feedback is the host schedule sample beside the latest received position. The bridge accepts one goal at a time. A result `error_code` of 0 is `SUCCESSFUL`. In `stream_mode:=velocity`, the hardware plugin sends the same `track` frame while the command is changing, then a position hold.
 
 The watchdog trips only while a goal is unfinished or a velocity command is nonzero and the host has been silent for `watchdog_ms`. Reaching the target and then going quiet does not trip. A stream disconnect mid-move trips immediately. `keepalive` does not clear the latch, and hosts must not do it automatically. `clear_alerts` is the recovery; until then position and velocity commands are ignored. It also clears `travel_limit`. The hardware plugin latches a watchdog trip and refuses further writes until the controller activates again, which calls `clear_alerts` before `enable`.
 
@@ -206,10 +206,20 @@ The watchdog trips only while a goal is unfinished or a velocity command is nonz
 
 ## XRCE-DDS
 
-The board can publish the four joints to a micro-ROS agent. This does not run a DDS participant on the ClearCore. The agent is the DDS participant. The board is an XRCE-DDS 1.0 client.
+The board publishes the four joints to a micro-ROS agent. The ClearCore is an XRCE-DDS 1.0 client. It does not run a DDS participant. The agent is the DDS participant, and it publishes `/joint_states`.
 
-`xrce_connect` takes `ip_address` and an optional `port` (default 8888, the micro-ROS agent UDP port). The board binds local UDP **9203**. That stays clear of ClearAI, ClearCNC, and the session ports. `xrce_disconnect` stops it. The agent address is not stored in NVM.
+`xrce_connect` takes `ip_address` and an optional `port` (default 8888, the micro-ROS agent UDP port). The board binds local UDP **9203**. That stays clear of ClearAI, ClearCNC, and the session ports. `xrce_disconnect` stops the client. The agent address is not stored in NVM.
 
-Once the agent accepts the session, the firmware publishes `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The names are `joint_x`, `joint_y`, `joint_z`, and `joint_a`, in meters and radians, from the same generated-step sample as the binary state frame. The stamp is time since boot, not a synchronized host clock. A reliable heartbeat is sent about once a second. If no agent packet arrives for 3 s, the client drops the session and sends `CREATE_CLIENT` again. The UDP port holds one inbound datagram, so the agent's reply to a message has to be a single datagram; a second packet sent in the same burst replaces the first before it is read. `get_status` reports `xrce` as `off`, `connecting`, `creating`, or `streaming`. `host/xrce_check.py` checks this exchange. It is not a DDS bridge. A micro-ROS agent is what places `/joint_states` on a ROS graph.
+`CREATE_CLIENT` is stamped with `session_id & 0x80` (`0x80` for this client). That header is the none-session and does not carry the client key. The session id `0x81` and the client key are in the payload. A header session of `0x01` is ignored by a micro-ROS agent.
+
+The client queues up to 12 inbound datagrams through lwIP. A real agent answers one request with several UDP packets. `EthernetUdp` keeps only the latest packet, so this socket does not use it. If the queue is full, a later datagram is dropped and the earlier ones are kept.
+
+The publish is `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The names are `joint_x`, `joint_y`, `joint_z`, and `joint_a`. X, Y, and Z are meters. A is radians. The sample is the same generated-step state as the binary frame. The stamp is time since boot, not a synchronized host clock. The body has no CDR encapsulation header. Fast DDS adds that header. A second encapsulation makes a ROS subscriber reject the sample.
+
+A reliable heartbeat is sent about once a second. If no agent packet arrives for 3 s, the client drops the session and sends `CREATE_CLIENT` again. `get_status` reports `xrce` as `off`, `connecting`, `creating`, or `streaming`.
+
+`host/xrce_check.py` answers the session and prints the sample. It is not a DDS bridge. A micro-ROS agent is what places `/joint_states` on a ROS graph, from the node `clearcore_ros`. `clearcore_bridge` also publishes `/joint_states`, for the joints in `axis_mask`, stamped when the host receives the sample. `joint_state_broadcaster` publishes that topic from `ros2_control`. Stop those other publishers before treating `/joint_states` as the agent stream.
+
+On the bench, with only `clearcore_ros` publishing, both installed axes moved from 0 to 0.030 m and back to 0. The agent samples reached those same endpoints, the board status matched, and there were no alerts.
 
 Commands still use the session and the binary stream. The XRCE client only publishes.
