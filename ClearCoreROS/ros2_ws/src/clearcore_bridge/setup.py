@@ -17,6 +17,7 @@ setup(
     author_email="agsweeney@gmail.com",
     description="ROS 2 joint bridge for ClearCoreROS firmware.",
     license="MIT",
+    tests_require=["pytest"],
     entry_points={
         "console_scripts": [
             "bridge = clearcore_bridge.bridge_node:main",

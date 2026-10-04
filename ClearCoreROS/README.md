@@ -191,12 +191,17 @@ URDF `<limit>` tags are not copied onto the board. Set soft limits with `configu
 
 ## Checks without a board
 
+Jazzy CI (`.github/workflows/clearcore-ros-jazzy.yml`) installs dependencies, builds the ROS packages, and runs simulated-host tests. A green job is **automated with simulated hardware**. It does not home motors or recover a physical watchdog. The versioned matrix is [docs/VALIDATION.md](docs/VALIDATION.md).
+
 ```powershell
+python host\run_ci_tests.py
 python host\test_wire.py
 python host\test_safety.py
+python host\test_hardware_sim.py
+python host\test_xrce_payloads.py
 ```
 
-`test_wire.py` checks the binary frame codec against `firmware/RosProtocol.h`. `test_safety.py` checks the bridge goal gate, trajectory sampling, and stale-state rules.
+`test_wire.py` checks the binary frame codec against `firmware/RosProtocol.h`. `test_safety.py` is the Python-bridge simulated path (cancel, stream EOF, restart, home JSON-RPC, watchdog recovery). `test_hardware_sim.py` is the ros2_control simulated path. `test_xrce_payloads.py` checks empty `effort` and `hlfb_duty` without UDP.
 
 ## Safety
 

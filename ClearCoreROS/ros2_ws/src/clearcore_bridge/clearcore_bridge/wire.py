@@ -92,6 +92,35 @@ def pack_heartbeat(seq: int) -> bytes:
     return _hdr(TYPE_HEARTBEAT, len(payload)) + payload
 
 
+def pack_state(
+    time_ms: int = 0,
+    seq: int = 1,
+    flags: int = 0,
+    mask: int = 3,
+    alert: int = 0,
+    position: Iterable[float] = (0.0, 0.0, 0.0, 0.0),
+    velocity: Iterable[float] = (0.0, 0.0, 0.0, 0.0),
+    effort: Iterable[float] = (0.0, 0.0, 0.0, 0.0),
+    track_mask: int = 0,
+    target_position: Iterable[float] = (0.0, 0.0, 0.0, 0.0),
+    target_velocity: Iterable[float] = (0.0, 0.0, 0.0, 0.0),
+    command_velocity: Iterable[float] = (0.0, 0.0, 0.0, 0.0),
+    target_latch_ms: Iterable[int] = (0, 0, 0, 0),
+) -> bytes:
+    """Build a state frame. Layout matches CcrosEncodeState."""
+    payload = bytearray(STATE_PAYLOAD)
+    struct.pack_into("<IHBBI", payload, 0, time_ms & 0xFFFFFFFF, seq & 0xFFFF, flags & 0xFF, mask & 0xFF, alert & 0xFFFFFFFF)
+    struct.pack_into("<4f", payload, 12, *tuple(position))
+    struct.pack_into("<4f", payload, 28, *tuple(velocity))
+    struct.pack_into("<4f", payload, 44, *tuple(effort))
+    payload[60] = track_mask & 0xFF
+    struct.pack_into("<4f", payload, 64, *tuple(target_position))
+    struct.pack_into("<4f", payload, 80, *tuple(target_velocity))
+    struct.pack_into("<4f", payload, 96, *tuple(command_velocity))
+    struct.pack_into("<4I", payload, 112, *tuple(int(v) & 0xFFFFFFFF for v in target_latch_ms))
+    return _hdr(TYPE_STATE, STATE_PAYLOAD) + bytes(payload)
+
+
 def _parse_payload(msg_type: int, payload: bytes) -> dict:
     if msg_type == TYPE_STATE:
         if len(payload) != STATE_PAYLOAD:

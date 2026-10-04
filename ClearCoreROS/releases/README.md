@@ -15,18 +15,20 @@ Prebuilt firmware for the first-motor guide. You do not need Microchip Studio to
 
 This image keeps the 0.1.2 TIMESTAMP withhold. `rt/joint_states` has empty `effort`. Normalized HLFB duty is `rt/hlfb_duty`. `host/xrce_check.py` in this tree matches this image and rejects 0.1.2 payloads.
 
+The adoption validation matrix is [../docs/VALIDATION.md](../docs/VALIDATION.md). Jazzy CI is simulated-host only.
+
 Flash instructions are in [../docs/FIRST_MOTOR.md](../docs/FIRST_MOTOR.md).
 
 ### What this revision was run on
 
-These are bench checks, not a continuous-integration suite. The Python bridge and `ros2_control` are different programs.
+These are bench checks plus simulated-host CI. The Python bridge and `ros2_control` are different programs. A green Jazzy job does not home motors.
 
 | Check | Path | Result on the bench |
 |-------|------|---------------------|
 | Flash over a version 3 blob | session `get_status` | Static `172.16.82.114`, `axis_mask` 3, motors disabled, `test_mode` false. |
 | XRCE empty `effort` plus `hlfb_duty` after `TIMESTAMP_REPLY` | `host/xrce_check.py` (0.4 s delayed reply) | Three `joint_states` with `effort_len=0`, two `hlfb_duty` samples, same stamps. No `JointState` before the reply. Motors left disabled. |
-| Mapping, first-motor 10 mm, two-axis `joint_trajectory_controller` | session / `ros2_control` | Not re-run on this `.bin`. Motion path is unchanged from 0.1.1. |
-| `ros2_control` cancellation, connection loss, restart, homing, recovery | hardware plugin | Not an automated matrix. Homing and probing exist on the session API. |
+| Mapping, first-motor 10 mm, two-axis `joint_trajectory_controller` | session / `ros2_control` | Not re-run on this `.bin`. Motion path is unchanged from 0.1.1. See [VALIDATION.md](../docs/VALIDATION.md). |
+| Cancellation, connection loss, restart, homing, recovery | Python bridge and ros2_control | Simulated in `host/test_safety.py` and `host/test_hardware_sim.py`. Hardware cancel, disconnect, home, and watchdog recovery are **not tested**. A Jazzy CI pass is not physical homing. |
 
 ## 0.1.2
 
