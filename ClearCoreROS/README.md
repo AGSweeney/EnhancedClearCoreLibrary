@@ -4,7 +4,22 @@
 
 ClearCore firmware and a ROS 2 host that expose ClearPath motors M0–M3 as joints. The board runs the step/direction generator. ROS 2 runs on the host (a Jetson or other Linux machine). The wire format is [PROTOCOL.md](PROTOCOL.md).
 
+Start with [docs/FIRST_MOTOR.md](docs/FIRST_MOTOR.md) and the firmware file in [releases/](releases/README.md). That path is one ClearPath on M0, the released `.bin`, and `host/ccros_cli.py`. It does not need Microchip Studio or ROS.
+
 The motor setup matches ClearAI: Step and Direction, HLFB ASG-Position with measured torque at 482 Hz, pose from `PositionRefCommanded()`, and alert bits reported only for axes in `axis_mask`. Reported position is generated steps, not a shaft encoder.
+
+## Choose a setup
+
+Three host programs talk to the same firmware. Only one of them should own motion, and only one of them should be the `/joint_states` source you are reading.
+
+| Setup | What you run | Who commands motion | Who publishes `/joint_states` |
+|-------|----------------|---------------------|-------------------------------|
+| First motor, no ROS | `host/ccros_cli.py` | The session on TCP 9200 | Nobody, unless you start an agent |
+| Python bridge | `clearcore_bridge` | `follow_joint_trajectory` on that node, over the session and the binary stream | The bridge, for joints in `axis_mask`. Stamps are host reception time. |
+| `ros2_control` | `clearcore_hardware` plus a controller | The controller's command interface, over the same session and stream | `joint_state_broadcaster`, if the launch starts it |
+| XRCE telemetry | `xrce_connect` and a micro-ROS agent | Nobody. This client only publishes. | The agent node `clearcore_ros`, all four joints, in metres and radians. The stamp is time since boot. |
+
+The session port accepts one TCP client. The bridge and the `ros2_control` plugin cannot both hold it. Stop the bridge and `joint_state_broadcaster` before treating `/joint_states` as the agent topic.
 
 | Joint | Motor | Unit |
 |-------|-------|------|
@@ -19,6 +34,8 @@ Zero is the pose at boot, or the pose after `home` with `zero` true. `0.01` m is
 
 | Path | Role |
 |------|------|
+| `docs/FIRST_MOTOR.md` | One motor, from the released firmware image, with no ROS install |
+| `releases/` | Versioned firmware binary, checksum, and what that revision was run on |
 | `firmware/` | Microchip Studio project `ClearCoreROS.atsln` |
 | `PROTOCOL.md` | Session methods, binary frames, NVM, limits, XRCE |
 | `host/ccros_cli.py` | Bench client. No ROS install. |
@@ -30,7 +47,9 @@ Zero is the pose at boot, or the pose after `home` with `zero` true. `0.01` m is
 
 ## Firmware
 
-Open `firmware/ClearCoreROS.atsln` in Microchip Studio 7, build, and flash with `Tools/flash_clearcore.cmd`. Command-line build from the Debug directory, same toolchain as ClearAI:
+The first-motor image is [releases/ClearCoreROS-0.1.0.bin](releases/ClearCoreROS-0.1.0.bin). Flash instructions and the tested-revision list are in [releases/README.md](releases/README.md) and [docs/FIRST_MOTOR.md](docs/FIRST_MOTOR.md).
+
+To build instead of using that file, open `firmware/ClearCoreROS.atsln` in Microchip Studio 7 and flash with `Tools/flash_clearcore.cmd`. Command-line build from the Debug directory, same toolchain as ClearAI:
 
 ```powershell
 cd ClearCoreROS\firmware\Debug

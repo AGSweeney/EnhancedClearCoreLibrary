@@ -315,6 +315,11 @@ class ClearCoreBridge(Node):
             if done:
                 return
             state = self._require_live()
+            # Path tolerance is the board-local diagnostic: generated position
+            # versus the time-advanced reference in this state frame. It does
+            # not measure error against the host trajectory setpoint. Feedback
+            # below pairs that setpoint with the latest received position, and
+            # those two numbers are not from the same instant.
             violated = local_tracking_violation(state, path_tol)
             if violated:
                 raise _PathError(violated)
