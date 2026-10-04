@@ -27,7 +27,8 @@ These are bench checks, not a continuous-integration suite. The Python bridge an
 | M0 renamed to `shoulder`, direction `-1`, gear `2`, offset `0.01` m, then a move to `0.012` m and back | session | Reported `0.010` m at zero steps, then `0.012` m and `0.010` m. Map restored to the defaults. |
 | 30 mm square, one axis at a time, then a coordinated diagonal out and back, 30 mm/s | `move_linear` | Endpoints matched at 0.001 mm. Peak \|Y−X\| on the diagonal was 0.007 mm. `est_ms` stayed 1000; the diagonal took about 1.6 s. |
 | First-motor 10 mm move on M0 with `test_mode` false, then return | `host/test_m0_live.py` against this `.bin` | Position lines matched the guide (`0.0100` then `0.0000`). `axis_mask` 3, limit flags, and test mode were restored. Motors left disabled. |
-| `ros2_control` hardware goals, cancellation, connection loss, restart, homing, recovery | either ROS path | Not run on this image. Homing and probing exist on the session API. |
+| Two-axis `joint_trajectory_controller` goal, (0.03, 0.03) m then origin | `trajectory.launch.py` and `send_trajectory_goal.py` | Result `error_code` 0. Peak |Y−X| 0.013 mm. End −0.09 mm. Motors left disabled. |
+| `ros2_control` cancellation, connection loss, restart, homing, recovery | hardware plugin | Not an automated matrix. Homing and probing exist on the session API. |
 
 ## 0.1.0
 

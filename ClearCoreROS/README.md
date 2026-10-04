@@ -170,13 +170,22 @@ Services on the node: `enable`, `disable`, `stop`, `estop`, `clear_alerts`.
 
 ### ros2_control
 
-`clearcore_hardware` exports a position command and position, velocity, and effort state. Effort is HLFB duty scaled to -1..1. Joint names come from the hardware parameters `name_x`, `name_y`, `name_z`, and `name_a` (defaults `joint_x` through `joint_a`). `rotary_*`, `direction_*`, `gear_*`, and `offset_*` are sent with `configure` on activate. The launch file starts `joint_state_broadcaster` and `forward_position_controller` for `joint_x` and `joint_y`.
+`clearcore_hardware` exports a position command and position, velocity, and effort state. Effort is HLFB duty scaled to -1..1. Joint names come from the hardware parameters `name_x`, `name_y`, `name_z`, and `name_a` (defaults `joint_x` through `joint_a`). `rotary_*`, `direction_*`, `gear_*`, and `offset_*` are sent with `configure` on activate. `hardware.launch.py` starts `joint_state_broadcaster` and `forward_position_controller` for `joint_x` and `joint_y`.
 
 ```bash
 ros2 launch clearcore_hardware hardware.launch.py host:=172.16.82.114
 ```
 
-`stream_mode` is `position` by default: a settled command becomes one trapezoidal move. Set `stream_mode` to `velocity` in the xacro when a `joint_trajectory_controller` is streaming interpolated samples. The plugin sends `dq/dt` with the position while the command is changing, then a position hold. A watchdog flag latches the plugin. Writes stop until the hardware is activated again, which calls `clear_alerts` before `enable`.
+`trajectory.launch.py` starts `joint_trajectory_controller` instead, with `stream_mode` set to `velocity`. A position-mode stream would turn every interpolated sample into its own trapezoid. In velocity mode the plugin sends `dq/dt` with the position while the command is changing, then one position hold. `send_trajectory_goal.py` sends (0.03 m, 0.03 m) at 2 s and (0, 0) at 4 s. Stopping the launch deactivates the hardware and disables the motors.
+
+```bash
+ros2 launch clearcore_hardware trajectory.launch.py host:=172.16.82.114
+ros2 run clearcore_hardware send_trajectory_goal.py
+```
+
+On the bench that goal returned `error_code` 0 (`SUCCESSFUL`). Joint-state samples reached about 30.16 mm on both axes and ended at −0.09 mm. Peak |Y−X| was 0.013 mm. Action feedback is the interpolated setpoint beside the latest hardware position, not the 0.05 mm board-local diagnostic. The motors were left disabled, `test_mode` false, with no alerts.
+
+`stream_mode` is `position` on the forward-controller launch: a settled command becomes one trapezoidal move. A watchdog flag latches the plugin. Writes stop until the hardware is activated again, which calls `clear_alerts` before `enable`.
 
 URDF `<limit>` tags are not copied onto the board. Set soft limits with `configure`.
 

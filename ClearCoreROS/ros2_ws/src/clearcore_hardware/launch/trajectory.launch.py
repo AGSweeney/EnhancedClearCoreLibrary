@@ -32,7 +32,7 @@ def generate_launch_description():
         DeclareLaunchArgument("host", default_value="192.168.0.109"),
         DeclareLaunchArgument("axis_mask", default_value="3"),
         DeclareLaunchArgument("test_mode", default_value="false"),
-        DeclareLaunchArgument("stream_mode", default_value="position"),
+        DeclareLaunchArgument("stream_mode", default_value="velocity"),
         Node(
             package="robot_state_publisher",
             executable="robot_state_publisher",
@@ -53,6 +53,6 @@ def generate_launch_description():
         Node(
             package="controller_manager",
             executable="spawner",
-            arguments=["forward_position_controller", "--controller-manager", "/controller_manager"],
+            arguments=["joint_trajectory_controller", "--controller-manager", "/controller_manager"],
         ),
     ])

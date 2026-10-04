@@ -5,6 +5,8 @@ controller_manager:
       type: joint_state_broadcaster/JointStateBroadcaster
     forward_position_controller:
       type: forward_command_controller/ForwardCommandController
+    joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
 
 forward_position_controller:
   ros__parameters:
@@ -12,3 +14,28 @@ forward_position_controller:
       - joint_x
       - joint_y
     interface_name: position
+
+# Position commands at the manager rate. The hardware stream_mode must be
+# velocity, so each new sample is a track frame rather than a fresh trapezoid.
+# Goal tolerance is 2 mm. The velocity estimate can still be a few cm/s after
+# the shaft has stopped, so the stopped-velocity check is looser than that.
+joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - joint_x
+      - joint_y
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    allow_partial_joints_goal: false
+    constraints:
+      stopped_velocity_tolerance: 0.05
+      goal_time: 1.0
+      joint_x:
+        trajectory: 0.01
+        goal: 0.002
+      joint_y:
+        trajectory: 0.01
+        goal: 0.002

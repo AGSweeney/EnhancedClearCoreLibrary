@@ -4,6 +4,7 @@
   <xacro:arg name="host" default="192.168.0.109"/>
   <xacro:arg name="axis_mask" default="3"/>
   <xacro:arg name="test_mode" default="false"/>
+  <xacro:arg name="stream_mode" default="position"/>
 
   <link name="base_link"/>
   <link name="link_x"/>
@@ -38,7 +39,7 @@
       <param name="decel_steps">250000</param>
       <param name="watchdog_ms">500</param>
       <param name="test_mode">$(arg test_mode)</param>
-      <param name="stream_mode">position</param>
+      <param name="stream_mode">$(arg stream_mode)</param>
     </hardware>
     <joint name="joint_x">
       <command_interface name="position"/>

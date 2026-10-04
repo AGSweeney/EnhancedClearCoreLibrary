@@ -33,6 +33,7 @@ install(TARGETS clearcore_system
   RUNTIME DESTINATION bin)
 install(DIRECTORY include/ DESTINATION include)
 install(DIRECTORY config launch urdf DESTINATION share/${PROJECT_NAME})
+install(PROGRAMS scripts/send_trajectory_goal.py DESTINATION lib/${PROJECT_NAME})
 
 ament_export_include_directories(include)
 ament_export_libraries(clearcore_system)
