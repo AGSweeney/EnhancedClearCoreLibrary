@@ -1,0 +1,24 @@
+{
+  "host_packages": {
+    "clearcore_bridge": "0.1.0",
+    "clearcore_hardware": "0.1.0"
+  },
+  "protocol": "1.0",
+  "git_head": "a31e0d75afe11d0e600aa9b780c677a47656e567",
+  "discover": "CLEARCORE_ROS ClearCoreROS IP=172.16.82.114 TCP=9200 STREAM=9201 FW=1.0",
+  "get_config_nvm": {
+    "nvm": true,
+    "nvm_valid": true,
+    "nvm_version": 3,
+    "axis_mask": 3,
+    "test_mode": false,
+    "names": [
+      "joint_x",
+      "joint_y",
+      "joint_z",
+      "joint_a"
+    ],
+    "ip_address": "172.16.82.114"
+  },
+  "firmware_protocol_fw": "1.0"
+}

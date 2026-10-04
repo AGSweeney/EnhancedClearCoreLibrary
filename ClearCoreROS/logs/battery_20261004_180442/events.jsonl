@@ -1,0 +1,95 @@
+{"t_s": 0.004, "utc": "2026-10-04T23:04:42.107713+00:00", "msg": "battery start", "host": "172.16.82.114", "duration_s": 1800, "ws": "/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/ros2_ws", "log_dir": "/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/logs/battery_20261004_180442"}
+{"t_s": 0.066, "utc": "2026-10-04T23:04:42.169637+00:00", "msg": "revisions", "host_packages": {"clearcore_bridge": "0.1.0", "clearcore_hardware": "0.1.0"}, "protocol": "1.0", "git_head": "a31e0d75afe11d0e600aa9b780c677a47656e567", "discover": "CLEARCORE_ROS ClearCoreROS IP=172.16.82.114 TCP=9200 STREAM=9201 FW=1.0", "firmware_protocol_fw": "1.0"}
+{"t_s": 0.076, "utc": "2026-10-04T23:04:42.179232+00:00", "msg": "board start", "enabled": false, "moving": false, "watchdog": false, "alerts": "none", "test_mode": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0]}
+{"t_s": 0.082, "utc": "2026-10-04T23:04:42.185095+00:00", "msg": "===== cycle 1 start =====", "remaining_s": 1799.9}
+{"t_s": 1.604, "utc": "2026-10-04T23:04:43.707131+00:00", "msg": "ros stopped", "reason": "cycle_1_start"}
+{"t_s": 1.614, "utc": "2026-10-04T23:04:43.716981+00:00", "msg": "board cycle001_pre", "enabled": false, "moving": false, "watchdog": false, "alerts": "none", "test_mode": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0]}
+{"t_s": 1.658, "utc": "2026-10-04T23:04:43.761869+00:00", "msg": "origin_pre ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 4.201, "utc": "2026-10-04T23:04:46.304740+00:00", "msg": "ready bridge action (main)"}
+{"t_s": 9.799, "utc": "2026-10-04T23:04:51.902694+00:00", "msg": "bridge_fjt done", "rc": 0, "ok": true, "target_m": 0.02}
+{"t_s": 11.485, "utc": "2026-10-04T23:04:53.588007+00:00", "msg": "bridge_cancel done", "rc": 0, "ok": true, "target_m": 0.018}
+{"t_s": 11.655, "utc": "2026-10-04T23:04:53.758174+00:00", "msg": "bridge sampler", "peak_abs_yx_mm": 0.012500211596488953, "gap_max_ms": 94.2936730000028, "gaps_over_150ms": 0}
+{"t_s": 13.341, "utc": "2026-10-04T23:04:55.444546+00:00", "msg": "ros stopped", "reason": "cycle_1_after_bridge"}
+{"t_s": 14.575, "utc": "2026-10-04T23:04:56.678572+00:00", "msg": "origin_mid ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 17.283, "utc": "2026-10-04T23:04:59.386506+00:00", "msg": "ready jtc action"}
+{"t_s": 24.666, "utc": "2026-10-04T23:05:06.769237+00:00", "msg": "jtc done", "rc": 0, "ok": true, "jtc_reported_end_mm": [-0.075, -0.075], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check"}
+{"t_s": 24.837, "utc": "2026-10-04T23:05:06.940380+00:00", "msg": "jtc sampler", "peak_abs_yx_mm": 0.006251037120819092, "jtc_reported_end_mm": [-0.075, -0.075], "note": "reported endpoint != later origin check"}
+{"t_s": 26.523, "utc": "2026-10-04T23:05:08.626354+00:00", "msg": "ros stopped", "reason": "cycle_1_after_jtc"}
+{"t_s": 27.567, "utc": "2026-10-04T23:05:09.669944+00:00", "msg": "origin_post ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 27.58, "utc": "2026-10-04T23:05:09.682659+00:00", "msg": "board cycle001_post", "enabled": false, "moving": false, "watchdog": false, "alerts": "none", "test_mode": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0]}
+{"t_s": 27.588, "utc": "2026-10-04T23:05:09.691026+00:00", "msg": "===== cycle 1 end =====", "ok": true, "bridge_peak_abs_yx_mm": 0.012500211596488953, "jtc_reported_end_mm": [-0.075, -0.075], "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0, "alert_events": 0, "gaps_over_150ms": 0}
+{"t_s": 32.595, "utc": "2026-10-04T23:05:14.698431+00:00", "msg": "===== cycle 2 start =====", "remaining_s": 1767.4}
+{"t_s": 34.118, "utc": "2026-10-04T23:05:16.221091+00:00", "msg": "ros stopped", "reason": "cycle_2_start"}
+{"t_s": 34.129, "utc": "2026-10-04T23:05:16.232114+00:00", "msg": "ALERT", "where": "cycle002_pre", "alerts": "motor_faulted"}
+{"t_s": 34.132, "utc": "2026-10-04T23:05:16.234924+00:00", "msg": "board cycle002_pre", "enabled": false, "moving": false, "watchdog": false, "alerts": "motor_faulted", "test_mode": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0]}
+{"t_s": 34.177, "utc": "2026-10-04T23:05:16.280312+00:00", "msg": "origin_pre ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 35.853, "utc": "2026-10-04T23:05:17.955771+00:00", "msg": "ready bridge action (main)"}
+{"t_s": 37.442, "utc": "2026-10-04T23:05:19.545515+00:00", "msg": "bridge_fjt done", "rc": 3, "ok": false, "target_m": 0.02}
+{"t_s": 39.174, "utc": "2026-10-04T23:05:21.276781+00:00", "msg": "bridge_cancel done", "rc": 0, "ok": true, "target_m": 0.018}
+{"t_s": 39.343, "utc": "2026-10-04T23:05:21.446056+00:00", "msg": "bridge sampler", "peak_abs_yx_mm": 0.006250105798244476, "gap_max_ms": 92.50161100000298, "gaps_over_150ms": 0}
+{"t_s": 41.081, "utc": "2026-10-04T23:05:23.184232+00:00", "msg": "ros stopped", "reason": "cycle_2_after_bridge"}
+{"t_s": 42.315, "utc": "2026-10-04T23:05:24.418445+00:00", "msg": "origin_mid ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 45.102, "utc": "2026-10-04T23:05:27.205053+00:00", "msg": "ready jtc action"}
+{"t_s": 52.435, "utc": "2026-10-04T23:05:34.537284+00:00", "msg": "jtc done", "rc": 0, "ok": true, "jtc_reported_end_mm": [-0.094, -0.094], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check"}
+{"t_s": 52.606, "utc": "2026-10-04T23:05:34.708582+00:00", "msg": "jtc sampler", "peak_abs_yx_mm": 0.006251037120819092, "jtc_reported_end_mm": [-0.094, -0.094], "note": "reported endpoint != later origin check"}
+{"t_s": 54.341, "utc": "2026-10-04T23:05:36.444135+00:00", "msg": "ros stopped", "reason": "cycle_2_after_jtc"}
+{"t_s": 55.385, "utc": "2026-10-04T23:05:37.488020+00:00", "msg": "origin_post ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 55.398, "utc": "2026-10-04T23:05:37.500550+00:00", "msg": "board cycle002_post", "enabled": false, "moving": false, "watchdog": false, "alerts": "none", "test_mode": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0]}
+{"t_s": 55.407, "utc": "2026-10-04T23:05:37.510046+00:00", "msg": "===== cycle 2 end =====", "ok": false, "bridge_peak_abs_yx_mm": 0.006250105798244476, "jtc_reported_end_mm": [-0.094, -0.094], "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0, "alert_events": 1, "gaps_over_150ms": 0}
+{"t_s": 60.414, "utc": "2026-10-04T23:05:42.516619+00:00", "msg": "===== cycle 3 start =====", "remaining_s": 1739.6}
+{"t_s": 61.936, "utc": "2026-10-04T23:05:44.039131+00:00", "msg": "ros stopped", "reason": "cycle_3_start"}
+{"t_s": 61.947, "utc": "2026-10-04T23:05:44.050120+00:00", "msg": "ALERT", "where": "cycle003_pre", "alerts": "motor_faulted"}
+{"t_s": 61.951, "utc": "2026-10-04T23:05:44.053249+00:00", "msg": "board cycle003_pre", "enabled": false, "moving": false, "watchdog": false, "alerts": "motor_faulted", "test_mode": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0]}
+{"t_s": 61.995, "utc": "2026-10-04T23:05:44.097649+00:00", "msg": "origin_pre ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 63.602, "utc": "2026-10-04T23:05:45.704227+00:00", "msg": "ready bridge action (main)"}
+{"t_s": 64.831, "utc": "2026-10-04T23:05:46.934058+00:00", "msg": "bridge_fjt done", "rc": 3, "ok": false, "target_m": 0.02}
+{"t_s": 66.509, "utc": "2026-10-04T23:05:48.611873+00:00", "msg": "bridge_cancel done", "rc": 0, "ok": true, "target_m": 0.018}
+{"t_s": 66.68, "utc": "2026-10-04T23:05:48.782505+00:00", "msg": "bridge sampler", "peak_abs_yx_mm": 0.006249989382922649, "gap_max_ms": 50.29567600000462, "gaps_over_150ms": 0}
+{"t_s": 68.366, "utc": "2026-10-04T23:05:50.469026+00:00", "msg": "ros stopped", "reason": "cycle_3_after_bridge"}
+{"t_s": 69.6, "utc": "2026-10-04T23:05:51.702961+00:00", "msg": "origin_mid ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 73.333, "utc": "2026-10-04T23:05:55.435550+00:00", "msg": "ready jtc action"}
+{"t_s": 80.661, "utc": "2026-10-04T23:06:03.523124+00:00", "msg": "jtc done", "rc": 0, "ok": true, "jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check"}
+{"t_s": 80.831, "utc": "2026-10-04T23:06:03.693254+00:00", "msg": "jtc sampler", "peak_abs_yx_mm": 0.006251037120819092, "jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check"}
+{"t_s": 82.521, "utc": "2026-10-04T23:06:05.383239+00:00", "msg": "ros stopped", "reason": "cycle_3_after_jtc"}
+{"t_s": 84.598, "utc": "2026-10-04T23:06:07.460677+00:00", "msg": "origin_post ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 84.609, "utc": "2026-10-04T23:06:07.471478+00:00", "msg": "board cycle003_post", "enabled": false, "moving": false, "watchdog": false, "alerts": "none", "test_mode": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0]}
+{"t_s": 84.618, "utc": "2026-10-04T23:06:07.479863+00:00", "msg": "===== cycle 3 end =====", "ok": false, "bridge_peak_abs_yx_mm": 0.006249989382922649, "jtc_reported_end_mm": [-0.144, -0.144], "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0, "alert_events": 1, "gaps_over_150ms": 0}
+{"t_s": 89.625, "utc": "2026-10-04T23:06:12.487414+00:00", "msg": "===== cycle 4 start =====", "remaining_s": 1710.4}
+{"t_s": 91.146, "utc": "2026-10-04T23:06:14.008558+00:00", "msg": "ros stopped", "reason": "cycle_4_start"}
+{"t_s": 91.156, "utc": "2026-10-04T23:06:14.018207+00:00", "msg": "ALERT", "where": "cycle004_pre", "alerts": "motor_faulted"}
+{"t_s": 91.159, "utc": "2026-10-04T23:06:14.020792+00:00", "msg": "board cycle004_pre", "enabled": false, "moving": false, "watchdog": false, "alerts": "motor_faulted", "test_mode": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0]}
+{"t_s": 91.201, "utc": "2026-10-04T23:06:14.062842+00:00", "msg": "origin_pre ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 92.739, "utc": "2026-10-04T23:06:15.601420+00:00", "msg": "ready bridge action (main)"}
+{"t_s": 93.962, "utc": "2026-10-04T23:06:16.823821+00:00", "msg": "bridge_fjt done", "rc": 3, "ok": false, "target_m": 0.02}
+{"t_s": 95.643, "utc": "2026-10-04T23:06:18.504987+00:00", "msg": "bridge_cancel done", "rc": 0, "ok": true, "target_m": 0.018}
+{"t_s": 95.812, "utc": "2026-10-04T23:06:18.673987+00:00", "msg": "bridge sampler", "peak_abs_yx_mm": 0.006250105798244476, "gap_max_ms": 50.46200399999634, "gaps_over_150ms": 0}
+{"t_s": 97.497, "utc": "2026-10-04T23:06:20.358860+00:00", "msg": "ros stopped", "reason": "cycle_4_after_bridge"}
+{"t_s": 98.727, "utc": "2026-10-04T23:06:21.588859+00:00", "msg": "origin_mid ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 101.326, "utc": "2026-10-04T23:06:24.188499+00:00", "msg": "ready jtc action"}
+{"t_s": 108.508, "utc": "2026-10-04T23:06:31.370467+00:00", "msg": "jtc done", "rc": 0, "ok": true, "jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check"}
+{"t_s": 108.678, "utc": "2026-10-04T23:06:31.540597+00:00", "msg": "jtc sampler", "peak_abs_yx_mm": 0.006251037120819092, "jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check"}
+{"t_s": 110.373, "utc": "2026-10-04T23:06:33.235195+00:00", "msg": "ros stopped", "reason": "cycle_4_after_jtc"}
+{"t_s": 111.413, "utc": "2026-10-04T23:06:34.275320+00:00", "msg": "origin_post ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 111.424, "utc": "2026-10-04T23:06:34.285993+00:00", "msg": "board cycle004_post", "enabled": false, "moving": false, "watchdog": false, "alerts": "none", "test_mode": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0]}
+{"t_s": 111.431, "utc": "2026-10-04T23:06:34.293680+00:00", "msg": "===== cycle 4 end =====", "ok": false, "bridge_peak_abs_yx_mm": 0.006250105798244476, "jtc_reported_end_mm": [-0.144, -0.144], "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0, "alert_events": 1, "gaps_over_150ms": 1}
+{"t_s": 116.438, "utc": "2026-10-04T23:06:42.232187+00:00", "msg": "===== cycle 5 start =====", "remaining_s": 1683.6}
+{"t_s": 117.959, "utc": "2026-10-04T23:06:43.753104+00:00", "msg": "ros stopped", "reason": "cycle_5_start"}
+{"t_s": 117.969, "utc": "2026-10-04T23:06:43.763505+00:00", "msg": "ALERT", "where": "cycle005_pre", "alerts": "motor_faulted"}
+{"t_s": 117.972, "utc": "2026-10-04T23:06:43.766470+00:00", "msg": "board cycle005_pre", "enabled": false, "moving": false, "watchdog": false, "alerts": "motor_faulted", "test_mode": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0]}
+{"t_s": 118.013, "utc": "2026-10-04T23:06:43.807430+00:00", "msg": "origin_pre ok", "return_x_mm": 0.0, "return_y_mm": 0.0, "return_err_mm": 0.0, "note": "generated-step / PositionRefCommanded (not shaft encoder)"}
+{"t_s": 119.57, "utc": "2026-10-04T23:06:45.364031+00:00", "msg": "ready bridge action (main)"}
+{"t_s": 120.801, "utc": "2026-10-04T23:06:46.595263+00:00", "msg": "bridge_fjt done", "rc": 3, "ok": false, "target_m": 0.02}
+{"t_s": 122.483, "utc": "2026-10-04T23:06:48.276614+00:00", "msg": "bridge_cancel done", "rc": 0, "ok": true, "target_m": 0.018}
+{"t_s": 122.651, "utc": "2026-10-04T23:06:48.445546+00:00", "msg": "bridge sampler", "peak_abs_yx_mm": 0.006250105798244476, "gap_max_ms": 50.22927599998184, "gaps_over_150ms": 0}
+{"t_s": 124.337, "utc": "2026-10-04T23:06:50.131379+00:00", "msg": "ros stopped", "reason": "cycle_5_after_bridge"}
+{"t_s": 125.346, "utc": "2026-10-04T23:06:51.140537+00:00", "msg": "origin_mid exception", "error": "[Errno 104] Connection reset by peer"}
+{"t_s": 168.17, "utc": "2026-10-04T23:07:36.897220+00:00", "msg": "timeout waiting for jtc action"}
+{"t_s": 168.172, "utc": "2026-10-04T23:07:36.899776+00:00", "msg": "reconnect jtc"}
+{"t_s": 169.856, "utc": "2026-10-04T23:07:38.583649+00:00", "msg": "ros stopped", "reason": "jtc_reconnect"}
+{"t_s": 210.726, "utc": "2026-10-04T23:08:25.318536+00:00", "msg": "timeout waiting for jtc action retry"}
+{"t_s": 212.411, "utc": "2026-10-04T23:08:27.003932+00:00", "msg": "ros stopped", "reason": "cycle_5_after_jtc"}
+{"t_s": 213.42, "utc": "2026-10-04T23:08:28.012902+00:00", "msg": "origin_post exception", "error": "[Errno 104] Connection reset by peer"}
+{"t_s": 213.43, "utc": "2026-10-04T23:08:28.022810+00:00", "msg": "finalizing"}
+{"t_s": 214.958, "utc": "2026-10-04T23:08:29.550827+00:00", "msg": "ros stopped", "reason": "finalize"}
+{"t_s": 214.963, "utc": "2026-10-04T23:08:29.555687+00:00", "msg": "finalize session failed", "error": "[Errno 104] Connection reset by peer"}
+{"t_s": 214.975, "utc": "2026-10-04T23:08:29.567845+00:00", "msg": "BATTERY_DONE", "ok": false, "log_dir": "/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/logs/battery_20261004_180442"}

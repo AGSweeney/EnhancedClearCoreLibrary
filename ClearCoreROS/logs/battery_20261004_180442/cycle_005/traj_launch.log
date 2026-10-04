@@ -1,0 +1,70 @@
+[INFO] [launch]: All log files can be found below /home/adam/.ros/log/2026-10-04-18-06-51-637140-DESKTOP-HF5K4CO-3703
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [3743]
+[INFO] [ros2_control_node-2]: process started with pid [3745]
+[INFO] [spawner-3]: process started with pid [3747]
+[INFO] [spawner-4]: process started with pid [3749]
+[robot_state_publisher-1] [INFO] [1791155212.173355498] [robot_state_publisher]: Robot initialized
+[ros2_control_node-2] [INFO] [1791155212.199440674] [controller_manager]: Using Steady (Monotonic) clock for triggering controller manager cycles.
+[ros2_control_node-2] [INFO] [1791155212.338706057] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[ros2_control_node-2] [INFO] [1791155212.338766964] [controller_manager]: update rate is 50 Hz
+[ros2_control_node-2] [INFO] [1791155212.338778522] [controller_manager]: Overruns handling is : enabled
+[ros2_control_node-2] [INFO] [1791155212.338785703] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-2] [WARN] [1791155212.342414462] [controller_manager]: Could not enable FIFO RT scheduling policy: with error number <1>(Operation not permitted). See [https://control.ros.org/master/doc/ros2_control/controller_manager/doc/userdoc.html] for details on how to enable realtime scheduling.
+[ros2_control_node-2] [INFO] [1791155212.367789894] [controller_manager]: Received robot description from topic.
+[ros2_control_node-2] [INFO] [1791155212.368271019] [controller_manager]: Enforcing command limits is disabled. Command limits from URDF will be ignored.
+[ros2_control_node-2] [INFO] [1791155212.444121086] [controller_manager]: Loading hardware 'ClearCore' 
+[ros2_control_node-2] [INFO] [1791155212.522114925] [controller_manager]: Loaded hardware 'ClearCore' from plugin 'clearcore_hardware/ClearCoreSystemHardware'
+[ros2_control_node-2] [INFO] [1791155212.522191500] [controller_manager]: Initialize hardware 'ClearCore' 
+[ros2_control_node-2] [INFO] [1791155212.527118498] [controller_manager]: Successful initialization of hardware 'ClearCore'
+[ros2_control_node-2] [INFO] [1791155212.527355316] [controller_manager]: Activating component 'ClearCore'.
+[ros2_control_node-2] [INFO] [1791155212.527365812] [resource_manager]: 'configure' hardware 'ClearCore' 
+[ros2_control_node-2] [INFO] [1791155212.527369319] [resource_manager]: Successful 'configure' of hardware 'ClearCore'
+[ros2_control_node-2] [INFO] [1791155212.527372389] [resource_manager]: 'activate' hardware 'ClearCore' 
+[ros2_control_node-2] [ERROR] [1791155212.529204561] [clearcore_system]: enable/configure rejected
+[ros2_control_node-2] [ERROR] [1791155212.529251066] [resource_manager]: Failed to 'activate' hardware 'ClearCore'
+[ros2_control_node-2] terminate called after throwing an instance of 'std::runtime_error'
+[ros2_control_node-2]   what():  Failed to set the initial state of the component : ClearCore to active
+[ros2_control_node-2] Stack trace (most recent call last) in thread 3850:
+[ros2_control_node-2] #17   Object "", at 0xffffffffffffffff, in 
+[ros2_control_node-2] #16   Source "../sysdeps/unix/sysv/linux/x86_64/clone3.S", line 78, in clone3 [0x7f0984b29ecb]
+[ros2_control_node-2] #15   Source "./nptl/pthread_create.c", line 447, in start_thread [0x7f0984a9cb83]
+[ros2_control_node-2] #14   Source "../../../../../libstdc++-v3/src/c++11/thread.cc", line 105, in execute_native_thread_routine [0x7f0984ef5b85]
+[ros2_control_node-2] #13   Object "/home/adam/micromamba/envs/ros_env/lib/librclcpp.so", at 0x7f0985337bd7, in rclcpp::executors::MultiThreadedExecutor::run(unsigned long)
+[ros2_control_node-2] #12   Object "/home/adam/micromamba/envs/ros_env/lib/librclcpp.so", at 0x7f09852f6105, in rclcpp::Executor::execute_any_executable(rclcpp::AnyExecutable&)
+[ros2_control_node-2] #11   Object "/home/adam/micromamba/envs/ros_env/lib/librclcpp.so", at 0x7f09852f5866, in rclcpp::Executor::execute_subscription(std::shared_ptr<rclcpp::SubscriptionBase>)
+[ros2_control_node-2] #10   Object "/home/adam/micromamba/envs/ros_env/lib/libcontroller_manager.so", at 0x7f0985709524, in rclcpp::Subscription<std_msgs::msg::String_<std::allocator<void> >, std::allocator<void>, std_msgs::msg::String_<std::allocator<void> >, std_msgs::msg::String_<std::allocator<void> >, rclcpp::message_memory_strategy::MessageMemoryStrategy<std_msgs::msg::String_<std::allocator<void> >, std::allocator<void> > >::handle_message(std::shared_ptr<void>&, rclcpp::MessageInfo const&)
+[ros2_control_node-2] #9    Object "/home/adam/micromamba/envs/ros_env/lib/libcontroller_manager.so", at 0x7f098574e0d2, in controller_manager::ControllerManager::robot_description_callback(std_msgs::msg::String_<std::allocator<void> > const&)
+[ros2_control_node-2] #8    Object "/home/adam/micromamba/envs/ros_env/lib/libcontroller_manager.so", at 0x7f0985749def, in controller_manager::ControllerManager::set_initial_hardware_components_state()
+[ros2_control_node-2] #7    Object "/home/adam/micromamba/envs/ros_env/lib/libcontroller_manager.so", at 0x7f0985641981, in controller_manager::ControllerManager::set_initial_hardware_components_state()::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rclcpp_lifecycle::State)#1}::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, rclcpp_lifecycle::State) const [clone .cold]
+[ros2_control_node-2] #6    Source "../../../../libstdc++-v3/libsupc++/eh_throw.cc", line 98, in __cxa_throw [0x7f0984ec5cb6]
+[ros2_control_node-2] #5    Source "../../../../libstdc++-v3/libsupc++/eh_terminate.cc", line 58, in terminate [0x7f0984eb284c]
+[ros2_control_node-2] #4    Source "../../../../libstdc++-v3/libsupc++/eh_terminate.cc", line 48, in __terminate [0x7f0984ec5a19]
+[ros2_control_node-2] #3    Source "../../../../libstdc++-v3/libsupc++/vterminate.cc", line 95, in __verbose_terminate_handler [0x7f0984eb2cd1]
+[ros2_control_node-2] #2    Source "./stdlib/abort.c", line 79, in abort [0x7f0984a288fe]
+[ros2_control_node-2] #1    Source "../sysdeps/posix/raise.c", line 26, in raise [0x7f0984a4527d]
+[ros2_control_node-2] #0  | Source "./nptl/pthread_kill.c", line 89, in __pthread_kill_internal
+[ros2_control_node-2]     | Source "./nptl/pthread_kill.c", line 78, in __pthread_kill_implementation
+[ros2_control_node-2]       Source "./nptl/pthread_kill.c", line 44, in __pthread_kill [0x7f0984a9ec0c]
+[ros2_control_node-2] Aborted (Signal sent by tkill() 3745 1000)
+[spawner-3] [INFO] [1791155212.761477851] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[ERROR] [ros2_control_node-2]: process has died [pid 3745, exit code -6, cmd '/home/adam/micromamba/envs/ros_env/lib/controller_manager/ros2_control_node --ros-args --params-file /mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/ros2_ws/install/clearcore_hardware/share/clearcore_hardware/config/controllers.yaml --params-file /tmp/launch_params_nmfupcx_'].
+[spawner-3] [WARN] [1791155222.780943895] [spawner_joint_state_broadcaster]: Could not contact service /controller_manager/list_controllers
+[spawner-3] [INFO] [1791155222.781299683] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[spawner-4] [WARN] [1791155235.684264098] [ros2_control_controller_spawner_joint_trajectory_controller]: Failed to acquire lock in 20 seconds. Attempt 1 of 5 failed. Retrying in 3 seconds...
+[spawner-3] [WARN] [1791155235.718882696] [spawner_joint_state_broadcaster]: Could not contact service /controller_manager/list_controllers
+[spawner-3] [INFO] [1791155235.719085599] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[spawner-3] [WARN] [1791155245.725433385] [spawner_joint_state_broadcaster]: Could not contact service /controller_manager/list_controllers
+[spawner-3] [INFO] [1791155245.725670862] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[spawner-3] [WARN] [1791155255.736827819] [spawner_joint_state_broadcaster]: Could not contact service /controller_manager/list_controllers
+[spawner-3] [INFO] [1791155255.737142534] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [spawner-4]: sending signal 'SIGINT' to process[spawner-4]
+[INFO] [spawner-3]: sending signal 'SIGINT' to process[spawner-3]
+[INFO] [robot_state_publisher-1]: sending signal 'SIGINT' to process[robot_state_publisher-1]
+[robot_state_publisher-1] [INFO] [1791155256.902891802] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[spawner-4] [INFO] [1791155256.902912108] [ros2_control_controller_spawner_joint_trajectory_controller]: KeyboardInterrupt received! Exiting....
+[spawner-3] [INFO] [1791155256.903204650] [spawner_joint_state_broadcaster]: KeyboardInterrupt received! Exiting....
+[INFO] [spawner-4]: process has finished cleanly [pid 3749]
+[INFO] [robot_state_publisher-1]: process has finished cleanly [pid 3743]
+[INFO] [spawner-3]: process has finished cleanly [pid 3747]

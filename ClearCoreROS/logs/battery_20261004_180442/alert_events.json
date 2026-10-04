@@ -1,0 +1,26 @@
+[
+  {
+    "t_s": 34.126934068,
+    "where": "cycle002_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 61.945577161,
+    "where": "cycle003_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 91.154502752,
+    "where": "cycle004_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 117.96725499499999,
+    "where": "cycle005_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  }
+]

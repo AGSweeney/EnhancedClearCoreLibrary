@@ -1,0 +1,21 @@
+[INFO] [launch]: All log files can be found below /home/adam/.ros/log/2026-10-04-18-06-14-515634-DESKTOP-HF5K4CO-2811
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [bridge-1]: process started with pid [2848]
+[bridge-1] [INFO] [1791155175.310659488] [clearcore_bridge]: ClearCoreROS bridge -> 172.16.82.114:9200 mask=3
+[bridge-1] [INFO] [1791155177.278269248] [clearcore_bridge]: connected and enabled
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [bridge-1]: sending signal 'SIGINT' to process[bridge-1]
+[bridge-1] Traceback (most recent call last):
+[bridge-1]   File "/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/ros2_ws/install/clearcore_bridge/lib/clearcore_bridge/bridge", line 33, in <module>
+[bridge-1]     sys.exit(load_entry_point('clearcore_bridge==0.1.0', 'console_scripts', 'bridge')())
+[bridge-1]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[bridge-1]   File "/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/ros2_ws/install/clearcore_bridge/lib/python3.12/site-packages/clearcore_bridge/bridge_node.py", line 516, in main
+[bridge-1]     rclpy.shutdown()
+[bridge-1]   File "/home/adam/micromamba/envs/ros_env/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[bridge-1]     _shutdown(context=context)
+[bridge-1]   File "/home/adam/micromamba/envs/ros_env/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[bridge-1]     context.shutdown()
+[bridge-1]   File "/home/adam/micromamba/envs/ros_env/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[bridge-1]     self.__context.shutdown()
+[bridge-1] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at /home/runner/conda-bld/bld/rattler-build_ros-jazzy-rcl_1788192738/work/ros-jazzy-rcl/src/work/src/rcl/init.c:333
+[ERROR] [bridge-1]: process has died [pid 2848, exit code 1, cmd '/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/ros2_ws/install/clearcore_bridge/lib/clearcore_bridge/bridge --ros-args -r __node:=clearcore_bridge --params-file /tmp/launch_params_3tq2twlj'].

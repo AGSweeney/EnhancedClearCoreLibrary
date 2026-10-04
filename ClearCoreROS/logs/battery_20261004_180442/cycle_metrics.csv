@@ -1,0 +1,5 @@
+cycle,ok,bridge_peak_abs_yx_mm,jtc_peak_abs_yx_mm,jtc_reported_end_x_mm,jtc_reported_end_y_mm,origin_return_x_mm,origin_return_y_mm,origin_return_err_mm,bridge_gap_max_ms,jtc_gap_max_ms,gaps_over_150ms,watchdog_events,alert_events,reconnects_this_cycle
+1,True,0.012500211596488953,0.006,-0.075,-0.075,0.0,0.0,0.0,94.2936730000028,48.04401700000227,0,0,0,0
+2,False,0.006250105798244476,0.006,-0.094,-0.094,0.0,0.0,0.0,92.50161100000298,21.09439699999882,0,0,1,0
+3,False,0.006249989382922649,0.006,-0.144,-0.144,0.0,0.0,0.0,50.29567600000462,20.686059999988515,0,0,1,0
+4,False,0.006250105798244476,0.006,-0.144,-0.144,0.0,0.0,0.0,50.46200399999634,351.3260619999983,1,0,1,0

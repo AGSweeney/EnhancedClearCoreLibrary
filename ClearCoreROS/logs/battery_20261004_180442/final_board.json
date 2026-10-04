@@ -1,0 +1,23 @@
+{
+  "status": {},
+  "config": {},
+  "disabled_state": {
+    "enabled": null,
+    "test_mode_status": null,
+    "test_mode_config": null,
+    "moving": null,
+    "watchdog": null,
+    "alerts": null,
+    "position_m": null,
+    "names": null,
+    "axis_mask": null
+  },
+  "checks": {
+    "enabled_false": false,
+    "test_mode_false": false,
+    "names_default": false,
+    "axis_mask_3": false,
+    "no_alerts": true,
+    "no_watchdog": false
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "label": "origin_post",
+  "ok": false,
+  "return_x_m": null,
+  "return_y_m": null,
+  "return_err_m": null,
+  "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+  "separate_from": "jtc_reported_endpoint",
+  "error": "[Errno 104] Connection reset by peer"
+}
