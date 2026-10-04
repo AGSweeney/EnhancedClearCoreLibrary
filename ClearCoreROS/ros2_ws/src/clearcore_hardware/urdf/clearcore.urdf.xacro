@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="clearcore">
+  <!-- URDF limits are informational. This scaffold does not enforce soft travel limits. -->
+  <xacro:arg name="host" default="192.168.0.109"/>
+  <xacro:arg name="axis_mask" default="3"/>
+
+  <link name="base_link"/>
+  <link name="link_x"/>
+  <link name="link_y"/>
+
+  <joint name="joint_x" type="prismatic">
+    <parent link="base_link"/>
+    <child link="link_x"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-1.0" upper="1.0" effort="1.0" velocity="0.17"/>
+  </joint>
+  <joint name="joint_y" type="prismatic">
+    <parent link="link_x"/>
+    <child link="link_y"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.0" upper="1.0" effort="1.0" velocity="0.17"/>
+  </joint>
+
+  <ros2_control name="ClearCore" type="system">
+    <hardware>
+      <plugin>clearcore_hardware/ClearCoreSystemHardware</plugin>
+      <param name="host">$(arg host)</param>
+      <param name="session_port">9200</param>
+      <param name="stream_port">9201</param>
+      <param name="axis_mask">$(arg axis_mask)</param>
+      <param name="steps_per_rev">800</param>
+      <param name="pitch_mm">5.0</param>
+      <param name="vel_steps">27000</param>
+      <param name="accel_steps">250000</param>
+      <param name="decel_steps">250000</param>
+      <param name="watchdog_ms">500</param>
+      <param name="stream_mode">position</param>
+    </hardware>
+    <joint name="joint_x">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+    <joint name="joint_y">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+  </ros2_control>
+</robot>

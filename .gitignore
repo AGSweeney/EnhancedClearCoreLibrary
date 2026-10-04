@@ -18,3 +18,22 @@ ClearAI_Controller/ClearCoreFirmware/Debug/*.eep
 ClearAI_Controller/ClearCoreFirmware/Debug/*.uf2
 ClearAI_Controller/ClearCoreFirmware/Debug/Device_Startup/*.o
 ClearAI_Controller/ClearCoreFirmware/Debug/Device_Startup/*.d
+
+# ClearCoreROS firmware build outputs (keep Debug/Makefile)
+ClearCoreROS/firmware/Debug/*.o
+ClearCoreROS/firmware/Debug/*.d
+ClearCoreROS/firmware/Debug/*.bin
+ClearCoreROS/firmware/Debug/*.elf
+ClearCoreROS/firmware/Debug/*.hex
+ClearCoreROS/firmware/Debug/*.lss
+ClearCoreROS/firmware/Debug/*.map
+ClearCoreROS/firmware/Debug/*.srec
+ClearCoreROS/firmware/Debug/*.eep
+ClearCoreROS/firmware/Debug/*.uf2
+ClearCoreROS/firmware/Debug/Device_Startup/*.o
+ClearCoreROS/firmware/Debug/Device_Startup/*.d
+ClearCoreROS/host/test_protocol.exe
+ClearCoreROS/host/*.o
+ClearCoreROS/ros2_ws/build/
+ClearCoreROS/ros2_ws/install/
+ClearCoreROS/ros2_ws/log/

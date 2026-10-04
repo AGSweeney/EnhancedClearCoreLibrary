@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<library path="clearcore_system">
+  <class name="clearcore_hardware/ClearCoreSystemHardware"
+         type="clearcore_hardware::ClearCoreSystemHardware"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ClearCore position-command hardware interface. State effort is HLFB duty scaled to -1..1.
+    </description>
+  </class>
+</library>
