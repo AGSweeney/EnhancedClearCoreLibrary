@@ -112,9 +112,13 @@ def cmd_move(args) -> None:
                 f"moving={status['moving']} watchdog={status['watchdog']}"
             )
             if status.get("watchdog"):
-                raise SystemExit("watchdog tripped; call keepalive")
+                raise SystemExit("watchdog tripped; call clear-alerts")
             if status.get("estop"):
                 raise SystemExit("estop active")
+            if status.get("fault"):
+                raise SystemExit("fault")
+            if not status.get("enabled"):
+                raise SystemExit("motor not enabled")
             if err <= tol and not status["moving"]:
                 _print(status)
                 return

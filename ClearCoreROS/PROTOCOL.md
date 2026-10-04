@@ -62,12 +62,12 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 | `get_config` | — | mechanics, watchdog, estop mode, test mode |
 | `get_status` | — | flags, `alert_reg`, `alerts`, position/velocity/effort |
 | `configure` | see below | `{"ok":true}` |
-| `set_test_mode` | `{"on":true}` | test mode skips DI-6 and the HLFB wait |
-| `enable` / `disable` | — | enable waits up to 500 ms for HLFB, then continues |
+| `set_test_mode` | `{"on":true}` | test mode skips DI-6 and the HLFB check |
+| `enable` / `disable` | — | enable waits up to 500 ms for HLFB on every masked axis. If HLFB is not asserted, enable fails and the motors are left disabled. Test mode skips that check. Enable also fails while a watchdog latch is set. |
 | `stop` | — | decelerate, drop the goal, stay enabled |
 | `estop` | — | abrupt stop and disable |
-| `clear_alerts` | — | `ClearAlerts()`, clear watchdog; estop stays if DI-6 is still faulted |
-| `keepalive` | — | clears a watchdog latch |
+| `clear_alerts` | — | `ClearAlerts()` and the only call that clears a watchdog latch. Estop stays if DI-6 is still faulted. |
+| `keepalive` | — | refreshes the host timer. A tripped watchdog stays tripped. |
 | `set_joints` | `x`,`y`,`z`,`a` in meters / radians | absolute goal for the named joints |
 
 `configure` fields:
@@ -103,6 +103,7 @@ Little-endian. Every frame:
 | position | 2 | 20 bytes, absolute joint command |
 | velocity | 3 | 20 bytes, joint velocity command |
 | heartbeat | 4 | 2 bytes, refreshes the watchdog only |
+| track | 5 | 36 bytes, scheduled position and velocity together |
 
 State payload:
 
@@ -116,6 +117,21 @@ State payload:
 | 12 | f32[4] | position (m, m, m, rad) |
 | 28 | f32[4] | velocity (m/s, m/s, m/s, rad/s) |
 | 44 | f32[4] | effort (HLFB / 100) |
+| 60 | u8 | `track_mask` (axes currently in timed tracking) |
+| 64 | f32[4] | target position latched by firmware |
+| 80 | f32[4] | target velocity latched by firmware |
+| 96 | f32[4] | velocity actually given to the step generator |
+| 112 | u32[4] | board time when that axis last accepted a track frame |
+
+Target position, target velocity, latch time, generated position, and `time_ms` are taken in the same firmware sample. The position correction is computed only when the track frame is accepted, against the latched position. It is not recomputed against the time-advanced reference while that target is held. Gain stays at `Kp = 8`.
+
+The local streaming diagnostic is tracking relative to the received reference, not relative to the host clock:
+
+`q_ref(time_ms) = q_latched + v_latched * (time_ms - latch_time)`
+
+Compare generated position with `q_ref` at that same `time_ms`. Host-schedule synchronization and physical shaft position during the move are separate measurements.
+
+On the 80 mm, 4 s ramp the peak of that comparison was 0.05 mm in both directions, about eight generated steps. Latch time is a whole millisecond. At 30 mm/s, 1 ms is 0.03 mm, so 0.05 mm is about 1.67 ms — larger than one timestamp tick. Whole-millisecond timestamps make the timing uncertainty significant, but they do not show that the whole residual is a timestamp artifact. The residual is too close to that resolution to justify changing `Kp` from this measurement alone. Finer timestamps would separate timing quantization from tracking error.
 
 Flag bits: `0x01` enabled, `0x02` moving, `0x04` estop, `0x08` fault, `0x10` watchdog.
 
@@ -130,17 +146,30 @@ Position and velocity payloads:
 
 Heartbeat payload is a `u16` sequence.
 
+Track payload:
+
+| Offset | Type | Field |
+|--------|------|-------|
+| 0 | u16 | sequence |
+| 2 | u8 | axis mask |
+| 3 | u8 | reserved |
+| 4 | f32[4] | scheduled position (m, m, m, rad) |
+| 20 | f32[4] | feedforward velocity |
+
+The firmware commands `feedforward + clamp(Kp * position_error, ±vel_steps/4)` with `Kp = 8` steps/s per step of error. Absolute `position` frames are unchanged.
+
 A bad magic byte is skipped. A known type with the wrong length is skipped. The host and firmware codecs live in `firmware/RosProtocol.h` and `ros2_ws/src/clearcore_bridge/clearcore_bridge/wire.py`. `host/test_wire.py` checks they match.
 
 ## How a goal becomes steps
 
 `StepGenerator::Move()` keeps the current speed and plans a stop at the new endpoint. Calling it on every 20 ms sample would make the motor brake toward each intermediate point.
 
-- A goal that stays unchanged for 40 ms becomes **one** absolute `Move()` at `vel_steps` / `accel_steps`. This is the path used by `set_joints`, `forward_command_controller`, and the FollowJointTrajectory bridge (one frame per trajectory point).
-- A goal that is still changing is followed with `MoveVelocity()`, and the velocity command is updated only when it changes by about 8% (or 200 steps/s). The cruise speed is the configured `vel_steps`, not the ROS trajectory's time parameterization.
-- A velocity frame runs that joint in velocity mode until a later position frame replaces it. `stream_mode:=velocity` on the hardware plugin sends `dq/dt` while a `joint_trajectory_controller` command is moving, then one position frame to land.
+- A goal that stays unchanged for 40 ms becomes **one** absolute `Move()` at `vel_steps` / `accel_steps`. `set_joints` and `forward_command_controller` use this path.
+- A goal that is still changing is followed with `MoveVelocity()`. Each new integer steps/s value is applied. There is no percentage deadband.
+- A `track` frame is the timed-execution path: velocity is feedforward and the position error adds a bounded correction. A later absolute `position` frame leaves tracking and uses the settled-move path.
+- `clearcore_bridge` samples `FollowJointTrajectory` against `time_from_start` and sends `track` frames. Specified point velocities are the spline boundary conditions. Omitted velocities use the segment slope. A non-zero acceleration limits the change in the streamed velocity. Path tolerances are checked against the sample. The bridge accepts one goal at a time. In `stream_mode:=velocity`, the hardware plugin sends the same `track` frame while the command is changing, then a position hold.
 
-The watchdog trips only while a goal is unfinished or a velocity command is nonzero and the host has been silent for `watchdog_ms`. Reaching the target and then going quiet does not trip. A stream disconnect mid-move trips immediately. Clearing the latch requires `keepalive` or `clear_alerts`.
+The watchdog trips only while a goal is unfinished or a velocity command is nonzero and the host has been silent for `watchdog_ms`. Reaching the target and then going quiet does not trip. A stream disconnect mid-move trips immediately. `keepalive` does not clear the latch, and hosts must not do it automatically. `clear_alerts` is the recovery; until then position and velocity commands are ignored. The hardware plugin also latches the trip and refuses further writes until the controller activates again, which calls `clear_alerts` before `enable`.
 
 ## Not in this scaffold
 

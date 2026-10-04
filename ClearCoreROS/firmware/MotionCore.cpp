@@ -4,8 +4,9 @@
  *
  * StepGenerator::Move() retargets and keeps the current velocity, but each
  * call plans a stop at the new endpoint. A goal that is still changing is
- * tracked with a latched velocity. Once the goal has been stable, one
- * absolute Move() lands on the nearest step.
+ * tracked with a latched velocity. Any new integer steps/s value is applied.
+ * A track frame adds a bounded correction from the scheduled-position error.
+ * Once an absolute goal has been stable, one Move() lands on the nearest step.
  *
  * Joint commands are absolute. Rounding is nearest-step on the absolute
  * target, so the relative-move residual drift fixed in ClearAI does not apply.
@@ -40,6 +41,11 @@ static uint32_t g_goalChangedMs[CCROS_AXIS_COUNT];
 static bool g_absIssued[CCROS_AXIS_COUNT];
 static bool g_absRetried[CCROS_AXIS_COUNT];
 static bool g_axisVelMode[CCROS_AXIS_COUNT];
+static bool g_axisTrack[CCROS_AXIS_COUNT];
+static float g_trackPos[CCROS_AXIS_COUNT];
+static float g_trackVel[CCROS_AXIS_COUNT];
+static bool g_trackDirty[CCROS_AXIS_COUNT];
+static uint32_t g_trackLatchMs[CCROS_AXIS_COUNT];
 static float g_velGoal[CCROS_AXIS_COUNT];
 static bool g_velLatched[CCROS_AXIS_COUNT];
 static int32_t g_velCmd[CCROS_AXIS_COUNT];
@@ -99,6 +105,10 @@ static void ClearGoals() {
         g_absIssued[a] = false;
         g_absRetried[a] = false;
         g_axisVelMode[a] = false;
+        g_axisTrack[a] = false;
+        g_trackDirty[a] = false;
+        g_trackPos[a] = 0.f;
+        g_trackVel[a] = 0.f;
         g_velGoal[a] = 0.f;
         g_velLatched[a] = false;
         g_velCmd[a] = 0;
@@ -235,7 +245,11 @@ static bool MotionPending() {
         if (!m) {
             continue;
         }
-        if (g_axisVelMode[a] && g_velCmd[a] != 0) {
+        if ((g_axisVelMode[a] || g_axisTrack[a]) && g_velCmd[a] != 0) {
+            return true;
+        }
+        if (g_axisTrack[a] && IAbs32(RoundToI32((double)g_trackPos[a] * StepsPerUnit(a)) -
+                                    m->PositionRefCommanded()) > 1) {
             return true;
         }
         if (g_goalValid[a] && IAbs32(g_goalSteps[a] - m->PositionRefCommanded()) > 1) {
@@ -273,10 +287,7 @@ static void LatchVelocity(uint8_t axis, MotorDriver *m, int32_t sps, uint32_t no
     if (delta < 0) {
         delta = -delta;
     }
-    int32_t thresh = (int32_t)(g_vel / 12u);
-    if (thresh < 200) {
-        thresh = 200;
-    }
+    const int32_t thresh = CcrosVelocityDeadband(sps, g_velCmd[axis]);
     const bool signChange =
         g_velLatched[axis] && g_velCmd[axis] != 0 && ((sps > 0) != (g_velCmd[axis] > 0));
     if (g_velLatched[axis] && !signChange && delta < thresh) {
@@ -291,6 +302,31 @@ static void LatchVelocity(uint8_t axis, MotorDriver *m, int32_t sps, uint32_t no
     } else {
         g_retryMs[axis] = now;
     }
+}
+
+/* Position correction runs only when a new track frame sets g_trackDirty.
+ * At that instant t - t_latch is ~0, so the error is versus q_latched, not
+ * versus q_latched + v*(t - t_latch). Between frames the latched target is
+ * held and this function does not run. */
+static void ServiceTrack(uint8_t axis, uint32_t now) {
+    if (!g_trackDirty[axis]) {
+        return;
+    }
+    g_trackDirty[axis] = false;
+    MotorDriver *m = MotorFor(axis);
+    const double spu = StepsPerUnit(axis);
+    if (!m || spu <= 0.0) {
+        return;
+    }
+    const int32_t scheduled = RoundToI32((double)g_trackPos[axis] * spu);
+    const int32_t ff = RoundToI32((double)g_trackVel[axis] * spu);
+    const int32_t err = scheduled - m->PositionRefCommanded();
+    int32_t corr_limit = (int32_t)(g_vel / 4u);
+    if (corr_limit < 1) {
+        corr_limit = 1;
+    }
+    const int32_t sps = CcrosTrackVelocity(ff, err, CCROS_TRACK_KP, corr_limit, (int32_t)g_vel);
+    LatchVelocity(axis, m, sps, now);
 }
 
 static void ServiceVelocity(uint8_t axis, uint32_t now) {
@@ -399,7 +435,7 @@ static const char *StorePosition(uint8_t mask, const float q[4], uint16_t seq, b
         return "estop active";
     }
     if (g_watchdogTripped) {
-        return "watchdog tripped; call keepalive";
+        return "watchdog tripped; call clear_alerts";
     }
     g_lastHostMs = Milliseconds();
     g_lastCmdSeq = seq;
@@ -438,6 +474,8 @@ static const char *StorePosition(uint8_t mask, const float q[4], uint16_t seq, b
             g_velLatched[a] = false;
         }
         g_axisVelMode[a] = false;
+        g_axisTrack[a] = false;
+        g_trackDirty[a] = false;
     }
     return nullptr;
 }
@@ -502,7 +540,9 @@ void MotionPoll() {
         if (!AxisOn(a)) {
             continue;
         }
-        if (g_axisVelMode[a]) {
+        if (g_axisTrack[a]) {
+            ServiceTrack(a, now);
+        } else if (g_axisVelMode[a]) {
             ServiceVelocity(a, now);
         } else if (g_goalValid[a]) {
             ServicePosition(a, now);
@@ -599,8 +639,10 @@ const char *MotionEnable() {
         g_interrupted = true;
         return "hardware estop";
     }
+    if (g_watchdogTripped) {
+        return "watchdog tripped; call clear_alerts";
+    }
     g_interrupted = false;
-    g_watchdogTripped = false;
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
         MotorDriver *m = MotorFor(a);
         if (!m) {
@@ -610,8 +652,9 @@ const char *MotionEnable() {
     }
     if (!g_testMode) {
         const uint32_t start = Milliseconds();
+        bool ready = false;
         while (Milliseconds() - start < CCROS_ENABLE_HLFB_WAIT_MS) {
-            bool ready = true;
+            ready = true;
             for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
                 if (!AxisOn(a)) {
                     continue;
@@ -625,6 +668,16 @@ const char *MotionEnable() {
                 break;
             }
             Delay_ms(1);
+        }
+        if (!ready) {
+            for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+                MotorDriver *m = MotorFor(a);
+                if (m) {
+                    m->EnableRequest(false);
+                }
+            }
+            g_enabled = false;
+            return "HLFB not ready";
         }
     }
     g_enabled = true;
@@ -664,9 +717,12 @@ const char *MotionClearAlerts() {
     return nullptr;
 }
 
-void MotionKeepalive() {
-    g_watchdogTripped = false;
+const char *MotionKeepalive() {
+    if (g_watchdogTripped) {
+        return "watchdog tripped; call clear_alerts";
+    }
     g_lastHostMs = Milliseconds();
+    return nullptr;
 }
 
 void MotionNoteHost() {
@@ -709,8 +765,40 @@ void MotionNoteVelocity(uint16_t seq, uint8_t mask, const float v[4]) {
             continue;
         }
         g_axisVelMode[a] = true;
+        g_axisTrack[a] = false;
+        g_trackDirty[a] = false;
         g_goalValid[a] = false;
         g_velGoal[a] = v[a];
+    }
+}
+
+void MotionNoteTrack(uint16_t seq, uint8_t mask, const float q[4], const float v[4]) {
+    if (g_interrupted || g_watchdogTripped) {
+        return;
+    }
+    g_lastHostMs = Milliseconds();
+    g_lastCmdSeq = seq;
+    if (!g_enabled) {
+        return;
+    }
+    const uint8_t use = (uint8_t)(mask & (uint8_t)g_axisMask);
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        if ((use & (1u << a)) == 0) {
+            continue;
+        }
+        if (!(q[a] > -1.0e9f && q[a] < 1.0e9f)) {
+            continue;
+        }
+        if (!(v[a] > -1.0e9f && v[a] < 1.0e9f)) {
+            continue;
+        }
+        g_axisTrack[a] = true;
+        g_axisVelMode[a] = false;
+        g_goalValid[a] = false;
+        g_trackPos[a] = q[a];
+        g_trackVel[a] = v[a];
+        g_trackLatchMs[a] = Milliseconds();
+        g_trackDirty[a] = true;
     }
 }
 
@@ -773,6 +861,19 @@ void MotionFillState(CcrosState *out) {
         if (duty >= -100.f && duty <= 100.f) {
             out->effort[a] = duty / 100.f;
         }
+        if (g_axisTrack[a]) {
+            out->track_mask = (uint8_t)(out->track_mask | (1u << a));
+            out->target_position[a] = g_trackPos[a];
+            out->target_velocity[a] = g_trackVel[a];
+        } else if (g_goalValid[a] && spu > 0.0) {
+            out->target_position[a] = (float)((double)g_goalSteps[a] / spu);
+        } else {
+            out->target_position[a] = out->position[a];
+        }
+        if (spu > 0.0) {
+            out->command_velocity[a] = (float)((double)g_velCmd[a] / spu);
+        }
+        out->target_latch_ms[a] = g_trackLatchMs[a];
     }
     out->alert_reg = alerts;
     if (fault) {

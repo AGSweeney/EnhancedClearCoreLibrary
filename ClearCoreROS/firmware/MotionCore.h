@@ -38,7 +38,7 @@ const char *MotionDisable();
 const char *MotionStop();
 const char *MotionEstop();
 const char *MotionClearAlerts();
-void MotionKeepalive();
+const char *MotionKeepalive();
 void MotionNoteHost();
 void MotionStreamLost();
 
@@ -46,6 +46,7 @@ void MotionStreamLost();
 const char *MotionSetJoints(uint8_t mask, const float q[4]);
 void MotionNotePosition(uint16_t seq, uint8_t mask, const float q[4]);
 void MotionNoteVelocity(uint16_t seq, uint8_t mask, const float v[4]);
+void MotionNoteTrack(uint16_t seq, uint8_t mask, const float q[4], const float v[4]);
 
 void MotionFillState(CcrosState *out);
 void MotionFillCapabilitiesJson(char *buf, uint16_t len);

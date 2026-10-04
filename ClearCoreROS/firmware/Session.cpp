@@ -310,9 +310,7 @@ void SessionDispatch(const char *line) {
         TransportSendLine(reply);
         return;
     }
-    if (strcmp(req.method, "keepalive") == 0) {
-        MotionKeepalive();
-    } else {
+    if (strcmp(req.method, "keepalive") != 0) {
         MotionNoteHost();
     }
 
@@ -366,7 +364,10 @@ void SessionDispatch(const char *line) {
             snprintf(body, sizeof(body), "{\"ok\":true}");
         }
     } else if (strcmp(req.method, "keepalive") == 0) {
-        snprintf(body, sizeof(body), "{\"ok\":true}");
+        err = MotionKeepalive();
+        if (!err) {
+            snprintf(body, sizeof(body), "{\"ok\":true}");
+        }
     } else if (strcmp(req.method, "set_joints") == 0) {
         uint8_t mask = 0;
         float q[CCROS_AXIS_COUNT] = {0, 0, 0, 0};

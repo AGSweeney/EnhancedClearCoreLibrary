@@ -82,6 +82,28 @@ int main() {
     if (!saw) {
         return Fail("resync missed state");
     }
+    /* 1000 -> 3250 steps/s must not be ignored. The old deadband was
+     * max(vel_max/12, 200) = 2250 at the default 27000 steps/s cap. */
+    if (CcrosVelocityDeadband(3250, 1000) != 1) {
+        return Fail("velocity deadband still discards small changes");
+    }
+    /* 300-step lag at Kp 8 is +2400 steps/s, under a 4000 step/s bound. */
+    if (CcrosTrackVelocity(4800, 300, 8, 4000, 16000) != 7200) {
+        return Fail("track correction");
+    }
+    if (CcrosTrackVelocity(4800, 10000, 8, 4000, 16000) != 8800) {
+        return Fail("track correction bound");
+    }
+    int hold = 0;
+    if (CcrosNextStream(1, 1, &hold) != CCROS_STREAM_VELOCITY || hold != 1) {
+        return Fail("velocity stream did not latch a hold");
+    }
+    if (CcrosNextStream(1, 0, &hold) != CCROS_STREAM_POSITION || hold != 0) {
+        return Fail("velocity stream heartbeat instead of hold");
+    }
+    if (CcrosNextStream(1, 0, &hold) != CCROS_STREAM_HEARTBEAT) {
+        return Fail("hold did not return to heartbeat");
+    }
     printf("ok\n");
     return 0;
 }

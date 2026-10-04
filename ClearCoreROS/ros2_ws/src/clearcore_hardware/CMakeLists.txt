@@ -13,9 +13,12 @@ find_package(rclcpp_lifecycle REQUIRED)
 
 add_library(clearcore_system SHARED src/clearcore_system.cpp)
 target_compile_features(clearcore_system PUBLIC cxx_std_17)
-target_include_directories(clearcore_system PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
+target_include_directories(clearcore_system
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../firmware)
 ament_target_dependencies(clearcore_system
   hardware_interface
   pluginlib

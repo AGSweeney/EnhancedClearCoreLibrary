@@ -19,6 +19,7 @@ TYPE_STATE = 1
 TYPE_POSITION = 2
 TYPE_VELOCITY = 3
 TYPE_HEARTBEAT = 4
+TYPE_TRACK = 5
 
 FLAG_ENABLED = 0x01
 FLAG_MOVING = 0x02
@@ -26,9 +27,10 @@ FLAG_ESTOP = 0x04
 FLAG_FAULT = 0x08
 FLAG_WATCHDOG = 0x10
 
-STATE_PAYLOAD = 60
+STATE_PAYLOAD = 128
 POSITION_PAYLOAD = 20
 HEARTBEAT_PAYLOAD = 2
+TRACK_PAYLOAD = 36
 
 JOINTS = ("joint_x", "joint_y", "joint_z", "joint_a")
 AXIS = {"x": 0, "y": 1, "z": 2, "a": 3, "joint_x": 0, "joint_y": 1, "joint_z": 2, "joint_a": 3}
@@ -56,6 +58,17 @@ def pack_velocity(seq: int, mask: int, v: Iterable[float]) -> bytes:
     return _hdr(TYPE_VELOCITY, len(payload)) + payload
 
 
+def pack_track(seq: int, mask: int, position: Iterable[float], velocity: Iterable[float]) -> bytes:
+    pos = tuple(position)
+    vel = tuple(velocity)
+    if len(pos) != 4 or len(vel) != 4:
+        raise ValueError("track needs 4 positions and 4 velocities")
+    payload = struct.pack("<HBB4f4f", seq & 0xFFFF, mask & 0xFF, 0, *pos, *vel)
+    if len(payload) != TRACK_PAYLOAD:
+        raise RuntimeError("track payload size")
+    return _hdr(TYPE_TRACK, len(payload)) + payload
+
+
 def pack_heartbeat(seq: int) -> bytes:
     payload = struct.pack("<H", seq & 0xFFFF)
     return _hdr(TYPE_HEARTBEAT, len(payload)) + payload
@@ -69,6 +82,11 @@ def _parse_payload(msg_type: int, payload: bytes) -> dict:
         pos = struct.unpack_from("<4f", payload, 12)
         vel = struct.unpack_from("<4f", payload, 28)
         eff = struct.unpack_from("<4f", payload, 44)
+        track_mask = payload[60]
+        target_pos = struct.unpack_from("<4f", payload, 64)
+        target_vel = struct.unpack_from("<4f", payload, 80)
+        command_vel = struct.unpack_from("<4f", payload, 96)
+        target_latch_ms = struct.unpack_from("<4I", payload, 112)
         return {
             "type": "state",
             "time_ms": time_ms,
@@ -79,6 +97,11 @@ def _parse_payload(msg_type: int, payload: bytes) -> dict:
             "position": pos,
             "velocity": vel,
             "effort": eff,
+            "track_mask": track_mask,
+            "target_position": target_pos,
+            "target_velocity": target_vel,
+            "command_velocity": command_vel,
+            "target_latch_ms": target_latch_ms,
             "enabled": bool(flags & FLAG_ENABLED),
             "moving": bool(flags & FLAG_MOVING),
             "estop": bool(flags & FLAG_ESTOP),
@@ -92,6 +115,13 @@ def _parse_payload(msg_type: int, payload: bytes) -> dict:
         vals = struct.unpack_from("<4f", payload, 4)
         kind = "position" if msg_type == TYPE_POSITION else "velocity"
         return {"type": kind, "seq": seq, "mask": mask, "values": vals}
+    if msg_type == TYPE_TRACK:
+        if len(payload) != TRACK_PAYLOAD:
+            raise ValueError("bad track payload")
+        seq, mask, _reserved = struct.unpack_from("<HBB", payload, 0)
+        pos = struct.unpack_from("<4f", payload, 4)
+        vel = struct.unpack_from("<4f", payload, 20)
+        return {"type": "track", "seq": seq, "mask": mask, "position": pos, "velocity": vel}
     if msg_type == TYPE_HEARTBEAT:
         if len(payload) != HEARTBEAT_PAYLOAD:
             raise ValueError("bad heartbeat payload")
@@ -120,6 +150,9 @@ def feed(buf: bytearray) -> list[dict]:
             del buf[0]
             continue
         if msg_type == TYPE_HEARTBEAT and plen != HEARTBEAT_PAYLOAD:
+            del buf[0]
+            continue
+        if msg_type == TYPE_TRACK and plen != TRACK_PAYLOAD:
             del buf[0]
             continue
         total = HDR_SIZE + plen
@@ -192,6 +225,9 @@ class StreamClient:
     def send_velocity(self, mask: int, v: Iterable[float]) -> None:
         self._send(pack_velocity(self._seq, mask, v))
 
+    def send_track(self, mask: int, position: Iterable[float], velocity: Iterable[float]) -> None:
+        self._send(pack_track(self._seq, mask, position, velocity))
+
     def send_heartbeat(self) -> None:
         self._send(pack_heartbeat(self._seq))
 
@@ -205,11 +241,12 @@ class StreamClient:
         try:
             chunk = self.sock.recv(512)
         except (BlockingIOError, socket.timeout):
-            chunk = b""
+            return feed(self._buf)
         except OSError:
             raise
-        if chunk:
-            self._buf.extend(chunk)
+        if chunk == b"":
+            raise ConnectionError("stream closed")
+        self._buf.extend(chunk)
         return feed(self._buf)
 
 

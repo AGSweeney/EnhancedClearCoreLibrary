@@ -20,6 +20,8 @@
 
 #define CCROS_STREAM_PERIOD_MS 20u
 #define CCROS_GOAL_STABLE_MS 40u
+/* Timed tracking: steps/s of correction per step of schedule error. */
+#define CCROS_TRACK_KP 8
 #define CCROS_MOVE_RETRY_MS 20u
 #define CCROS_WAIT_USB_MS 5000u
 #define CCROS_ENABLE_HLFB_WAIT_MS 500u

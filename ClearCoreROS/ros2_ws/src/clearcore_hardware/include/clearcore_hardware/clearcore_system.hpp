@@ -52,7 +52,8 @@ private:
   std::vector<uint8_t> rx_;
   bool have_state_{false};
   bool velocity_stream_{false};
-  int stable_cycles_{0};
+  bool velocity_hold_pending_{false};
+  bool fault_latched_{false};
   uint16_t seq_{1};
 
   std::vector<int> axis_of_joint_;

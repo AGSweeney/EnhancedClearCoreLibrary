@@ -3,6 +3,7 @@
   <!-- URDF limits are informational. This scaffold does not enforce soft travel limits. -->
   <xacro:arg name="host" default="192.168.0.109"/>
   <xacro:arg name="axis_mask" default="3"/>
+  <xacro:arg name="test_mode" default="false"/>
 
   <link name="base_link"/>
   <link name="link_x"/>
@@ -36,6 +37,7 @@
       <param name="accel_steps">250000</param>
       <param name="decel_steps">250000</param>
       <param name="watchdog_ms">500</param>
+      <param name="test_mode">$(arg test_mode)</param>
       <param name="stream_mode">position</param>
     </hardware>
     <joint name="joint_x">

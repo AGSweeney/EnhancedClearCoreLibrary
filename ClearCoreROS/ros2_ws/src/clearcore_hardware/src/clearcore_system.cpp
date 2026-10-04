@@ -6,6 +6,8 @@
 
 #include "clearcore_hardware/clearcore_system.hpp"
 
+#include "RosProtocol.h"
+
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -267,7 +269,13 @@ hardware_interface::CallbackReturn ClearCoreSystemHardware::on_activate(
       << ",\"accel_steps\":" << param("accel_steps", "250000")
       << ",\"decel_steps\":" << param("decel_steps", param("accel_steps", "250000"))
       << ",\"watchdog_ms\":" << param("watchdog_ms", "500") << "}";
-  if (!session_call("disable", "") || !session_call("configure", cfg.str()) ||
+  /* clear_alerts is the recovery from a watchdog latch. It is part of
+   * activate, not of the realtime read loop. */
+  const std::string test_mode = param("test_mode", "false");
+  const bool skip_hlfb = test_mode == "true" || test_mode == "1";
+  if (!session_call("disable", "") || !session_call("clear_alerts", "") ||
+      !session_call("configure", cfg.str()) ||
+      (skip_hlfb && !session_call("set_test_mode", "{\"on\":true}")) ||
       !session_call("enable", ""))
   {
     RCLCPP_ERROR(rclcpp::get_logger("clearcore_system"), "enable/configure rejected");
@@ -280,6 +288,9 @@ hardware_interface::CallbackReturn ClearCoreSystemHardware::on_activate(
     return hardware_interface::CallbackReturn::ERROR;
   }
   have_state_ = false;
+  fault_latched_ = false;
+  velocity_hold_pending_ = false;
+  rx_.clear();
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
   while (!have_state_ && std::chrono::steady_clock::now() < deadline) {
     if (drain_stream() != hardware_interface::return_type::OK) {
@@ -297,7 +308,6 @@ hardware_interface::CallbackReturn ClearCoreSystemHardware::on_activate(
   }
   hw_cmd_ = hw_pos_;
   last_cmd_ = hw_pos_;
-  stable_cycles_ = 0;
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -313,6 +323,9 @@ hardware_interface::CallbackReturn ClearCoreSystemHardware::on_deactivate(
 
 hardware_interface::return_type ClearCoreSystemHardware::drain_stream()
 {
+  if (fault_latched_) {
+    return hardware_interface::return_type::ERROR;
+  }
   uint8_t tmp[256];
   while (true) {
     const ssize_t n = ::recv(stream_fd_, tmp, sizeof(tmp), MSG_DONTWAIT);
@@ -339,7 +352,7 @@ hardware_interface::return_type ClearCoreSystemHardware::drain_stream()
     }
     const uint8_t type = rx_[off + 2];
     const uint16_t plen = get_u16(&rx_[off + 4]);
-    if (plen > 60 || (type == kTypeState && plen != 60)) {
+    if (plen > 128 || (type == kTypeState && plen != 128)) {
       ++off;
       continue;
     }
@@ -350,7 +363,10 @@ hardware_interface::return_type ClearCoreSystemHardware::drain_stream()
       const uint8_t * p = &rx_[off + 6];
       const uint8_t flags = p[6];
       if (flags & kFlagWatchdog) {
-        session_call("keepalive", "");
+        /* Leave the latch set. clear_alerts during the next activate is the
+         * recovery; a keepalive here would resume motion on the next write. */
+        fault_latched_ = true;
+        return hardware_interface::return_type::ERROR;
       }
       for (size_t i = 0; i < axis_of_joint_.size(); ++i) {
         const int axis = axis_of_joint_[i];
@@ -399,7 +415,7 @@ bool ClearCoreSystemHardware::send_frame(const uint8_t * data, size_t n)
 hardware_interface::return_type ClearCoreSystemHardware::write(
   const rclcpp::Time &, const rclcpp::Duration & period)
 {
-  if (stream_fd_ < 0) {
+  if (stream_fd_ < 0 || fault_latched_) {
     return hardware_interface::return_type::ERROR;
   }
   float q[4] = {0, 0, 0, 0};
@@ -417,23 +433,19 @@ hardware_interface::return_type ClearCoreSystemHardware::write(
     mask = static_cast<uint8_t>(mask | (1u << axis));
   }
 
-  uint8_t frame[32];
-  frame[0] = kMagic;
-  frame[1] = kVersion;
-  frame[3] = 0;
-  const bool land = velocity_stream_ && !changed && stable_cycles_ >= 2;
-  if (velocity_stream_ && changed) {
-    frame[2] = kTypeVelocity;
-    put_u16(frame + 4, 20);
-    put_u16(frame + 6, seq_);
-    frame[8] = mask;
-    frame[9] = 0;
-    for (int a = 0; a < 4; ++a) {
-      put_f32(frame + 10 + (a * 4), v[a]);
-    }
-    stable_cycles_ = 0;
+  int hold = velocity_hold_pending_ ? 1 : 0;
+  const int action = CcrosNextStream(velocity_stream_ ? 1 : 0, changed ? 1 : 0, &hold);
+  velocity_hold_pending_ = hold != 0;
+
+  uint8_t frame[CCROS_MAX_FRAME];
+  int n = 0;
+  if (action == CCROS_STREAM_VELOCITY) {
+    n = CcrosEncodeTrack(frame, sizeof(frame), seq_, mask, q, v);
     last_cmd_ = hw_cmd_;
-  } else if (!velocity_stream_ || land) {
+  } else if (action == CCROS_STREAM_POSITION) {
+    frame[0] = kMagic;
+    frame[1] = kVersion;
+    frame[3] = 0;
     frame[2] = kTypePosition;
     put_u16(frame + 4, 20);
     put_u16(frame + 6, seq_);
@@ -442,19 +454,19 @@ hardware_interface::return_type ClearCoreSystemHardware::write(
     for (int a = 0; a < 4; ++a) {
       put_f32(frame + 10 + (a * 4), q[a]);
     }
-    if (land) {
-      stable_cycles_ = 0;
-    }
     last_cmd_ = hw_cmd_;
+    n = 26;
   } else {
+    frame[0] = kMagic;
+    frame[1] = kVersion;
     frame[2] = kTypeHeartbeat;
+    frame[3] = 0;
     put_u16(frame + 4, 2);
     put_u16(frame + 6, seq_);
-    ++stable_cycles_;
+    n = 8;
   }
-  const size_t n = (frame[2] == kTypeHeartbeat) ? 8u : 26u;
   seq_ = static_cast<uint16_t>(seq_ + 1);
-  if (!send_frame(frame, n)) {
+  if (n <= 0 || !send_frame(frame, static_cast<size_t>(n))) {
     return hardware_interface::return_type::ERROR;
   }
   return hardware_interface::return_type::OK;

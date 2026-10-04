@@ -69,7 +69,7 @@ source install/setup.bash
 
 ### Trajectory action
 
-`clearcore_bridge` connects, enables, publishes `/joint_states`, and serves `follow_joint_trajectory`. Each trajectory point is one absolute move. The firmware uses its own `vel_steps` / `accel_steps`; `time_from_start` is the deadline for that point. For the M0 bench, pass `axis_mask:=1`.
+`clearcore_bridge` connects, enables, publishes `/joint_states`, and serves `follow_joint_trajectory`. The action follows `time_from_start`, including point velocities and accelerations when they are set, and checks path tolerances while the arm is moving. Streaming error is generated position versus the received reference advanced to the board sample time (`q_latched + v_latched * (time_ms - latch_time)`), not versus the host clock. A second goal is rejected until the first finishes. Joint state stamps are the time the sample was received, and a stale, disabled, faulted, or tripped sample is not treated as a finished move. For the M0 bench, pass `axis_mask:=1`. `enable` fails unless HLFB is asserted; pass `test_mode:=true` on a bare motor.
 
 ```bash
 ros2 launch clearcore_bridge bridge.launch.py host:=172.16.82.113 axis_mask:=1
@@ -86,7 +86,7 @@ Services on the node: `enable`, `disable`, `stop`, `estop`, `clear_alerts`.
 ros2 launch clearcore_hardware hardware.launch.py host:=172.16.82.113
 ```
 
-`stream_mode` is `position` by default: a settled command becomes one trapezoidal move. Set `stream_mode` to `velocity` in the xacro when a `joint_trajectory_controller` is streaming interpolated samples; the plugin then sends `dq/dt` and a final position to land. That mode follows the command's slope. It still uses the firmware accel limit.
+`stream_mode` is `position` by default: a settled command becomes one trapezoidal move. Set `stream_mode` to `velocity` in the xacro when a `joint_trajectory_controller` is streaming interpolated samples. The plugin sends `dq/dt` while the command is changing, then a position hold on the next cycle. A watchdog flag latches the plugin; writes stop until the hardware is activated again.
 
 URDF `<limit>` tags are not enforced on the board. Soft limits are not implemented yet.
 
@@ -94,5 +94,5 @@ URDF `<limit>` tags are not enforced on the board. Soft limits are not implement
 
 - DI-6 defaults to an active-low estop (`estop_di6` 1), same as ClearAI. `set_test_mode` is bench-only.
 - `stop` decelerates. `estop` and `disable` drop the enable line.
-- A host that disappears mid-move trips the watchdog (default 500 ms) or, if the stream socket drops, stops immediately.
+- A host that disappears mid-move trips the watchdog (default 500 ms) or, if the stream socket drops, stops immediately. Clearing that latch is `clear_alerts`, not a keepalive.
 - Do not connect the CLI and a ROS node at the same time. Each port accepts one client.

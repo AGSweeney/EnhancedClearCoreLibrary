@@ -30,7 +30,7 @@ static uint16_t g_usbIndex = 0;
 static char g_tcpLine[CCROS_MAX_LINE];
 static uint16_t g_tcpIndex = 0;
 
-static uint8_t g_rx[128];
+static uint8_t g_rx[256];
 static uint16_t g_rxLen = 0;
 static uint32_t g_lastStateMs = 0;
 static uint16_t g_stateSeq = 0;
@@ -158,6 +158,8 @@ static void PollStream() {
             MotionNotePosition(decoded.seq, decoded.mask, decoded.a);
         } else if (decoded.type == CCROS_TYPE_VELOCITY) {
             MotionNoteVelocity(decoded.seq, decoded.mask, decoded.a);
+        } else if (decoded.type == CCROS_TYPE_TRACK) {
+            MotionNoteTrack(decoded.seq, decoded.mask, decoded.a, decoded.b);
         } else if (decoded.type == CCROS_TYPE_HEARTBEAT) {
             MotionNoteHost();
         }
