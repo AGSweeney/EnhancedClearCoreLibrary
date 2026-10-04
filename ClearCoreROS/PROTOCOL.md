@@ -77,6 +77,8 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 | `wait_idle` | optional `timeout_ms` | blocks until motion is still |
 | `home` | `axis`, `dir`, optional `seek`, `backoff`, `timeout_ms`, `zero` | seek that axis's limit switch |
 | `probe` | `axis`, `dir`, `pin`, optional `active`, `seek`, `backoff`, `zero` | seek until the probe input trips |
+| `xrce_connect` | `ip_address`, optional `port` | start the XRCE-DDS client toward a micro-ROS agent |
+| `xrce_disconnect` | — | stop the XRCE-DDS client |
 
 `configure` fields:
 
@@ -199,6 +201,12 @@ The watchdog trips only while a goal is unfinished or a velocity command is nonz
 
 `probe` seeks until digital input `pin` (1..12) reads `active` (`high` by default, or `low`). The pin cannot be one already assigned as a limit. `zero` defaults to false. A hit stops that axis. Hardware estop aborts the seek. The call blocks, so a following `stop` is not read until it returns.
 
-## Not in this scaffold
+## XRCE-DDS
 
-- micro-ROS / XRCE-DDS. The joint mapping above is what a future XRCE transport would publish.
+The board can publish the four joints to a micro-ROS agent. This does not run a DDS participant on the ClearCore. The agent is the DDS participant. The board is an XRCE-DDS 1.0 client.
+
+`xrce_connect` takes `ip_address` and an optional `port` (default 8888, the micro-ROS agent UDP port). The board binds local UDP **9203**. That stays clear of ClearAI, ClearCNC, and the session ports. `xrce_disconnect` stops it. The agent address is not stored in NVM.
+
+Once the agent accepts the session, the firmware publishes `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The names are `joint_x`, `joint_y`, `joint_z`, and `joint_a`, in meters and radians, from the same generated-step sample as the binary state frame. The stamp is time since boot, not a synchronized host clock. `get_status` reports `xrce` as `off`, `connecting`, `creating`, or `streaming`.
+
+Commands still use the session and the binary stream. The XRCE client only publishes.

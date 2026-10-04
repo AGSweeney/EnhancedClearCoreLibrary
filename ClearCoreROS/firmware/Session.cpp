@@ -4,6 +4,7 @@
 
 #include "MotionCore.h"
 #include "Transport.h"
+#include "XrceClient.h"
 
 #define JSMN_STATIC
 #include "jsmn.h"
@@ -54,6 +55,8 @@ struct SessionReq {
     bool zeroOn;
     bool hasFeed;
     double feedMps;
+    bool hasPort;
+    uint16_t port;
 };
 
 static bool TokEq(const char *js, const jsmntok_t *t, const char *s) {
@@ -378,7 +381,7 @@ static void ApplyKey(const char *js, const jsmntok_t *toks, int ntok, int keyInd
             return;
         }
     } else if (TokEq(js, key, "pin") || TokEq(js, key, "seek") || TokEq(js, key, "backoff") ||
-               TokEq(js, key, "timeout_ms") || TokEq(js, key, "feed_mps")) {
+               TokEq(js, key, "port") || TokEq(js, key, "timeout_ms") || TokEq(js, key, "feed_mps")) {
         double d = 0;
         if (!ParseDouble(js, val, &d)) {
             req->error = "expected a number";
@@ -397,6 +400,13 @@ static void ApplyKey(const char *js, const jsmntok_t *toks, int ntok, int keyInd
         } else if (TokEq(js, key, "backoff")) {
             req->hasBackoff = true;
             req->backoff = d;
+        } else if (TokEq(js, key, "port")) {
+            if (d < 1.0 || d > 65535.0) {
+                req->error = "port out of range";
+                return;
+            }
+            req->hasPort = true;
+            req->port = (uint16_t)d;
         } else if (TokEq(js, key, "timeout_ms")) {
             if (d < 0.0) {
                 req->error = "timeout_ms out of range";
@@ -640,6 +650,55 @@ void SessionDispatch(const char *line) {
         err = MotionHome(req.hasAxisName ? req.axisName : nullptr, req.hasDirName ? req.dirName : nullptr,
                          req.hasSeek, req.seek, req.hasBackoff, req.backoff, req.hasTimeout, req.timeoutMs,
                          req.hasZero, req.zeroOn, body, sizeof(body));
+    } else if (strcmp(req.method, "xrce_connect") == 0) {
+        if (!req.hasIp) {
+            err = "ip_address required";
+        } else {
+            uint8_t ip[4];
+            uint8_t parts = 0;
+            uint16_t acc = 0;
+            bool any = false;
+            bool ok = true;
+            for (const char *s = req.ipAddress;; s++) {
+                const char c = *s;
+                if (c >= '0' && c <= '9') {
+                    acc = (uint16_t)(acc * 10u + (uint16_t)(c - '0'));
+                    any = true;
+                    if (acc > 255) {
+                        ok = false;
+                        break;
+                    }
+                } else if (c == '.' || c == '\0') {
+                    if (!any || parts >= 4) {
+                        ok = false;
+                        break;
+                    }
+                    ip[parts++] = (uint8_t)acc;
+                    acc = 0;
+                    any = false;
+                    if (c == '\0') {
+                        break;
+                    }
+                } else {
+                    ok = false;
+                    break;
+                }
+            }
+            if (!ok || parts != 4) {
+                err = "invalid ip_address";
+            } else {
+                err = XrceConnect(ip, req.hasPort ? req.port : CCROS_XRCE_AGENT_PORT);
+                if (!err) {
+                    snprintf(body, sizeof(body),
+                             "{\"state\":\"%s\",\"local_port\":%u,\"agent_port\":%u}",
+                             XrceStateName(), (unsigned)CCROS_XRCE_LOCAL_PORT,
+                             (unsigned)(req.hasPort ? req.port : CCROS_XRCE_AGENT_PORT));
+                }
+            }
+        }
+    } else if (strcmp(req.method, "xrce_disconnect") == 0) {
+        XrceDisconnect();
+        snprintf(body, sizeof(body), "{\"state\":\"off\"}");
     } else if (strcmp(req.method, "probe") == 0) {
         if (!req.hasPin) {
             err = "pin required";

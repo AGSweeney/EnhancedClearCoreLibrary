@@ -74,6 +74,17 @@ def cmd_configure(args) -> None:
         client.close()
 
 
+def cmd_xrce_connect(args) -> None:
+    params = {"ip_address": args.ip}
+    if args.port is not None:
+        params["port"] = args.port
+    client = _session(args)
+    try:
+        _print(client.call("xrce_connect", params))
+    finally:
+        client.close()
+
+
 def cmd_configure_network(args) -> None:
     params = {}
     if args.mode is not None:
@@ -208,6 +219,12 @@ def build_parser() -> argparse.ArgumentParser:
     net.add_argument("--netmask")
     net.add_argument("--gateway")
     net.set_defaults(func=cmd_configure_network)
+
+    xrce = sub.add_parser("xrce-connect", help="Publish JointState to a micro-ROS agent.")
+    xrce.add_argument("--ip", required=True)
+    xrce.add_argument("--port", type=int)
+    xrce.set_defaults(func=cmd_xrce_connect)
+    sub.add_parser("xrce-disconnect").set_defaults(func=lambda a: _simple(a, "xrce_disconnect"))
 
     sub.add_parser("restart").set_defaults(func=lambda a: _simple(a, "restart"))
     sub.add_parser("reset-config").set_defaults(func=lambda a: _simple(a, "reset_config"))

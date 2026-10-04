@@ -272,6 +272,9 @@
     <Compile Include="Transport.cpp">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="XrceClient.cpp">
+      <SubType>compile</SubType>
+    </Compile>
     <None Include="..\..\Depreciated\MotionStreamingExample\Device_Startup\flash_without_bootloader.ld">
       <SubType>compile</SubType>
       <Link>Device_Startup\flash_without_bootloader.ld</Link>

@@ -8,6 +8,7 @@
 #include "EthernetUdp.h"
 #include "MotionCore.h"
 #include "RosConfig.h"
+#include "XrceClient.h"
 #include "RosProtocol.h"
 #include "SysTiming.h"
 
@@ -223,6 +224,7 @@ void TransportPoll() {
     PollSessionAccept();
     PollStream();
     PollDiscovery();
+    XrcePoll();
 }
 
 void TransportSendLine(const char *line) {

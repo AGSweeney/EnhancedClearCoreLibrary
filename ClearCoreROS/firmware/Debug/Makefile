@@ -37,7 +37,7 @@ LDFLAGS := -mthumb -Wl,-Map=ClearCoreROS.map --specs=rdimon.specs \
 	-Wl,--gc-sections -mcpu=cortex-m4 \
 	-T$(LDSCRIPT) -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
-OBJS := Device_Startup/startup_same53.o ClearCoreROS.o MotionCore.o Session.o Transport.o
+OBJS := Device_Startup/startup_same53.o ClearCoreROS.o MotionCore.o Session.o Transport.o XrceClient.o
 
 all: ClearCoreROS.elf
 

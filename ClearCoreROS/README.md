@@ -92,6 +92,8 @@ URDF `<limit>` tags are not copied onto the board. Soft limits are `min_x` / `ma
 
 `move_linear` runs X and Y on the coordinated planner when both are enabled, so the path is a straight line. `move_arc` needs both axes. `home` seeks a configured limit switch and can zero that joint. `probe` seeks until a digital input trips. `wait_idle` waits until the move has settled.
 
+`xrce_connect` publishes those joints as `sensor_msgs/JointState` to a micro-ROS agent. The board binds UDP 9203 and sends to the agent's port. `host/xrce_check.py` is a small checker that accepts the XRCE session and prints the joint sample.
+
 ## Safety
 
 - DI-6 defaults to an active-low estop (`estop_di6` 1), same as ClearAI. `set_test_mode` is bench-only.
