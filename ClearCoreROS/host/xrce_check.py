@@ -104,9 +104,10 @@ def joint_from_write(payload: bytes) -> str | None:
         pos = [cdr.f64() for _ in range(npos)]
     except (struct.error, IndexError, UnicodeDecodeError):
         return None
-    stamp = "unsync" if frame == "unsync" or sec == 0 else "synced"
+    if frame == "unsync" or sec == 0:
+        return None
     joints = " ".join(f"{name}={value:.5f}" for name, value in zip(names, pos))
-    return f"{stamp} sec={sec} nsec={nsec} {joints}"
+    return f"sec={sec} nsec={nsec} frame={frame!r} {joints}"
 
 
 def main() -> None:
@@ -117,10 +118,17 @@ def main() -> None:
     print(f"listening {port}", flush=True)
     deadline = time.time() + 20
     samples = 0
-    unsync = 0
-    synced = 0
     addr = None
-    while time.time() < deadline and (synced < 1 or samples < 3):
+    sync_reply: bytes | None = None
+    sync_addr = None
+    sync_due: float | None = None
+    sync_sent = False
+    while time.time() < deadline and samples < 3:
+        if sync_reply is not None and sync_due is not None and time.time() >= sync_due:
+            sock.sendto(sync_reply, sync_addr)
+            print("TIMESTAMP_REPLY", flush=True)
+            sync_reply = None
+            sync_sent = True
         try:
             data, addr = sock.recvfrom(2048)
         except socket.timeout:
@@ -153,25 +161,29 @@ def main() -> None:
             elif mid == 14 and len(payload) >= 8:
                 t1_sec, t1_nsec = struct.unpack_from("<iI", payload, 0)
                 print("TIMESTAMP", t1_sec, t1_nsec, flush=True)
-                reply = reply_timestamp(0x81, seq, t1_sec, t1_nsec)
+                if not sync_sent and sync_reply is None:
+                    # Hold the reply so a premature WRITE_DATA is visible.
+                    sync_due = time.time() + 0.4
+                    sync_reply = reply_timestamp(0x81, seq, t1_sec, t1_nsec)
+                    sync_addr = addr
+                    reply = reply_ack(0x81, seq)
+                elif reply is None:
+                    reply = reply_ack(0x81, seq)
             elif mid == 11 and reply is None:
                 reply = reply_ack(0x81, seq)
             elif mid == 7:
+                if not sync_sent:
+                    raise SystemExit("JointState before TIMESTAMP_REPLY")
                 text = joint_from_write(payload)
-                if text:
-                    samples += 1
-                    if text.startswith("unsync"):
-                        unsync += 1
-                    else:
-                        synced += 1
-                    print("JOINT", text, flush=True)
+                if text is None:
+                    raise SystemExit("unsynced or invalid JointState")
+                samples += 1
+                print("JOINT", text, flush=True)
         if reply is not None:
             sock.sendto(reply, addr)
     if samples < 1:
         raise SystemExit("no JointState sample")
-    if synced < 1:
-        raise SystemExit("no TIMESTAMP_REPLY JointState")
-    print(f"XRCE_OK samples={samples} unsync={unsync} synced={synced}", flush=True)
+    print(f"XRCE_OK samples={samples}", flush=True)
 
 
 if __name__ == "__main__":

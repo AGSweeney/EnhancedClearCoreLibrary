@@ -83,7 +83,7 @@ static uint32_t g_lastHeartbeatMs = 0;
 static uint32_t g_lastTimeSyncMs = 0;
 static uint32_t g_timeSyncT1Ms = 0;
 static bool g_timeSynced = false;
-static int64_t g_rosOffsetNs = 0;
+static int64_t g_agentOffsetNs = 0;
 static bool g_waiting = false;
 static uint8_t g_clientKey[4] = {0x43, 0x52, 0x4F, 0x53};
 
@@ -136,7 +136,7 @@ static int64_t BoardNs(uint32_t ms) {
 
 static void ResetTimeSync() {
     g_timeSynced = false;
-    g_rosOffsetNs = 0;
+    g_agentOffsetNs = 0;
     g_timeSyncT1Ms = 0;
     g_lastTimeSyncMs = 0;
 }
@@ -301,31 +301,23 @@ static void SendReliableHeartbeat() {
 }
 
 static void SendJointState() {
+    if (!g_timeSynced) {
+        return;
+    }
     CcrosState st;
     MotionFillState(&st);
     uint8_t raw[512];
     XrceBuf body = {raw, 0, sizeof(raw)};
     /* Fast DDS adds the CDR encapsulation. Alignment is from the start of this body.
-     * Before TIMESTAMP_REPLY, stamp is {0, uptime_ns % 1e9} and frame_id is unsync.
-     * After it succeeds, stamp is agent_epoch_ns + (board_ms - t1_ms) * 1e6. */
-    const uint32_t ms = st.time_ms;
-    uint32_t sec = 0;
-    uint32_t nsec = 0;
-    const char *frameId = "unsync";
-    if (g_timeSynced) {
-        int64_t rosNs = g_rosOffsetNs + BoardNs(ms);
-        if (rosNs < 0) {
-            rosNs = 0;
-        }
-        sec = (uint32_t)(rosNs / 1000000000LL);
-        nsec = (uint32_t)(rosNs % 1000000000LL);
-        frameId = "";
-    } else {
-        nsec = (uint32_t)(BoardNs(ms) % 1000000000LL);
+     * Stamps are agent system time: agent_epoch_ns + (board_ms - t1_ms) * 1e6.
+     * They do not follow ROS /clock. */
+    int64_t stampNs = g_agentOffsetNs + BoardNs(st.time_ms);
+    if (stampNs < 0) {
+        stampNs = 0;
     }
-    PutU32(&body, sec);
-    PutU32(&body, nsec);
-    PutStr(&body, frameId);
+    PutU32(&body, (uint32_t)(stampNs / 1000000000LL));
+    PutU32(&body, (uint32_t)(stampNs % 1000000000LL));
+    PutStr(&body, "");
     PutU32(&body, 4);
     PutStr(&body, MotionJointName(0));
     PutStr(&body, MotionJointName(1));
@@ -386,7 +378,7 @@ static void OnTimestampReply(const uint8_t *p, uint16_t len) {
     const int64_t t2 = TimeToNs(p + 8);
     const int64_t t3 = TimeToNs(p + 16);
     const int64_t t4 = BoardNs(Milliseconds());
-    g_rosOffsetNs = ((t2 - t1) + (t3 - t4)) / 2;
+    g_agentOffsetNs = ((t2 - t1) + (t3 - t4)) / 2;
     g_timeSynced = true;
     g_timeSyncT1Ms = 0;
 }
