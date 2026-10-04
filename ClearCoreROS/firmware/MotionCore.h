@@ -25,6 +25,18 @@ struct MotionConfigPatch {
     uint32_t watchdogMs;
     bool hasEstop;
     uint8_t estopDi6;
+    bool hasLimitMin[CCROS_AXIS_COUNT];
+    double limitMin[CCROS_AXIS_COUNT];
+    bool hasLimitMax[CCROS_AXIS_COUNT];
+    double limitMax[CCROS_AXIS_COUNT];
+    bool hasClearMin[CCROS_AXIS_COUNT];
+    bool hasClearMax[CCROS_AXIS_COUNT];
+    bool hasClearLimits;
+    bool clearLimits;
+    bool hasPosLim[CCROS_AXIS_COUNT];
+    uint8_t posLim[CCROS_AXIS_COUNT];
+    bool hasNegLim[CCROS_AXIS_COUNT];
+    uint8_t negLim[CCROS_AXIS_COUNT];
 };
 
 bool MotionInit();

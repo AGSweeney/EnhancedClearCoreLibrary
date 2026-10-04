@@ -56,6 +56,17 @@ def cmd_configure(args) -> None:
         params["watchdog_ms"] = args.watchdog_ms
     if args.estop_di6 is not None:
         params["estop_di6"] = args.estop_di6
+    for axis in AXIS:
+        for side in ("min", "max"):
+            value = getattr(args, f"{side}_{axis}")
+            if value is not None:
+                params[f"{side}_{axis}"] = value
+        for side in ("pos", "neg"):
+            value = getattr(args, f"{side}_lim_{axis}")
+            if value is not None:
+                params[f"{side}_lim_{axis}"] = value
+    if args.clear_limits:
+        params["clear_limits"] = True
     client = _session(args)
     try:
         _print(client.call("configure", params))
@@ -183,6 +194,12 @@ def build_parser() -> argparse.ArgumentParser:
     cfg.add_argument("--decel", type=int)
     cfg.add_argument("--watchdog-ms", type=int)
     cfg.add_argument("--estop-di6", type=int)
+    cfg.add_argument("--clear-limits", action="store_true")
+    for axis in AXIS:
+        cfg.add_argument(f"--min-{axis}", type=float)
+        cfg.add_argument(f"--max-{axis}", type=float)
+        cfg.add_argument(f"--pos-lim-{axis}", type=int)
+        cfg.add_argument(f"--neg-lim-{axis}", type=int)
     cfg.set_defaults(func=cmd_configure)
 
     net = sub.add_parser("configure-network", help="Persist DHCP or a static address. Applies on restart.")

@@ -18,6 +18,7 @@
 #include "NvmManager.h"
 #include "SysTiming.h"
 
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -35,6 +36,13 @@ static uint8_t g_netMode = 0;
 static uint8_t g_ipOctets[4] = {0, 0, 0, 0};
 static uint8_t g_netmaskOctets[4] = {0, 0, 0, 0};
 static uint8_t g_gatewayOctets[4] = {0, 0, 0, 0};
+static uint8_t g_limitFlags = 0;
+static double g_limitMin[CCROS_AXIS_COUNT];
+static double g_limitMax[CCROS_AXIS_COUNT];
+static uint8_t g_posLimDi[CCROS_AXIS_COUNT];
+static uint8_t g_negLimDi[CCROS_AXIS_COUNT];
+static char g_limitErr[40];
+static char g_travelLimit[48];
 static bool g_enabled = false;
 static bool g_interrupted = false;
 static bool g_watchdogTripped = false;
@@ -151,12 +159,14 @@ static void ApplyMechanics() {
     ApplyDynamics();
 }
 
-/* User-page blob. Magic differs from ClearAI ('CAIC') so that blob is not applied. */
+/* User-page blob. Magic differs from ClearAI ('CAIC') so that blob is not applied.
+ * Version 1 is mechanics and network. Version 2 appends soft limits and DI pins. */
 static const uint32_t CCROS_NVM_MAGIC = 0x534F5243u; /* 'CROS' */
-static const uint16_t CCROS_NVM_VERSION = 1;
+static const uint16_t CCROS_NVM_VERSION_V1 = 1;
+static const uint16_t CCROS_NVM_VERSION = 2;
 
 #pragma pack(push, 1)
-struct CcrosNvmConfig {
+struct CcrosNvmConfigV1 {
     uint32_t magic;
     uint16_t version;
     uint16_t size;
@@ -174,9 +184,19 @@ struct CcrosNvmConfig {
     uint8_t netmaskOctets[4];
     uint8_t gatewayOctets[4];
 };
+
+struct CcrosNvmConfig {
+    CcrosNvmConfigV1 v1;
+    uint8_t limitFlags;
+    uint8_t posLimDi[CCROS_AXIS_COUNT];
+    uint8_t negLimDi[CCROS_AXIS_COUNT];
+    float limitMin[CCROS_AXIS_COUNT];
+    float limitMax[CCROS_AXIS_COUNT];
+};
 #pragma pack(pop)
 
 static_assert(sizeof(CcrosNvmConfig) <= 416, "ROS NVM blob exceeds the user page");
+static_assert(offsetof(CcrosNvmConfig, limitFlags) == sizeof(CcrosNvmConfigV1), "v1 prefix");
 
 static ClearCore::NvmManager &Nvm() {
     return ClearCore::NvmManager::Instance();
@@ -202,13 +222,19 @@ static void ApplyCompileDefaults() {
     memset(g_ipOctets, 0, sizeof(g_ipOctets));
     memset(g_netmaskOctets, 0, sizeof(g_netmaskOctets));
     memset(g_gatewayOctets, 0, sizeof(g_gatewayOctets));
+    g_limitFlags = 0;
+    memset(g_limitMin, 0, sizeof(g_limitMin));
+    memset(g_limitMax, 0, sizeof(g_limitMax));
+    memset(g_posLimDi, 0, sizeof(g_posLimDi));
+    memset(g_negLimDi, 0, sizeof(g_negLimDi));
+    g_travelLimit[0] = '\0';
 }
 
-static bool ConfigBlobOk(const CcrosNvmConfig *cfg) {
-    if (cfg->magic != CCROS_NVM_MAGIC || cfg->version != CCROS_NVM_VERSION ||
-        cfg->size != sizeof(CcrosNvmConfig)) {
-        return false;
-    }
+static bool LimitDiOk(uint8_t di) {
+    return di == 0 || di == 255 || di <= 12;
+}
+
+static bool ConfigPrefixOk(const CcrosNvmConfigV1 *cfg) {
     if (cfg->axisMask == 0 || cfg->axisMask > 0x0f) {
         return false;
     }
@@ -233,7 +259,39 @@ static bool ConfigBlobOk(const CcrosNvmConfig *cfg) {
     return true;
 }
 
-static void ConfigApply(const CcrosNvmConfig *cfg) {
+static bool ConfigBlobOk(const CcrosNvmConfig *cfg) {
+    if (cfg->v1.magic != CCROS_NVM_MAGIC) {
+        return false;
+    }
+    if (cfg->v1.version == CCROS_NVM_VERSION_V1 && cfg->v1.size == sizeof(CcrosNvmConfigV1)) {
+        return ConfigPrefixOk(&cfg->v1);
+    }
+    if (cfg->v1.version != CCROS_NVM_VERSION || cfg->v1.size != sizeof(CcrosNvmConfig)) {
+        return false;
+    }
+    if (!ConfigPrefixOk(&cfg->v1)) {
+        return false;
+    }
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        if (!LimitDiOk(cfg->posLimDi[a]) || !LimitDiOk(cfg->negLimDi[a])) {
+            return false;
+        }
+        const bool minEn = (cfg->limitFlags & (1u << (a * 2u))) != 0;
+        const bool maxEn = (cfg->limitFlags & (1u << (a * 2u + 1u))) != 0;
+        if (minEn && !(cfg->limitMin[a] > -1.0e6f && cfg->limitMin[a] < 1.0e6f)) {
+            return false;
+        }
+        if (maxEn && !(cfg->limitMax[a] > -1.0e6f && cfg->limitMax[a] < 1.0e6f)) {
+            return false;
+        }
+        if (minEn && maxEn && cfg->limitMin[a] > cfg->limitMax[a] + 1.0e-4f) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void ConfigApplyPrefix(const CcrosNvmConfigV1 *cfg) {
     g_axisMask = cfg->axisMask;
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
         g_stepsPerRev[a] = cfg->stepsPerRev[a];
@@ -251,26 +309,59 @@ static void ConfigApply(const CcrosNvmConfig *cfg) {
     memcpy(g_gatewayOctets, cfg->gatewayOctets, 4);
 }
 
+static uint8_t LimitDiNorm(uint8_t di) {
+    if (di == 0 || di == 255 || di > 12) {
+        return 0;
+    }
+    return di;
+}
+
+static void ConfigApply(const CcrosNvmConfig *cfg) {
+    ConfigApplyPrefix(&cfg->v1);
+    g_limitFlags = 0;
+    memset(g_limitMin, 0, sizeof(g_limitMin));
+    memset(g_limitMax, 0, sizeof(g_limitMax));
+    memset(g_posLimDi, 0, sizeof(g_posLimDi));
+    memset(g_negLimDi, 0, sizeof(g_negLimDi));
+    if (cfg->v1.version != CCROS_NVM_VERSION) {
+        return;
+    }
+    g_limitFlags = cfg->limitFlags;
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        g_limitMin[a] = cfg->limitMin[a];
+        g_limitMax[a] = cfg->limitMax[a];
+        g_posLimDi[a] = LimitDiNorm(cfg->posLimDi[a]);
+        g_negLimDi[a] = LimitDiNorm(cfg->negLimDi[a]);
+    }
+}
+
 static void ConfigFill(CcrosNvmConfig *cfg) {
     memset(cfg, 0, sizeof(*cfg));
-    cfg->magic = CCROS_NVM_MAGIC;
-    cfg->version = CCROS_NVM_VERSION;
-    cfg->size = (uint16_t)sizeof(CcrosNvmConfig);
-    cfg->axisMask = g_axisMask;
+    cfg->v1.magic = CCROS_NVM_MAGIC;
+    cfg->v1.version = CCROS_NVM_VERSION;
+    cfg->v1.size = (uint16_t)sizeof(CcrosNvmConfig);
+    cfg->v1.axisMask = g_axisMask;
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
-        cfg->stepsPerRev[a] = g_stepsPerRev[a];
-        cfg->pitchMm[a] = (float)g_pitchMm[a];
+        cfg->v1.stepsPerRev[a] = g_stepsPerRev[a];
+        cfg->v1.pitchMm[a] = (float)g_pitchMm[a];
     }
-    cfg->vel = g_vel;
-    cfg->accel = g_accel;
-    cfg->decel = g_decel;
-    cfg->watchdogMs = g_watchdogMs;
-    cfg->estopDi6 = g_estopDi6;
-    cfg->testMode = g_testMode ? 1u : 0u;
-    cfg->netMode = g_netMode;
-    memcpy(cfg->ipOctets, g_ipOctets, 4);
-    memcpy(cfg->netmaskOctets, g_netmaskOctets, 4);
-    memcpy(cfg->gatewayOctets, g_gatewayOctets, 4);
+    cfg->v1.vel = g_vel;
+    cfg->v1.accel = g_accel;
+    cfg->v1.decel = g_decel;
+    cfg->v1.watchdogMs = g_watchdogMs;
+    cfg->v1.estopDi6 = g_estopDi6;
+    cfg->v1.testMode = g_testMode ? 1u : 0u;
+    cfg->v1.netMode = g_netMode;
+    memcpy(cfg->v1.ipOctets, g_ipOctets, 4);
+    memcpy(cfg->v1.netmaskOctets, g_netmaskOctets, 4);
+    memcpy(cfg->v1.gatewayOctets, g_gatewayOctets, 4);
+    cfg->limitFlags = g_limitFlags;
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        cfg->limitMin[a] = (float)g_limitMin[a];
+        cfg->limitMax[a] = (float)g_limitMax[a];
+        cfg->posLimDi[a] = g_posLimDi[a];
+        cfg->negLimDi[a] = g_negLimDi[a];
+    }
 }
 
 static bool ConfigWrite(const CcrosNvmConfig *cfg) {
@@ -287,7 +378,7 @@ static bool ConfigWrite(const CcrosNvmConfig *cfg) {
     if (memcmp(&existing, cfg, sizeof(*cfg)) == 0) {
         CcrosNvmConfig nudge;
         memset(&nudge, 0, sizeof(nudge));
-        nudge.magic = 1;
+        nudge.v1.magic = 1;
         if (!Nvm().BlockWrite(ClearCore::NvmManager::NVM_LOC_USER_START, (int)sizeof(nudge),
                               (const uint8_t *)&nudge)) {
             return false;
@@ -365,6 +456,8 @@ static bool ParseIpOctets(const char *str, uint8_t out[4]) {
     return parts == 4;
 }
 
+static bool StepsActive(MotorDriver *m);
+
 static void StopDecelAll() {
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
         MotorDriver *m = MotorFor(a);
@@ -377,6 +470,177 @@ static void StopDecelAll() {
         g_velCmd[a] = 0;
         g_absIssued[a] = false;
     }
+}
+
+static const char *AxisName(uint8_t axis) {
+    switch (axis) {
+        case CCROS_AXIS_X: return "x";
+        case CCROS_AXIS_Y: return "y";
+        case CCROS_AXIS_Z: return "z";
+        case CCROS_AXIS_A: return "a";
+        default: return "?";
+    }
+}
+
+static bool LimitMinEn(uint8_t axis) {
+    return (g_limitFlags & (1u << (axis * 2u))) != 0;
+}
+
+static bool LimitMaxEn(uint8_t axis) {
+    return (g_limitFlags & (1u << (axis * 2u + 1u))) != 0;
+}
+
+static void HaltAxis(uint8_t axis) {
+    MotorDriver *m = MotorFor(axis);
+    if (m) {
+        m->MoveStopDecel(g_decel);
+    }
+    g_goalValid[axis] = false;
+    g_absIssued[axis] = false;
+    g_absRetried[axis] = false;
+    g_axisVelMode[axis] = false;
+    g_axisTrack[axis] = false;
+    g_trackDirty[axis] = false;
+    g_velGoal[axis] = 0.f;
+    g_velLatched[axis] = false;
+    g_velCmd[axis] = 0;
+}
+
+static void NoteTravelLimit(const char *msg) {
+    snprintf(g_travelLimit, sizeof(g_travelLimit), "%s", msg);
+}
+
+static Connector *LimitConnector(uint8_t pin) {
+    if (pin == 0 || pin > 12) {
+        return nullptr;
+    }
+    return SysMgr.ConnectorByIndex((ClearCorePins)pin);
+}
+
+static void ApplyHwLimitInputs() {
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        Connector *pos = LimitConnector(g_posLimDi[a]);
+        Connector *neg = LimitConnector(g_negLimDi[a]);
+        if (pos) {
+            pos->Mode(Connector::INPUT_DIGITAL);
+        }
+        if (neg) {
+            neg->Mode(Connector::INPUT_DIGITAL);
+        }
+    }
+    ConnectorDI6.Mode(Connector::INPUT_DIGITAL);
+}
+
+static bool HwLimitOn(uint8_t axis, bool positive) {
+    if (g_testMode || !AxisOn(axis)) {
+        return false;
+    }
+    const uint8_t di = positive ? g_posLimDi[axis] : g_negLimDi[axis];
+    Connector *input = LimitConnector(di);
+    return input && input->State() != 0;
+}
+
+static const char *SoftReject(uint8_t axis, double q) {
+    const double spu = StepsPerUnit(axis);
+    const double eps = (spu > 0.0) ? (0.5 / spu) : 1.0e-6;
+    if (LimitMinEn(axis) && q < g_limitMin[axis] - eps) {
+        snprintf(g_limitErr, sizeof(g_limitErr), "%s below min limit", AxisName(axis));
+        return g_limitErr;
+    }
+    if (LimitMaxEn(axis) && q > g_limitMax[axis] + eps) {
+        snprintf(g_limitErr, sizeof(g_limitErr), "%s above max limit", AxisName(axis));
+        return g_limitErr;
+    }
+    return nullptr;
+}
+
+static const char *RejectSteps(uint8_t axis, int32_t target) {
+    const double spu = StepsPerUnit(axis);
+    const double q = (spu > 0.0) ? ((double)target / spu) : 0.0;
+    const char *err = SoftReject(axis, q);
+    if (err) {
+        return err;
+    }
+    MotorDriver *m = MotorFor(axis);
+    const int32_t cur = m ? m->PositionRefCommanded() : 0;
+    if (target > cur && HwLimitOn(axis, true)) {
+        snprintf(g_limitErr, sizeof(g_limitErr), "%s pos limit active", AxisName(axis));
+        return g_limitErr;
+    }
+    if (target < cur && HwLimitOn(axis, false)) {
+        snprintf(g_limitErr, sizeof(g_limitErr), "%s neg limit active", AxisName(axis));
+        return g_limitErr;
+    }
+    return nullptr;
+}
+
+static const char *RejectVelocity(uint8_t axis, float vel) {
+    MotorDriver *m = MotorFor(axis);
+    const double spu = StepsPerUnit(axis);
+    const double q = (m && spu > 0.0) ? ((double)m->PositionRefCommanded() / spu) : 0.0;
+    const double eps = (spu > 0.0) ? (0.5 / spu) : 1.0e-6;
+    if (vel > 0.f) {
+        if (HwLimitOn(axis, true)) {
+            snprintf(g_limitErr, sizeof(g_limitErr), "%s pos limit active", AxisName(axis));
+            return g_limitErr;
+        }
+        if (LimitMaxEn(axis) && q > g_limitMax[axis] + eps) {
+            snprintf(g_limitErr, sizeof(g_limitErr), "%s above max limit", AxisName(axis));
+            return g_limitErr;
+        }
+    }
+    if (vel < 0.f) {
+        if (HwLimitOn(axis, false)) {
+            snprintf(g_limitErr, sizeof(g_limitErr), "%s neg limit active", AxisName(axis));
+            return g_limitErr;
+        }
+        if (LimitMinEn(axis) && q < g_limitMin[axis] - eps) {
+            snprintf(g_limitErr, sizeof(g_limitErr), "%s below min limit", AxisName(axis));
+            return g_limitErr;
+        }
+    }
+    return nullptr;
+}
+
+/* Stop this axis when its generated position has crossed a soft limit in the
+ * direction of travel, or a hardware switch is active in that direction. */
+static bool PollTravel(uint8_t axis) {
+    MotorDriver *m = MotorFor(axis);
+    if (!m) {
+        return false;
+    }
+    const bool moving = StepsActive(m);
+    const bool posDir = m->StatusReg().bit.MoveDirection != 0;
+    if (moving && ((posDir && HwLimitOn(axis, true)) || (!posDir && HwLimitOn(axis, false)))) {
+        HaltAxis(axis);
+        snprintf(g_limitErr, sizeof(g_limitErr), "%s %s limit active", AxisName(axis), posDir ? "pos" : "neg");
+        NoteTravelLimit(g_limitErr);
+        return true;
+    }
+    const double spu = StepsPerUnit(axis);
+    if (spu <= 0.0) {
+        return false;
+    }
+    const double q = (double)m->PositionRefCommanded() / spu;
+    const double eps = 0.5 / spu;
+    const int32_t cur = m->PositionRefCommanded();
+    const bool cmdPos = g_velCmd[axis] > 0 || (g_goalValid[axis] && g_goalSteps[axis] > cur) ||
+                        (g_axisTrack[axis] && g_trackVel[axis] > 0.f);
+    const bool cmdNeg = g_velCmd[axis] < 0 || (g_goalValid[axis] && g_goalSteps[axis] < cur) ||
+                        (g_axisTrack[axis] && g_trackVel[axis] < 0.f);
+    if (LimitMaxEn(axis) && q > g_limitMax[axis] + eps && ((moving && posDir) || cmdPos)) {
+        HaltAxis(axis);
+        snprintf(g_limitErr, sizeof(g_limitErr), "%s above max limit", AxisName(axis));
+        NoteTravelLimit(g_limitErr);
+        return true;
+    }
+    if (LimitMinEn(axis) && q < g_limitMin[axis] - eps && ((moving && !posDir) || cmdNeg)) {
+        HaltAxis(axis);
+        snprintf(g_limitErr, sizeof(g_limitErr), "%s below min limit", AxisName(axis));
+        NoteTravelLimit(g_limitErr);
+        return true;
+    }
+    return false;
 }
 
 static void AbruptDisable() {
@@ -540,6 +804,20 @@ static void ServiceTrack(uint8_t axis, uint32_t now) {
     }
     const int32_t scheduled = RoundToI32((double)g_trackPos[axis] * spu);
     const int32_t ff = RoundToI32((double)g_trackVel[axis] * spu);
+    const char *blocked = RejectSteps(axis, scheduled);
+    if (!blocked && ff > 0 && HwLimitOn(axis, true)) {
+        snprintf(g_limitErr, sizeof(g_limitErr), "%s pos limit active", AxisName(axis));
+        blocked = g_limitErr;
+    }
+    if (!blocked && ff < 0 && HwLimitOn(axis, false)) {
+        snprintf(g_limitErr, sizeof(g_limitErr), "%s neg limit active", AxisName(axis));
+        blocked = g_limitErr;
+    }
+    if (blocked) {
+        HaltAxis(axis);
+        NoteTravelLimit(blocked);
+        return;
+    }
     const int32_t err = scheduled - m->PositionRefCommanded();
     int32_t corr_limit = (int32_t)(g_vel / 4u);
     if (corr_limit < 1) {
@@ -562,6 +840,12 @@ static void ServiceVelocity(uint8_t axis, uint32_t now) {
     }
     if (sps < -cap) {
         sps = -cap;
+    }
+    const char *blocked = RejectVelocity(axis, (float)sps / (float)spu);
+    if (blocked) {
+        HaltAxis(axis);
+        NoteTravelLimit(blocked);
+        return;
     }
     LatchVelocity(axis, m, sps, now);
 }
@@ -587,6 +871,12 @@ static void ServicePosition(uint8_t axis, uint32_t now) {
             g_absRetried[axis] = true;
         }
         if (!g_absIssued[axis] && absErr > 0 && RetryReady(axis, now)) {
+            const char *blocked = RejectSteps(axis, g_goalSteps[axis]);
+            if (blocked) {
+                HaltAxis(axis);
+                NoteTravelLimit(blocked);
+                return;
+            }
             if (m->Move(g_goalSteps[axis], StepGenerator::MOVE_TARGET_ABSOLUTE)) {
                 g_absIssued[axis] = true;
                 g_velLatched[axis] = false;
@@ -685,6 +975,15 @@ static const char *StorePosition(uint8_t mask, const float q[4], uint16_t seq, b
             return "axis is not configured";
         }
         const int32_t steps = RoundToI32((double)q[a] * spu);
+        const char *blocked = RejectSteps(a, steps);
+        if (blocked) {
+            if (fromSession) {
+                return blocked;
+            }
+            HaltAxis(a);
+            NoteTravelLimit(blocked);
+            continue;
+        }
         if (!g_goalValid[a] || steps != g_goalSteps[a]) {
             g_goalSteps[a] = steps;
             g_goalValid[a] = true;
@@ -721,6 +1020,7 @@ bool MotionInit() {
     ConnectorM2.EnableRequest(false);
     ConnectorM3.EnableRequest(false);
     ConfigLoad();
+    ApplyHwLimitInputs();
     ApplyMechanics();
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
         MotorDriver *m = MotorFor(a);
@@ -753,6 +1053,9 @@ void MotionPoll() {
         if (!AxisOn(a)) {
             continue;
         }
+        if (PollTravel(a)) {
+            continue;
+        }
         if (g_axisTrack[a]) {
             ServiceTrack(a, now);
         } else if (g_axisVelMode[a]) {
@@ -765,6 +1068,78 @@ void MotionPoll() {
 
 bool MotionIsEnabled() {
     return g_enabled;
+}
+
+static const char *ApplyLimitPatch(const MotionConfigPatch *patch) {
+    bool any = patch->hasClearLimits && patch->clearLimits;
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        any = any || patch->hasLimitMin[a] || patch->hasLimitMax[a] || patch->hasClearMin[a] ||
+              patch->hasClearMax[a] || patch->hasPosLim[a] || patch->hasNegLim[a];
+    }
+    if (!any) {
+        return nullptr;
+    }
+    uint8_t flags = g_limitFlags;
+    double mn[CCROS_AXIS_COUNT];
+    double mx[CCROS_AXIS_COUNT];
+    uint8_t pos[CCROS_AXIS_COUNT];
+    uint8_t neg[CCROS_AXIS_COUNT];
+    memcpy(mn, g_limitMin, sizeof(mn));
+    memcpy(mx, g_limitMax, sizeof(mx));
+    memcpy(pos, g_posLimDi, sizeof(pos));
+    memcpy(neg, g_negLimDi, sizeof(neg));
+    if (patch->hasClearLimits && patch->clearLimits) {
+        flags = 0;
+        memset(pos, 0, sizeof(pos));
+        memset(neg, 0, sizeof(neg));
+    }
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        if (patch->hasClearMin[a]) {
+            flags = (uint8_t)(flags & ~(1u << (a * 2u)));
+        }
+        if (patch->hasClearMax[a]) {
+            flags = (uint8_t)(flags & ~(1u << (a * 2u + 1u)));
+        }
+        if (patch->hasLimitMin[a]) {
+            if (!(patch->limitMin[a] > -1.0e6 && patch->limitMin[a] < 1.0e6)) {
+                return "soft limit out of range";
+            }
+            mn[a] = patch->limitMin[a];
+            flags = (uint8_t)(flags | (1u << (a * 2u)));
+        }
+        if (patch->hasLimitMax[a]) {
+            if (!(patch->limitMax[a] > -1.0e6 && patch->limitMax[a] < 1.0e6)) {
+                return "soft limit out of range";
+            }
+            mx[a] = patch->limitMax[a];
+            flags = (uint8_t)(flags | (1u << (a * 2u + 1u)));
+        }
+        if (patch->hasPosLim[a]) {
+            if (!LimitDiOk(patch->posLim[a])) {
+                return "invalid limit di";
+            }
+            pos[a] = LimitDiNorm(patch->posLim[a]);
+        }
+        if (patch->hasNegLim[a]) {
+            if (!LimitDiOk(patch->negLim[a])) {
+                return "invalid limit di";
+            }
+            neg[a] = LimitDiNorm(patch->negLim[a]);
+        }
+        const bool minEn = (flags & (1u << (a * 2u))) != 0;
+        const bool maxEn = (flags & (1u << (a * 2u + 1u))) != 0;
+        if (minEn && maxEn && mn[a] > mx[a] + 1.0e-9) {
+            snprintf(g_limitErr, sizeof(g_limitErr), "%s min above max", AxisName(a));
+            return g_limitErr;
+        }
+    }
+    g_limitFlags = flags;
+    memcpy(g_limitMin, mn, sizeof(mn));
+    memcpy(g_limitMax, mx, sizeof(mx));
+    memcpy(g_posLimDi, pos, sizeof(pos));
+    memcpy(g_negLimDi, neg, sizeof(neg));
+    ApplyHwLimitInputs();
+    return nullptr;
 }
 
 const char *MotionConfigure(const MotionConfigPatch *patch) {
@@ -834,6 +1209,12 @@ const char *MotionConfigure(const MotionConfigPatch *patch) {
         ApplyMechanics();
     } else if (patch->hasVel || patch->hasAccel || patch->hasDecel) {
         ApplyDynamics();
+    }
+    {
+        const char *limitErr = ApplyLimitPatch(patch);
+        if (limitErr) {
+            return limitErr;
+        }
     }
     if (!ConfigSave()) {
         return "nvm write failed";
@@ -1018,6 +1399,7 @@ const char *MotionClearAlerts() {
         }
     }
     g_watchdogTripped = false;
+    g_travelLimit[0] = '\0';
     g_lastHostMs = Milliseconds();
     if (!HardwareEstop()) {
         g_interrupted = false;
@@ -1216,9 +1598,14 @@ void MotionFillConfigJson(char *buf, uint16_t len) {
              "\"accel_steps\":%lu,\"decel_steps\":%lu,\"watchdog_ms\":%lu,"
              "\"estop_di6\":%u,\"test_mode\":%s,\"enabled\":%s,"
              "\"network_mode\":\"%s\",\"ip_address\":\"%u.%u.%u.%u\","
-             "\"netmask\":\"%u.%u.%u.%u\",\"gateway\":\"%u.%u.%u.%u\"}",
+             "\"netmask\":\"%u.%u.%u.%u\",\"gateway\":\"%u.%u.%u.%u\","
+             "\"limit_flags\":%u,"
+             "\"limits_min\":[%.6f,%.6f,%.6f,%.6f],"
+             "\"limits_max\":[%.6f,%.6f,%.6f,%.6f],"
+             "\"pos_lim_di\":[%u,%u,%u,%u],"
+             "\"neg_lim_di\":[%u,%u,%u,%u]}",
              g_nvmLoaded ? "true" : "false", storedOk ? "true" : "false",
-             storedOk ? (unsigned)stored.version : 0u,
+             storedOk ? (unsigned)stored.v1.version : 0u,
              (unsigned long)g_axisMask,
              (unsigned long)g_stepsPerRev[0], (unsigned long)g_stepsPerRev[1],
              (unsigned long)g_stepsPerRev[2], (unsigned long)g_stepsPerRev[3],
@@ -1231,7 +1618,14 @@ void MotionFillConfigJson(char *buf, uint16_t len) {
              (unsigned)g_ipOctets[3], (unsigned)g_netmaskOctets[0], (unsigned)g_netmaskOctets[1],
              (unsigned)g_netmaskOctets[2], (unsigned)g_netmaskOctets[3],
              (unsigned)g_gatewayOctets[0], (unsigned)g_gatewayOctets[1],
-             (unsigned)g_gatewayOctets[2], (unsigned)g_gatewayOctets[3]);
+             (unsigned)g_gatewayOctets[2], (unsigned)g_gatewayOctets[3],
+             (unsigned)g_limitFlags,
+             g_limitMin[0], g_limitMin[1], g_limitMin[2], g_limitMin[3],
+             g_limitMax[0], g_limitMax[1], g_limitMax[2], g_limitMax[3],
+             (unsigned)g_posLimDi[0], (unsigned)g_posLimDi[1], (unsigned)g_posLimDi[2],
+             (unsigned)g_posLimDi[3],
+             (unsigned)g_negLimDi[0], (unsigned)g_negLimDi[1], (unsigned)g_negLimDi[2],
+             (unsigned)g_negLimDi[3]);
 }
 
 void MotionFillStatusJson(char *buf, uint16_t len) {
@@ -1242,7 +1636,7 @@ void MotionFillStatusJson(char *buf, uint16_t len) {
     snprintf(buf, len,
              "{\"enabled\":%s,\"moving\":%s,\"estop\":%s,\"fault\":%s,"
              "\"watchdog\":%s,\"test_mode\":%s,\"axis_mask\":%u,\"alert_reg\":%lu,"
-             "\"alerts\":\"%s\",\"last_cmd_seq\":%u,"
+             "\"alerts\":\"%s\",\"travel_limit\":\"%s\",\"last_cmd_seq\":%u,"
              "\"position\":[%.6f,%.6f,%.6f,%.6f],"
              "\"velocity\":[%.6f,%.6f,%.6f,%.6f],"
              "\"effort\":[%.4f,%.4f,%.4f,%.4f]}",
@@ -1253,6 +1647,7 @@ void MotionFillStatusJson(char *buf, uint16_t len) {
              (st.flags & CCROS_FLAG_WATCHDOG) ? "true" : "false",
              g_testMode ? "true" : "false",
              (unsigned)st.axis_mask, (unsigned long)st.alert_reg, alerts,
+             g_travelLimit[0] ? g_travelLimit : "none",
              (unsigned)g_lastCmdSeq,
              st.position[0], st.position[1], st.position[2], st.position[3],
              st.velocity[0], st.velocity[1], st.velocity[2], st.velocity[3],

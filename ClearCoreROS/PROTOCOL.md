@@ -83,10 +83,18 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 | `vel_steps`, `accel_steps`, `decel_steps` | step generator limits. Applied immediately. |
 | `watchdog_ms` | `0` disables. Default 500. |
 | `estop_di6` | `0` off, `1` fault when DI-6 is low (default), `2` fault when DI-6 is high. |
+| `min_x` … `min_a`, `max_x` … `max_a` | Soft travel limit in joint units (meters, A in radians). Setting one enables that side. Allowed while motors are enabled. |
+| `clear_min_x` … `clear_max_a` | `true` disables that one side. |
+| `clear_limits` | `true` clears every soft limit and every limit-switch assignment. |
+| `pos_lim_x` … `pos_lim_a`, `neg_lim_x` … `neg_lim_a` | Digital input for that direction. `0` or `255` disables it. `1`..`12` are IO-0…IO-5, DI-6…DI-8, and A-9…A-12. The pin is forced to a digital input. |
 
-`configure`, `set_test_mode`, and `configure_network` write the same versioned blob (`magic` `CROS`, version 1) at `NvmManager` user offset 0. Boot reads it after the compile defaults. An unrecognized blob, including a ClearAI `CAIC` blob, is left untouched and the compile defaults stay in effect. A successful save replaces the bytes of that blob. `get_capabilities` reports `nvm` true after a blob has been loaded or saved. `nvm_valid` is true when the stored blob passes the version and range checks. NVM writes require a supply above the ClearCore undervoltage lockout; a low supply returns `nvm write failed`.
+`configure`, `set_test_mode`, and `configure_network` write one blob (`magic` `CROS`) at `NvmManager` user offset 0. Version 1 is mechanics and network. Version 2 adds the soft limits and limit-switch pins. Boot still loads a version 1 blob and treats limits as unset. An unrecognized blob, including a ClearAI `CAIC` blob, is left untouched and the compile defaults stay in effect. A successful save writes version 2 and replaces those bytes. `get_capabilities` reports `nvm` true after a blob has been loaded or saved. `nvm_valid` is true when the stored blob passes the version and range checks. NVM writes require a supply above the ClearCore undervoltage lockout; a low supply returns `nvm write failed`.
 
 `configure_network` with `mode:"static"` requires `ip_address` and `netmask` when none are already stored. `gateway` may be omitted. The running Ethernet stack is not changed in place. Call `restart` after saving. `mode:"dhcp"` is the boot default.
+
+Soft limits are checked against the commanded joint position. A target past an enabled side is rejected (`"x above max limit"`, `"x below min limit"`). A velocity or track frame that would travel farther past that side is stopped. `limit_flags` bits are min X, max X, min Y, max Y, min Z, max Z, min A, max A.
+
+A limit switch is active when the input reads high. Motion toward an active switch is rejected, and motion already underway decelerates to a stop on that axis. `get_status` reports the last stop in `travel_limit` until `clear_alerts`. Hardware switches are ignored in test mode. Soft limits are not. DI-6 remains the estop input when `estop_di6` is non-zero; it can also be assigned as a limit.
 
 Only axes in `axis_mask` are enabled and included in `alert_reg`. A disabled motor's `motor_disabled` alert is not reported, same as ClearAI.
 
@@ -180,6 +188,5 @@ The watchdog trips only while a goal is unfinished or a velocity command is nonz
 
 ## Not in this scaffold
 
-- Soft travel limits and DI limit switches.
 - Homing, probing, arcs, and the XY coordinated planner. Joints move independently.
 - micro-ROS / XRCE-DDS. The joint mapping above is what a future XRCE transport would publish.

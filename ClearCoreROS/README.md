@@ -88,7 +88,7 @@ ros2 launch clearcore_hardware hardware.launch.py host:=172.16.82.113
 
 `stream_mode` is `position` by default: a settled command becomes one trapezoidal move. Set `stream_mode` to `velocity` in the xacro when a `joint_trajectory_controller` is streaming interpolated samples. The plugin sends `dq/dt` while the command is changing, then a position hold on the next cycle. A watchdog flag latches the plugin; writes stop until the hardware is activated again.
 
-URDF `<limit>` tags are not enforced on the board. Soft limits are not implemented yet.
+URDF `<limit>` tags are not copied onto the board. Soft limits are `min_x` / `max_x` (and Y, Z, A) in `configure`, in meters or radians. `pos_lim_x` / `neg_lim_x` assign a digital input that stops that direction. Both are saved in NVM.
 
 ## Safety
 

@@ -144,8 +144,24 @@ static const char *ReadNumberArray(const char *js, const jsmntok_t *toks, int nt
     return nullptr;
 }
 
+static bool KeyAxis(const char *js, const jsmntok_t *key, const char *prefix, int *axis) {
+    const int plen = (int)strlen(prefix);
+    const int n = key->end - key->start;
+    if (key->type != JSMN_STRING || n != plen + 1 || memcmp(js + key->start, prefix, (size_t)plen) != 0) {
+        return false;
+    }
+    const char suffix = js[key->start + plen];
+    if (suffix == 'x') *axis = 0;
+    else if (suffix == 'y') *axis = 1;
+    else if (suffix == 'z') *axis = 2;
+    else if (suffix == 'a') *axis = 3;
+    else return false;
+    return true;
+}
+
 static void ApplyKey(const char *js, const jsmntok_t *toks, int ntok, int keyIndex,
                      SessionReq *req) {
+    int axis = 0;
     if (req->error) {
         return;
     }
@@ -229,6 +245,53 @@ static void ApplyKey(const char *js, const jsmntok_t *toks, int ntok, int keyInd
         else if (TokEq(js, key, "a")) axis = 3;
         req->hasJoint[axis] = true;
         req->joint[axis] = (float)d;
+    } else if (TokEq(js, key, "clear_limits")) {
+        if (!ParseBool(js, val, &req->cfg.clearLimits)) {
+            req->error = "clear_limits must be a boolean";
+            return;
+        }
+        req->cfg.hasClearLimits = true;
+    } else if (KeyAxis(js, key, "min_", &axis) || KeyAxis(js, key, "max_", &axis)) {
+        double d = 0;
+        if (!ParseDouble(js, val, &d)) {
+            req->error = "soft limit must be a number";
+            return;
+        }
+        const bool isMin = js[key->start] == 'm' && js[key->start + 1] == 'i';
+        if (isMin) {
+            req->cfg.hasLimitMin[axis] = true;
+            req->cfg.limitMin[axis] = d;
+        } else {
+            req->cfg.hasLimitMax[axis] = true;
+            req->cfg.limitMax[axis] = d;
+        }
+    } else if (KeyAxis(js, key, "clear_min_", &axis) || KeyAxis(js, key, "clear_max_", &axis)) {
+        bool on = false;
+        if (!ParseBool(js, val, &on)) {
+            req->error = "clear limit must be a boolean";
+            return;
+        }
+        if (!on) {
+            return;
+        }
+        if (memcmp(js + key->start, "clear_min_", 10) == 0) {
+            req->cfg.hasClearMin[axis] = true;
+        } else {
+            req->cfg.hasClearMax[axis] = true;
+        }
+    } else if (KeyAxis(js, key, "pos_lim_", &axis) || KeyAxis(js, key, "neg_lim_", &axis)) {
+        double d = 0;
+        if (!ParseDouble(js, val, &d) || d < 0.0 || d > 255.0) {
+            req->error = "limit di must be 0..12 or 255";
+            return;
+        }
+        if (js[key->start] == 'p') {
+            req->cfg.hasPosLim[axis] = true;
+            req->cfg.posLim[axis] = (uint8_t)d;
+        } else {
+            req->cfg.hasNegLim[axis] = true;
+            req->cfg.negLim[axis] = (uint8_t)d;
+        }
     } else if (TokEq(js, key, "mode") || TokEq(js, key, "ip_address") ||
                TokEq(js, key, "netmask") || TokEq(js, key, "gateway")) {
         if (val->type != JSMN_STRING) {
