@@ -2,7 +2,8 @@
 """Send the bench XY goal to joint_trajectory_controller and print the result.
 
 The trajectory is joint_x and joint_y: (0.03, 0.03) m at 2 s, then (0, 0) at 4 s.
-Raw joint positions are metres. error_code 0 is SUCCESSFUL.
+Raw joint positions are metres. Success is STATUS_SUCCEEDED and error_code SUCCESSFUL.
+A canceled Jazzy goal can still carry error_code 0.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 import sys
 
 import rclpy
+from action_msgs.msg import GoalStatus
 from control_msgs.action import FollowJointTrajectory
 from rclpy.action import ActionClient
 from rclpy.node import Node
@@ -59,11 +61,16 @@ class GoalSender(Node):
             return 1
         result_future = handle.get_result_async()
         rclpy.spin_until_future_complete(self, result_future)
-        result = result_future.result().result
+        wrapped = result_future.result()
+        if wrapped is None:
+            self.get_logger().error("no action result")
+            return 1
+        status = int(wrapped.status)
+        result = wrapped.result
         code = int(result.error_code)
         self.get_logger().info(
-            "result error_code=%d (%s) %s"
-            % (code, _code_name(code), result.error_string)
+            "result status=%s error_code=%d (%s) %s"
+            % (_status_name(status), code, _code_name(code), result.error_string)
         )
         if self._samples:
             xs = [sample[0] for sample in self._samples]
@@ -83,7 +90,7 @@ class GoalSender(Node):
                     end_y * 1000.0,
                 )
             )
-        return 0 if code == FollowJointTrajectory.Result.SUCCESSFUL else 1
+        return 0 if _goal_succeeded(status, code) else 1
 
     def _feedback(self, feedback) -> None:
         point = feedback.feedback.actual
@@ -99,6 +106,26 @@ class GoalSender(Node):
                 desired[1] * 1000.0 if len(desired) > 1 else float("nan"),
             )
         )
+
+
+def _goal_succeeded(status: int, error_code: int) -> bool:
+    return (
+        status == GoalStatus.STATUS_SUCCEEDED
+        and error_code == FollowJointTrajectory.Result.SUCCESSFUL
+    )
+
+
+def _status_name(status: int) -> str:
+    names = {
+        GoalStatus.STATUS_UNKNOWN: "UNKNOWN",
+        GoalStatus.STATUS_ACCEPTED: "ACCEPTED",
+        GoalStatus.STATUS_EXECUTING: "EXECUTING",
+        GoalStatus.STATUS_CANCELING: "CANCELING",
+        GoalStatus.STATUS_SUCCEEDED: "SUCCEEDED",
+        GoalStatus.STATUS_CANCELED: "CANCELED",
+        GoalStatus.STATUS_ABORTED: "ABORTED",
+    }
+    return names.get(status, "UNKNOWN")
 
 
 def _code_name(code: int) -> str:
