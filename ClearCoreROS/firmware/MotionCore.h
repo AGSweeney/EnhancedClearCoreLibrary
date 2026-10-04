@@ -37,7 +37,20 @@ struct MotionConfigPatch {
     uint8_t posLim[CCROS_AXIS_COUNT];
     bool hasNegLim[CCROS_AXIS_COUNT];
     uint8_t negLim[CCROS_AXIS_COUNT];
+    bool hasName[CCROS_AXIS_COUNT];
+    char name[CCROS_AXIS_COUNT][16];
+    bool hasRotary[CCROS_AXIS_COUNT];
+    bool rotary[CCROS_AXIS_COUNT];
+    bool hasDirection[CCROS_AXIS_COUNT];
+    int8_t direction[CCROS_AXIS_COUNT];
+    bool hasGear[CCROS_AXIS_COUNT];
+    double gear[CCROS_AXIS_COUNT];
+    bool hasOffset[CCROS_AXIS_COUNT];
+    double offset[CCROS_AXIS_COUNT];
 };
+
+const char *MotionJointName(uint8_t axis);
+bool MotionAxisRotary(uint8_t axis);
 
 bool MotionInit();
 void MotionPoll();

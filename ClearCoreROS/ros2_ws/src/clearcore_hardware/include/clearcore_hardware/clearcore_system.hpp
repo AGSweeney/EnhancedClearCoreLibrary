@@ -47,6 +47,11 @@ private:
   int session_port_{9200};
   int stream_port_{9201};
   int axis_mask_{3};
+  std::string joint_name_[4];
+  bool rotary_[4];
+  int direction_[4];
+  std::string gear_[4];
+  std::string offset_[4];
   int session_fd_{-1};
   int stream_fd_{-1};
   std::vector<uint8_t> rx_;

@@ -32,8 +32,26 @@ POSITION_PAYLOAD = 20
 HEARTBEAT_PAYLOAD = 2
 TRACK_PAYLOAD = 36
 
-JOINTS = ("joint_x", "joint_y", "joint_z", "joint_a")
+JOINTS = ["joint_x", "joint_y", "joint_z", "joint_a"]
 AXIS = {"x": 0, "y": 1, "z": 2, "a": 3, "joint_x": 0, "joint_y": 1, "joint_z": 2, "joint_a": 3}
+ROTARY = [False, False, False, True]
+
+
+def apply_joint_map(names, rotary=None) -> None:
+    """Replace the live joint names in place. Callers keep the same list and dict."""
+    if not isinstance(names, list) or len(names) != 4:
+        return
+    if any(not isinstance(name, str) or not name for name in names):
+        return
+    if len(set(names)) != 4:
+        return
+    for old in list(JOINTS):
+        AXIS.pop(old, None)
+    for index, name in enumerate(names):
+        JOINTS[index] = name
+        AXIS[name] = index
+        if isinstance(rotary, list) and index < len(rotary):
+            ROTARY[index] = bool(rotary[index])
 
 
 def _hdr(msg_type: int, payload_len: int) -> bytes:

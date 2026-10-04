@@ -2,7 +2,7 @@
 
 Get one ClearPath moving on connector M0. This uses the released firmware and `host/ccros_cli.py`. It does not use ROS, `ros2_control`, or the XRCE publisher.
 
-Joint names, linear versus rotary, direction, gearing, and offsets are not configurable yet. M0 is `joint_x` and it is a linear axis in meters. If the shaft turns the wrong way, change direction in MSP or the motor cable. There is no firmware setting for that.
+This exercise uses the released image. M0 is `joint_x`, a linear axis in meters. That download does not accept a joint name, rotary flag, direction, gear, or offset. Current sources do, through `configure` (`name_x`, `rotary_x`, `direction_x`, `gear_x`, `offset_x`, and the same keys for `y`, `z`, and `a`); change those only while the motors are disabled. On this exercise, a reversed shaft is an MSP or cable change.
 
 Reported position is generated steps (`PositionRefCommanded`), not a shaft encoder. `0.01` in a status position is 0.01 m, which is 10 mm.
 

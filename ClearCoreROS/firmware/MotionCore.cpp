@@ -26,6 +26,11 @@
 
 static uint32_t g_stepsPerRev[CCROS_AXIS_COUNT];
 static double g_pitchMm[CCROS_AXIS_COUNT];
+static char g_jointName[CCROS_AXIS_COUNT][16];
+static uint8_t g_rotaryMask;
+static int8_t g_direction[CCROS_AXIS_COUNT];
+static double g_gear[CCROS_AXIS_COUNT];
+static double g_offset[CCROS_AXIS_COUNT];
 static uint32_t g_axisMask = CCROS_DEFAULT_AXIS_MASK;
 static uint32_t g_vel = CCROS_DEFAULT_VEL_STEPS;
 static uint32_t g_accel = CCROS_DEFAULT_ACCEL_STEPS;
@@ -105,17 +110,54 @@ static int32_t RoundToI32(double v) {
     return (int32_t)(v - 0.5);
 }
 
+static bool AxisIsRotary(uint8_t axis) {
+    return (g_rotaryMask & (1u << axis)) != 0;
+}
+
 static double StepsPerUnit(uint8_t axis) {
     if (g_stepsPerRev[axis] == 0) {
         return 0.0;
     }
-    if (axis == CCROS_AXIS_A) {
+    if (AxisIsRotary(axis)) {
         return (double)g_stepsPerRev[axis] / (2.0 * 3.14159265358979323846);
     }
     if (g_pitchMm[axis] <= 0.0) {
         return 0.0;
     }
     return (double)g_stepsPerRev[axis] * 1000.0 / g_pitchMm[axis];
+}
+
+/* Joint units are what the host sends and what status reports.
+ * motor = direction * (joint - offset) / gear, with direction ±1 and gear > 0. */
+static double JointToMotor(uint8_t axis, double joint) {
+    return (double)g_direction[axis] * (joint - g_offset[axis]) / g_gear[axis];
+}
+
+static double MotorToJoint(uint8_t axis, double motor) {
+    return (double)g_direction[axis] * g_gear[axis] * motor + g_offset[axis];
+}
+
+static double JointVelToMotor(uint8_t axis, double jointVel) {
+    return (double)g_direction[axis] * jointVel / g_gear[axis];
+}
+
+static double JointDeltaToMotor(uint8_t axis, double delta) {
+    return (double)g_direction[axis] * delta / g_gear[axis];
+}
+
+static double MotorVelToJoint(uint8_t axis, double motorVel) {
+    return (double)g_direction[axis] * g_gear[axis] * motorVel;
+}
+
+const char *MotionJointName(uint8_t axis) {
+    if (axis >= CCROS_AXIS_COUNT) {
+        return "";
+    }
+    return g_jointName[axis];
+}
+
+bool MotionAxisRotary(uint8_t axis) {
+    return axis < CCROS_AXIS_COUNT && AxisIsRotary(axis);
 }
 
 static void ClearGoals() {
@@ -155,7 +197,7 @@ static void ApplyMechanics() {
         }
         m->HlfbMode(MotorDriver::HLFB_MODE_HAS_BIPOLAR_PWM);
         m->HlfbCarrier(MotorDriver::HLFB_CARRIER_482_HZ);
-        if (a == CCROS_AXIS_A) {
+        if (AxisIsRotary(a)) {
             m->SetMechanicalParams(g_stepsPerRev[a], 360.0, UNIT_DEGREES, 1.0);
         } else {
             m->SetMechanicalParams(g_stepsPerRev[a], g_pitchMm[a], UNIT_MM, 1.0);
@@ -171,10 +213,12 @@ static void ApplyMechanics() {
 }
 
 /* User-page blob. Magic differs from ClearAI ('CAIC') so that blob is not applied.
- * Version 1 is mechanics and network. Version 2 appends soft limits and DI pins. */
+ * Version 1 is mechanics and network. Version 2 appends soft limits and DI pins.
+ * Version 3 appends joint name, rotary flag, direction, gear, and offset. */
 static const uint32_t CCROS_NVM_MAGIC = 0x534F5243u; /* 'CROS' */
 static const uint16_t CCROS_NVM_VERSION_V1 = 1;
-static const uint16_t CCROS_NVM_VERSION = 2;
+static const uint16_t CCROS_NVM_VERSION_V2 = 2;
+static const uint16_t CCROS_NVM_VERSION = 3;
 
 #pragma pack(push, 1)
 struct CcrosNvmConfigV1 {
@@ -196,7 +240,7 @@ struct CcrosNvmConfigV1 {
     uint8_t gatewayOctets[4];
 };
 
-struct CcrosNvmConfig {
+struct CcrosNvmConfigV2 {
     CcrosNvmConfigV1 v1;
     uint8_t limitFlags;
     uint8_t posLimDi[CCROS_AXIS_COUNT];
@@ -204,10 +248,20 @@ struct CcrosNvmConfig {
     float limitMin[CCROS_AXIS_COUNT];
     float limitMax[CCROS_AXIS_COUNT];
 };
+
+struct CcrosNvmConfig {
+    CcrosNvmConfigV2 v2;
+    char jointName[CCROS_AXIS_COUNT][16];
+    uint8_t rotaryMask;
+    int8_t direction[CCROS_AXIS_COUNT];
+    float gear[CCROS_AXIS_COUNT];
+    float offset[CCROS_AXIS_COUNT];
+};
 #pragma pack(pop)
 
 static_assert(sizeof(CcrosNvmConfig) <= 416, "ROS NVM blob exceeds the user page");
-static_assert(offsetof(CcrosNvmConfig, limitFlags) == sizeof(CcrosNvmConfigV1), "v1 prefix");
+static_assert(offsetof(CcrosNvmConfigV2, limitFlags) == sizeof(CcrosNvmConfigV1), "v1 prefix");
+static_assert(offsetof(CcrosNvmConfig, jointName) == sizeof(CcrosNvmConfigV2), "v2 prefix");
 
 static ClearCore::NvmManager &Nvm() {
     return ClearCore::NvmManager::Instance();
@@ -217,11 +271,24 @@ static bool OctetsZero(const uint8_t o[4]) {
     return (o[0] | o[1] | o[2] | o[3]) == 0;
 }
 
+static void ApplyMapDefaults() {
+    static const char *kName[CCROS_AXIS_COUNT] = {"joint_x", "joint_y", "joint_z", "joint_a"};
+    g_rotaryMask = (uint8_t)(1u << CCROS_AXIS_A);
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        memset(g_jointName[a], 0, sizeof(g_jointName[a]));
+        strncpy(g_jointName[a], kName[a], sizeof(g_jointName[a]) - 1u);
+        g_direction[a] = 1;
+        g_gear[a] = 1.0;
+        g_offset[a] = 0.0;
+    }
+}
+
 static void ApplyCompileDefaults() {
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
         g_stepsPerRev[a] = CCROS_DEFAULT_STEPS_PER_REV;
         g_pitchMm[a] = CCROS_DEFAULT_PITCH_MM;
     }
+    ApplyMapDefaults();
     g_axisMask = CCROS_DEFAULT_AXIS_MASK;
     g_vel = CCROS_DEFAULT_VEL_STEPS;
     g_accel = CCROS_DEFAULT_ACCEL_STEPS;
@@ -270,19 +337,7 @@ static bool ConfigPrefixOk(const CcrosNvmConfigV1 *cfg) {
     return true;
 }
 
-static bool ConfigBlobOk(const CcrosNvmConfig *cfg) {
-    if (cfg->v1.magic != CCROS_NVM_MAGIC) {
-        return false;
-    }
-    if (cfg->v1.version == CCROS_NVM_VERSION_V1 && cfg->v1.size == sizeof(CcrosNvmConfigV1)) {
-        return ConfigPrefixOk(&cfg->v1);
-    }
-    if (cfg->v1.version != CCROS_NVM_VERSION || cfg->v1.size != sizeof(CcrosNvmConfig)) {
-        return false;
-    }
-    if (!ConfigPrefixOk(&cfg->v1)) {
-        return false;
-    }
+static bool LimitsOk(const CcrosNvmConfigV2 *cfg) {
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
         if (!LimitDiOk(cfg->posLimDi[a]) || !LimitDiOk(cfg->negLimDi[a])) {
             return false;
@@ -297,6 +352,66 @@ static bool ConfigBlobOk(const CcrosNvmConfig *cfg) {
         }
         if (minEn && maxEn && cfg->limitMin[a] > cfg->limitMax[a] + 1.0e-4f) {
             return false;
+        }
+    }
+    return true;
+}
+
+static bool NameOk(const char *name) {
+    size_t n = 0;
+    while (n < 16 && name[n] != '\0') {
+        n++;
+    }
+    if (n == 0 || n >= 16) {
+        return false;
+    }
+    for (size_t i = 0; i < n; i++) {
+        const char c = name[i];
+        const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                        (c >= '0' && c <= '9') || c == '_';
+        if (!ok) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool ConfigBlobOk(const CcrosNvmConfig *cfg) {
+    if (cfg->v2.v1.magic != CCROS_NVM_MAGIC) {
+        return false;
+    }
+    if (cfg->v2.v1.version == CCROS_NVM_VERSION_V1 && cfg->v2.v1.size == sizeof(CcrosNvmConfigV1)) {
+        return ConfigPrefixOk(&cfg->v2.v1);
+    }
+    if (cfg->v2.v1.version == CCROS_NVM_VERSION_V2 && cfg->v2.v1.size == sizeof(CcrosNvmConfigV2)) {
+        return ConfigPrefixOk(&cfg->v2.v1) && LimitsOk(&cfg->v2);
+    }
+    if (cfg->v2.v1.version != CCROS_NVM_VERSION || cfg->v2.v1.size != sizeof(CcrosNvmConfig)) {
+        return false;
+    }
+    if (!ConfigPrefixOk(&cfg->v2.v1) || !LimitsOk(&cfg->v2)) {
+        return false;
+    }
+    if (cfg->rotaryMask > 0x0f) {
+        return false;
+    }
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        if (!NameOk(cfg->jointName[a])) {
+            return false;
+        }
+        if (cfg->direction[a] != 1 && cfg->direction[a] != -1) {
+            return false;
+        }
+        if (!(cfg->gear[a] > 1.0e-6f && cfg->gear[a] < 1.0e6f)) {
+            return false;
+        }
+        if (!(cfg->offset[a] > -1.0e6f && cfg->offset[a] < 1.0e6f)) {
+            return false;
+        }
+        for (uint8_t b = (uint8_t)(a + 1u); b < CCROS_AXIS_COUNT; b++) {
+            if (strcmp(cfg->jointName[a], cfg->jointName[b]) == 0) {
+                return false;
+            }
         }
     }
     return true;
@@ -328,51 +443,68 @@ static uint8_t LimitDiNorm(uint8_t di) {
 }
 
 static void ConfigApply(const CcrosNvmConfig *cfg) {
-    ConfigApplyPrefix(&cfg->v1);
+    ConfigApplyPrefix(&cfg->v2.v1);
+    ApplyMapDefaults();
     g_limitFlags = 0;
     memset(g_limitMin, 0, sizeof(g_limitMin));
     memset(g_limitMax, 0, sizeof(g_limitMax));
     memset(g_posLimDi, 0, sizeof(g_posLimDi));
     memset(g_negLimDi, 0, sizeof(g_negLimDi));
-    if (cfg->v1.version != CCROS_NVM_VERSION) {
+    if (cfg->v2.v1.version < CCROS_NVM_VERSION_V2) {
         return;
     }
-    g_limitFlags = cfg->limitFlags;
+    g_limitFlags = cfg->v2.limitFlags;
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
-        g_limitMin[a] = cfg->limitMin[a];
-        g_limitMax[a] = cfg->limitMax[a];
-        g_posLimDi[a] = LimitDiNorm(cfg->posLimDi[a]);
-        g_negLimDi[a] = LimitDiNorm(cfg->negLimDi[a]);
+        g_limitMin[a] = cfg->v2.limitMin[a];
+        g_limitMax[a] = cfg->v2.limitMax[a];
+        g_posLimDi[a] = LimitDiNorm(cfg->v2.posLimDi[a]);
+        g_negLimDi[a] = LimitDiNorm(cfg->v2.negLimDi[a]);
+    }
+    if (cfg->v2.v1.version < CCROS_NVM_VERSION) {
+        return;
+    }
+    g_rotaryMask = cfg->rotaryMask;
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        memset(g_jointName[a], 0, sizeof(g_jointName[a]));
+        strncpy(g_jointName[a], cfg->jointName[a], sizeof(g_jointName[a]) - 1u);
+        g_direction[a] = cfg->direction[a];
+        g_gear[a] = cfg->gear[a];
+        g_offset[a] = cfg->offset[a];
     }
 }
 
 static void ConfigFill(CcrosNvmConfig *cfg) {
     memset(cfg, 0, sizeof(*cfg));
-    cfg->v1.magic = CCROS_NVM_MAGIC;
-    cfg->v1.version = CCROS_NVM_VERSION;
-    cfg->v1.size = (uint16_t)sizeof(CcrosNvmConfig);
-    cfg->v1.axisMask = g_axisMask;
+    cfg->v2.v1.magic = CCROS_NVM_MAGIC;
+    cfg->v2.v1.version = CCROS_NVM_VERSION;
+    cfg->v2.v1.size = (uint16_t)sizeof(CcrosNvmConfig);
+    cfg->v2.v1.axisMask = g_axisMask;
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
-        cfg->v1.stepsPerRev[a] = g_stepsPerRev[a];
-        cfg->v1.pitchMm[a] = (float)g_pitchMm[a];
+        cfg->v2.v1.stepsPerRev[a] = g_stepsPerRev[a];
+        cfg->v2.v1.pitchMm[a] = (float)g_pitchMm[a];
     }
-    cfg->v1.vel = g_vel;
-    cfg->v1.accel = g_accel;
-    cfg->v1.decel = g_decel;
-    cfg->v1.watchdogMs = g_watchdogMs;
-    cfg->v1.estopDi6 = g_estopDi6;
-    cfg->v1.testMode = g_testMode ? 1u : 0u;
-    cfg->v1.netMode = g_netMode;
-    memcpy(cfg->v1.ipOctets, g_ipOctets, 4);
-    memcpy(cfg->v1.netmaskOctets, g_netmaskOctets, 4);
-    memcpy(cfg->v1.gatewayOctets, g_gatewayOctets, 4);
-    cfg->limitFlags = g_limitFlags;
+    cfg->v2.v1.vel = g_vel;
+    cfg->v2.v1.accel = g_accel;
+    cfg->v2.v1.decel = g_decel;
+    cfg->v2.v1.watchdogMs = g_watchdogMs;
+    cfg->v2.v1.estopDi6 = g_estopDi6;
+    cfg->v2.v1.testMode = g_testMode ? 1u : 0u;
+    cfg->v2.v1.netMode = g_netMode;
+    memcpy(cfg->v2.v1.ipOctets, g_ipOctets, 4);
+    memcpy(cfg->v2.v1.netmaskOctets, g_netmaskOctets, 4);
+    memcpy(cfg->v2.v1.gatewayOctets, g_gatewayOctets, 4);
+    cfg->v2.limitFlags = g_limitFlags;
     for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
-        cfg->limitMin[a] = (float)g_limitMin[a];
-        cfg->limitMax[a] = (float)g_limitMax[a];
-        cfg->posLimDi[a] = g_posLimDi[a];
-        cfg->negLimDi[a] = g_negLimDi[a];
+        cfg->v2.limitMin[a] = (float)g_limitMin[a];
+        cfg->v2.limitMax[a] = (float)g_limitMax[a];
+        cfg->v2.posLimDi[a] = g_posLimDi[a];
+        cfg->v2.negLimDi[a] = g_negLimDi[a];
+        strncpy(cfg->jointName[a], g_jointName[a], sizeof(cfg->jointName[a]) - 1u);
+        cfg->direction[a] = g_direction[a];
+        cfg->gear[a] = (float)g_gear[a];
+        cfg->offset[a] = (float)g_offset[a];
     }
+    cfg->rotaryMask = g_rotaryMask;
 }
 
 static bool ConfigWrite(const CcrosNvmConfig *cfg) {
@@ -389,7 +521,7 @@ static bool ConfigWrite(const CcrosNvmConfig *cfg) {
     if (memcmp(&existing, cfg, sizeof(*cfg)) == 0) {
         CcrosNvmConfig nudge;
         memset(&nudge, 0, sizeof(nudge));
-        nudge.v1.magic = 1;
+        nudge.v2.v1.magic = 1;
         if (!Nvm().BlockWrite(ClearCore::NvmManager::NVM_LOC_USER_START, (int)sizeof(nudge),
                               (const uint8_t *)&nudge)) {
             return false;
@@ -563,7 +695,7 @@ static bool HwLimitOn(uint8_t axis, bool positive) {
 
 static const char *SoftReject(uint8_t axis, double q) {
     const double spu = StepsPerUnit(axis);
-    const double eps = (spu > 0.0) ? (0.5 / spu) : 1.0e-6;
+    const double eps = (spu > 0.0) ? ((0.5 / spu) * g_gear[axis]) : 1.0e-6;
     if (LimitMinEn(axis) && q < g_limitMin[axis] - eps) {
         snprintf(g_limitErr, sizeof(g_limitErr), "%s below min limit", AxisName(axis));
         return g_limitErr;
@@ -577,8 +709,8 @@ static const char *SoftReject(uint8_t axis, double q) {
 
 static const char *RejectSteps(uint8_t axis, int32_t target) {
     const double spu = StepsPerUnit(axis);
-    const double q = (spu > 0.0) ? ((double)target / spu) : 0.0;
-    const char *err = SoftReject(axis, q);
+    const double motor = (spu > 0.0) ? ((double)target / spu) : 0.0;
+    const char *err = SoftReject(axis, MotorToJoint(axis, motor));
     if (err) {
         return err;
     }
@@ -598,10 +730,12 @@ static const char *RejectSteps(uint8_t axis, int32_t target) {
 static const char *RejectVelocity(uint8_t axis, float vel) {
     MotorDriver *m = MotorFor(axis);
     const double spu = StepsPerUnit(axis);
-    const double q = (m && spu > 0.0) ? ((double)m->PositionRefCommanded() / spu) : 0.0;
-    const double eps = (spu > 0.0) ? (0.5 / spu) : 1.0e-6;
-    if (vel > 0.f) {
-        if (HwLimitOn(axis, true)) {
+    const double motor = (m && spu > 0.0) ? ((double)m->PositionRefCommanded() / spu) : 0.0;
+    const double q = MotorToJoint(axis, motor);
+    const double eps = (spu > 0.0) ? (0.5 / spu) * g_gear[axis] : 1.0e-6;
+    const float jointVel = (float)MotorVelToJoint(axis, vel);
+    if (jointVel > 0.f) {
+        if (HwLimitOn(axis, g_direction[axis] > 0)) {
             snprintf(g_limitErr, sizeof(g_limitErr), "%s pos limit active", AxisName(axis));
             return g_limitErr;
         }
@@ -610,8 +744,8 @@ static const char *RejectVelocity(uint8_t axis, float vel) {
             return g_limitErr;
         }
     }
-    if (vel < 0.f) {
-        if (HwLimitOn(axis, false)) {
+    if (jointVel < 0.f) {
+        if (HwLimitOn(axis, g_direction[axis] < 0)) {
             snprintf(g_limitErr, sizeof(g_limitErr), "%s neg limit active", AxisName(axis));
             return g_limitErr;
         }
@@ -645,20 +779,24 @@ static bool PollTravel(uint8_t axis) {
     if (spu <= 0.0) {
         return false;
     }
-    const double q = (double)m->PositionRefCommanded() / spu;
-    const double eps = 0.5 / spu;
+    const double q = MotorToJoint(axis, (double)m->PositionRefCommanded() / spu);
+    const double eps = (0.5 / spu) * g_gear[axis];
     const int32_t cur = m->PositionRefCommanded();
     const bool cmdPos = g_velCmd[axis] > 0 || (g_goalValid[axis] && g_goalSteps[axis] > cur) ||
                         (g_axisTrack[axis] && g_trackVel[axis] > 0.f);
     const bool cmdNeg = g_velCmd[axis] < 0 || (g_goalValid[axis] && g_goalSteps[axis] < cur) ||
                         (g_axisTrack[axis] && g_trackVel[axis] < 0.f);
-    if (LimitMaxEn(axis) && q > g_limitMax[axis] + eps && ((moving && posDir) || cmdPos)) {
+    const bool towardMax = g_direction[axis] > 0 ? ((moving && posDir) || cmdPos)
+                                                 : ((moving && !posDir) || cmdNeg);
+    const bool towardMin = g_direction[axis] > 0 ? ((moving && !posDir) || cmdNeg)
+                                                 : ((moving && posDir) || cmdPos);
+    if (LimitMaxEn(axis) && q > g_limitMax[axis] + eps && towardMax) {
         HaltAxis(axis);
         snprintf(g_limitErr, sizeof(g_limitErr), "%s above max limit", AxisName(axis));
         NoteTravelLimit(g_limitErr);
         return true;
     }
-    if (LimitMinEn(axis) && q < g_limitMin[axis] - eps && ((moving && !posDir) || cmdNeg)) {
+    if (LimitMinEn(axis) && q < g_limitMin[axis] - eps && towardMin) {
         HaltAxis(axis);
         snprintf(g_limitErr, sizeof(g_limitErr), "%s below min limit", AxisName(axis));
         NoteTravelLimit(g_limitErr);
@@ -1004,7 +1142,7 @@ static const char *StorePosition(uint8_t mask, const float q[4], uint16_t seq, b
         if (spu <= 0.0) {
             return "axis is not configured";
         }
-        const int32_t steps = RoundToI32((double)q[a] * spu);
+        const int32_t steps = RoundToI32(JointToMotor(a, q[a]) * spu);
         const char *blocked = RejectSteps(a, steps);
         if (blocked) {
             if (fromSession) {
@@ -1185,7 +1323,13 @@ const char *MotionConfigure(const MotionConfigPatch *patch) {
     if (!patch) {
         return "missing params";
     }
-    const bool mechanics = patch->hasAxisMask || patch->hasSteps || patch->hasPitch;
+    bool mapScale = false;
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        if (patch->hasRotary[a] || patch->hasDirection[a] || patch->hasGear[a] || patch->hasOffset[a]) {
+            mapScale = true;
+        }
+    }
+    const bool mechanics = patch->hasAxisMask || patch->hasSteps || patch->hasPitch || mapScale;
     if (mechanics && g_enabled) {
         return "disable before changing mechanics";
     }
@@ -1243,6 +1387,47 @@ const char *MotionConfigure(const MotionConfigPatch *patch) {
             return "estop_di6 must be 0, 1, or 2";
         }
         g_estopDi6 = patch->estopDi6;
+    }
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        if (patch->hasName[a]) {
+            if (!NameOk(patch->name[a])) {
+                return "joint name must be 1..15 letters, digits, or _";
+            }
+            memset(g_jointName[a], 0, sizeof(g_jointName[a]));
+            strncpy(g_jointName[a], patch->name[a], sizeof(g_jointName[a]) - 1u);
+        }
+        if (patch->hasRotary[a]) {
+            if (patch->rotary[a]) {
+                g_rotaryMask = (uint8_t)(g_rotaryMask | (1u << a));
+            } else {
+                g_rotaryMask = (uint8_t)(g_rotaryMask & ~(1u << a));
+            }
+        }
+        if (patch->hasDirection[a]) {
+            if (patch->direction[a] != 1 && patch->direction[a] != -1) {
+                return "direction must be -1 or 1";
+            }
+            g_direction[a] = patch->direction[a];
+        }
+        if (patch->hasGear[a]) {
+            if (!(patch->gear[a] > 1.0e-6 && patch->gear[a] < 1.0e6)) {
+                return "gear out of range";
+            }
+            g_gear[a] = patch->gear[a];
+        }
+        if (patch->hasOffset[a]) {
+            if (!(patch->offset[a] > -1.0e6 && patch->offset[a] < 1.0e6)) {
+                return "offset out of range";
+            }
+            g_offset[a] = patch->offset[a];
+        }
+    }
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        for (uint8_t b = (uint8_t)(a + 1u); b < CCROS_AXIS_COUNT; b++) {
+            if (strcmp(g_jointName[a], g_jointName[b]) == 0) {
+                return "joint names must be unique";
+            }
+        }
     }
     if (mechanics) {
         ApplyMechanics();
@@ -1505,6 +1690,15 @@ static bool AxisFromName(const char *name, uint8_t *axis) {
     return true;
 }
 
+/* The XY planner is a millimetre path. A rotary axis, or unequal gears, is not one path speed. */
+static bool XyCoordinated() {
+    if (!g_xyReady || AxisIsRotary(CCROS_AXIS_X) || AxisIsRotary(CCROS_AXIS_Y)) {
+        return false;
+    }
+    const double diff = g_gear[CCROS_AXIS_X] - g_gear[CCROS_AXIS_Y];
+    return diff > -1.0e-4 && diff < 1.0e-4;
+}
+
 static void ApplyFeed(uint8_t mask, bool hasFeed, double feedMps) {
     if (g_xyReady) {
         g_xy.ArcAccelMax(g_accel);
@@ -1524,7 +1718,7 @@ static void ApplyFeed(uint8_t mask, bool hasFeed, double feedMps) {
         if (!m || spu <= 0.0) {
             continue;
         }
-        double sps = feedMps * spu;
+        double sps = (feedMps / g_gear[a]) * spu;
         if (sps > (double)g_vel) {
             sps = (double)g_vel;
         }
@@ -1533,10 +1727,11 @@ static void ApplyFeed(uint8_t mask, bool hasFeed, double feedMps) {
         }
         m->VelMax((uint32_t)sps);
     }
-    if (g_xyReady && (mask & 0x3u) != 0) {
-        g_xy.FeedRateMMPerMin(feedMps * 60000.0);
+    if (XyCoordinated() && (mask & 0x3u) != 0) {
+        const double motorMps = feedMps / g_gear[CCROS_AXIS_X];
+        g_xy.FeedRateMMPerMin(motorMps * 60000.0);
         const double spu = StepsPerUnit(CCROS_AXIS_X);
-        double sps = (spu > 0.0) ? feedMps * spu : (double)g_vel;
+        double sps = (spu > 0.0) ? motorMps * spu : (double)g_vel;
         if (sps > (double)g_vel) {
             sps = (double)g_vel;
         }
@@ -1560,7 +1755,7 @@ static const char *MoveAxisAbs(uint8_t axis, int32_t steps) {
 }
 
 static const char *IssueXyOrIndependent(int32_t tx, int32_t ty, bool hasX, bool hasY) {
-    if (hasX && hasY && AxisOn(CCROS_AXIS_X) && AxisOn(CCROS_AXIS_Y) && g_xyReady) {
+    if (hasX && hasY && AxisOn(CCROS_AXIS_X) && AxisOn(CCROS_AXIS_Y) && XyCoordinated()) {
         ReleaseAxis(CCROS_AXIS_X);
         ReleaseAxis(CCROS_AXIS_Y);
         g_xy.SetPosition(ConnectorM0.PositionRefCommanded(), ConnectorM1.PositionRefCommanded());
@@ -1633,7 +1828,7 @@ const char *MotionMoveLinear(uint8_t mask, const float q[4], bool hasFeed, doubl
         if (spu <= 0.0) {
             return "axis is not configured";
         }
-        target[a] = RoundToI32((double)q[a] * spu);
+        target[a] = RoundToI32(JointToMotor(a, q[a]) * spu);
         err = RejectSteps(a, target[a]);
         if (err) {
             return err;
@@ -1668,13 +1863,13 @@ const char *MotionMoveLinear(uint8_t mask, const float q[4], bool hasFeed, doubl
             continue;
         }
         const double dist = fabs((double)(target[a] - start[a]) / spu);
-        const double sps = (speed > 0.0) ? speed : ((double)g_vel / spu);
+        const double sps = (speed > 0.0) ? (speed / g_gear[a]) : ((double)g_vel / spu);
         if (sps > 0.0 && dist / sps > seconds) {
             seconds = dist / sps;
         }
     }
     snprintf(buf, len, "{\"ok\":true,\"coordinated\":%s,\"est_ms\":%lu}",
-             ((use & 0x3u) == 0x3u && g_xyReady) ? "true" : "false",
+             ((use & 0x3u) == 0x3u && XyCoordinated()) ? "true" : "false",
              (unsigned long)(seconds * 1000.0));
     return nullptr;
 }
@@ -1685,8 +1880,8 @@ const char *MotionMoveArc(bool hasX, float x, bool hasY, float y, float iOff, fl
     if (err) {
         return err;
     }
-    if (!AxisOn(CCROS_AXIS_X) || !AxisOn(CCROS_AXIS_Y) || !g_xyReady) {
-        return "arc requires x and y";
+    if (!AxisOn(CCROS_AXIS_X) || !AxisOn(CCROS_AXIS_Y) || !XyCoordinated()) {
+        return "arc requires linear x and y with the same gear";
     }
     if (!hasX && !hasY) {
         return "arc requires x or y";
@@ -1698,8 +1893,8 @@ const char *MotionMoveArc(bool hasX, float x, bool hasY, float y, float iOff, fl
     }
     const int32_t sx = ConnectorM0.PositionRefCommanded();
     const int32_t sy = ConnectorM1.PositionRefCommanded();
-    const int32_t ex = hasX ? RoundToI32((double)x * spuX) : sx;
-    const int32_t ey = hasY ? RoundToI32((double)y * spuY) : sy;
+    const int32_t ex = hasX ? RoundToI32(JointToMotor(CCROS_AXIS_X, x) * spuX) : sx;
+    const int32_t ey = hasY ? RoundToI32(JointToMotor(CCROS_AXIS_Y, y) * spuY) : sy;
     err = RejectSteps(CCROS_AXIS_X, ex);
     if (err) {
         return err;
@@ -1708,8 +1903,8 @@ const char *MotionMoveArc(bool hasX, float x, bool hasY, float y, float iOff, fl
     if (err) {
         return err;
     }
-    const int32_t cx = sx + RoundToI32((double)iOff * spuX);
-    const int32_t cy = sy + RoundToI32((double)jOff * spuY);
+    const int32_t cx = sx + RoundToI32(JointDeltaToMotor(CCROS_AXIS_X, iOff) * spuX);
+    const int32_t cy = sy + RoundToI32(JointDeltaToMotor(CCROS_AXIS_Y, jOff) * spuY);
     const double dx = (double)sx - (double)cx;
     const double dy = (double)sy - (double)cy;
     const double radius = sqrt(dx * dx + dy * dy);
@@ -1836,16 +2031,17 @@ static const char *RunSeek(uint8_t axis, bool positive, bool useLimit, uint8_t p
     if (!(seekUnits > 0.0)) {
         return "seek invalid";
     }
-    const int32_t seekSteps = RoundToI32(seekUnits * spu);
+    const int32_t seekSteps = RoundToI32((seekUnits / g_gear[axis]) * spu);
+    const bool motorPos = g_direction[axis] > 0 ? positive : !positive;
     ApplyFeed(1u << axis, false, 0.0);
     g_seekActive = true;
-    const char *err = SeekAxis(axis, positive, seekSteps);
+    const char *err = SeekAxis(axis, motorPos, seekSteps);
     if (err) {
         g_seekActive = false;
         return err;
     }
     const uint32_t timeout = hasTimeout ? timeoutMs : 30000u;
-    const int rc = SeekUntil(axis, positive, useLimit, pin, activeHigh, timeout);
+    const int rc = SeekUntil(axis, motorPos, useLimit, pin, activeHigh, timeout);
     if (rc != 0) {
         g_seekActive = false;
         if (rc == -1) {
@@ -1858,8 +2054,8 @@ static const char *RunSeek(uint8_t axis, bool positive, bool useLimit, uint8_t p
     }
     const double backUnits = hasBackoff ? backoff : 0.0;
     if (backUnits > 0.0) {
-        const int32_t backSteps = RoundToI32(backUnits * spu);
-        err = SeekAxis(axis, !positive, backSteps);
+        const int32_t backSteps = RoundToI32((backUnits / g_gear[axis]) * spu);
+        err = SeekAxis(axis, !motorPos, backSteps);
         if (err) {
             g_seekActive = false;
             return err;
@@ -1875,7 +2071,8 @@ static const char *RunSeek(uint8_t axis, bool positive, bool useLimit, uint8_t p
         ZeroAxis(axis);
     }
     MotorDriver *m = MotorFor(axis);
-    const double pos = (m && spu > 0.0) ? ((double)m->PositionRefCommanded() / spu) : 0.0;
+    const double motor = (m && spu > 0.0) ? ((double)m->PositionRefCommanded() / spu) : 0.0;
+    const double pos = MotorToJoint(axis, motor);
     if (homing) {
         const uint8_t lim = positive ? g_posLimDi[axis] : g_negLimDi[axis];
         snprintf(buf, len, "{\"homed\":true,\"axis\":\"%s\",\"dir\":\"%s\",\"pos\":%.6f,\"limit_pin\":%u}",
@@ -1994,7 +2191,7 @@ void MotionNoteVelocity(uint16_t seq, uint8_t mask, const float v[4]) {
         g_axisTrack[a] = false;
         g_trackDirty[a] = false;
         g_goalValid[a] = false;
-        g_velGoal[a] = v[a];
+        g_velGoal[a] = (float)JointVelToMotor(a, v[a]);
     }
 }
 
@@ -2021,8 +2218,8 @@ void MotionNoteTrack(uint16_t seq, uint8_t mask, const float q[4], const float v
         g_axisTrack[a] = true;
         g_axisVelMode[a] = false;
         g_goalValid[a] = false;
-        g_trackPos[a] = q[a];
-        g_trackVel[a] = v[a];
+        g_trackPos[a] = (float)JointToMotor(a, q[a]);
+        g_trackVel[a] = (float)JointVelToMotor(a, v[a]);
         g_trackLatchMs[a] = Milliseconds();
         g_trackDirty[a] = true;
     }
@@ -2078,8 +2275,9 @@ void MotionFillState(CcrosState *out) {
         MotorDriver *m = MotorFor(a);
         const double spu = StepsPerUnit(a);
         const int32_t steps = m ? m->PositionRefCommanded() : 0;
-        out->position[a] = (spu > 0.0) ? (float)((double)steps / spu) : 0.f;
-        out->velocity[a] = g_velRos[a];
+        const double motor = (spu > 0.0) ? ((double)steps / spu) : 0.0;
+        out->position[a] = (float)MotorToJoint(a, motor);
+        out->velocity[a] = (float)MotorVelToJoint(a, g_velRos[a]);
         float duty = 0.f;
         if (m && AxisOn(a)) {
             duty = m->HlfbPercent();
@@ -2089,15 +2287,15 @@ void MotionFillState(CcrosState *out) {
         }
         if (g_axisTrack[a]) {
             out->track_mask = (uint8_t)(out->track_mask | (1u << a));
-            out->target_position[a] = g_trackPos[a];
-            out->target_velocity[a] = g_trackVel[a];
+            out->target_position[a] = (float)MotorToJoint(a, g_trackPos[a]);
+            out->target_velocity[a] = (float)MotorVelToJoint(a, g_trackVel[a]);
         } else if (g_goalValid[a] && spu > 0.0) {
-            out->target_position[a] = (float)((double)g_goalSteps[a] / spu);
+            out->target_position[a] = (float)MotorToJoint(a, (double)g_goalSteps[a] / spu);
         } else {
             out->target_position[a] = out->position[a];
         }
         if (spu > 0.0) {
-            out->command_velocity[a] = (float)((double)g_velCmd[a] / spu);
+            out->command_velocity[a] = (float)MotorVelToJoint(a, (double)g_velCmd[a] / spu);
         }
         out->target_latch_ms[a] = g_trackLatchMs[a];
     }
@@ -2108,16 +2306,25 @@ void MotionFillState(CcrosState *out) {
 }
 
 void MotionFillCapabilitiesJson(char *buf, uint16_t len) {
+    const char *types[CCROS_AXIS_COUNT];
+    const char *units[CCROS_AXIS_COUNT];
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        types[a] = AxisIsRotary(a) ? "revolute" : "prismatic";
+        units[a] = AxisIsRotary(a) ? "rad" : "m";
+    }
     snprintf(buf, len,
              "{\"protocol\":\"%s\",\"firmware\":\"%s\",\"session_port\":%u,"
              "\"stream_port\":%u,\"discover_port\":%u,\"stream_hz\":%u,"
-             "\"joints\":[\"joint_x\",\"joint_y\",\"joint_z\",\"joint_a\"],"
-             "\"joint_types\":[\"prismatic\",\"prismatic\",\"prismatic\",\"revolute\"],"
-             "\"units\":[\"m\",\"m\",\"m\",\"rad\"],\"axis_mask\":%lu,\"nvm\":%s}",
+             "\"joints\":[\"%s\",\"%s\",\"%s\",\"%s\"],"
+             "\"joint_types\":[\"%s\",\"%s\",\"%s\",\"%s\"],"
+             "\"units\":[\"%s\",\"%s\",\"%s\",\"%s\"],\"axis_mask\":%lu,\"nvm\":%s}",
              CCROS_PROTOCOL_VERSION, CCROS_FIRMWARE_NAME,
              (unsigned)CCROS_TCP_SESSION_PORT, (unsigned)CCROS_TCP_STREAM_PORT,
              (unsigned)CCROS_UDP_DISCOVERY_PORT,
              (unsigned)(1000u / CCROS_STREAM_PERIOD_MS),
+             g_jointName[0], g_jointName[1], g_jointName[2], g_jointName[3],
+             types[0], types[1], types[2], types[3],
+             units[0], units[1], units[2], units[3],
              (unsigned long)g_axisMask, g_nvmLoaded ? "true" : "false");
 }
 
@@ -2139,9 +2346,14 @@ void MotionFillConfigJson(char *buf, uint16_t len) {
              "\"limits_min\":[%.6f,%.6f,%.6f,%.6f],"
              "\"limits_max\":[%.6f,%.6f,%.6f,%.6f],"
              "\"pos_lim_di\":[%u,%u,%u,%u],"
-             "\"neg_lim_di\":[%u,%u,%u,%u]}",
+             "\"neg_lim_di\":[%u,%u,%u,%u],"
+             "\"names\":[\"%s\",\"%s\",\"%s\",\"%s\"],"
+             "\"rotary\":[%u,%u,%u,%u],"
+             "\"direction\":[%d,%d,%d,%d],"
+             "\"gear\":[%.6f,%.6f,%.6f,%.6f],"
+             "\"offset\":[%.6f,%.6f,%.6f,%.6f]}",
              g_nvmLoaded ? "true" : "false", storedOk ? "true" : "false",
-             storedOk ? (unsigned)stored.v1.version : 0u,
+             storedOk ? (unsigned)stored.v2.v1.version : 0u,
              (unsigned long)g_axisMask,
              (unsigned long)g_stepsPerRev[0], (unsigned long)g_stepsPerRev[1],
              (unsigned long)g_stepsPerRev[2], (unsigned long)g_stepsPerRev[3],
@@ -2161,7 +2373,13 @@ void MotionFillConfigJson(char *buf, uint16_t len) {
              (unsigned)g_posLimDi[0], (unsigned)g_posLimDi[1], (unsigned)g_posLimDi[2],
              (unsigned)g_posLimDi[3],
              (unsigned)g_negLimDi[0], (unsigned)g_negLimDi[1], (unsigned)g_negLimDi[2],
-             (unsigned)g_negLimDi[3]);
+             (unsigned)g_negLimDi[3],
+             g_jointName[0], g_jointName[1], g_jointName[2], g_jointName[3],
+             (unsigned)AxisIsRotary(0), (unsigned)AxisIsRotary(1),
+             (unsigned)AxisIsRotary(2), (unsigned)AxisIsRotary(3),
+             (int)g_direction[0], (int)g_direction[1], (int)g_direction[2], (int)g_direction[3],
+             g_gear[0], g_gear[1], g_gear[2], g_gear[3],
+             g_offset[0], g_offset[1], g_offset[2], g_offset[3]);
 }
 
 void MotionFillStatusJson(char *buf, uint16_t len) {

@@ -65,6 +65,21 @@ def cmd_configure(args) -> None:
             value = getattr(args, f"{side}_lim_{axis}")
             if value is not None:
                 params[f"{side}_lim_{axis}"] = value
+        name = getattr(args, f"name_{axis}")
+        if name is not None:
+            params[f"name_{axis}"] = name
+        rotary = getattr(args, f"rotary_{axis}")
+        if rotary is not None:
+            params[f"rotary_{axis}"] = rotary
+        direction = getattr(args, f"direction_{axis}")
+        if direction is not None:
+            params[f"direction_{axis}"] = direction
+        gear = getattr(args, f"gear_{axis}")
+        if gear is not None:
+            params[f"gear_{axis}"] = gear
+        offset = getattr(args, f"offset_{axis}")
+        if offset is not None:
+            params[f"offset_{axis}"] = offset
     if args.clear_limits:
         params["clear_limits"] = True
     client = _session(args)
@@ -211,6 +226,11 @@ def build_parser() -> argparse.ArgumentParser:
         cfg.add_argument(f"--max-{axis}", type=float)
         cfg.add_argument(f"--pos-lim-{axis}", type=int)
         cfg.add_argument(f"--neg-lim-{axis}", type=int)
+        cfg.add_argument(f"--name-{axis}")
+        cfg.add_argument(f"--rotary-{axis}", type=int, choices=(0, 1))
+        cfg.add_argument(f"--direction-{axis}", type=int, choices=(-1, 1))
+        cfg.add_argument(f"--gear-{axis}", type=float)
+        cfg.add_argument(f"--offset-{axis}", type=float)
     cfg.set_defaults(func=cmd_configure)
 
     net = sub.add_parser("configure-network", help="Persist DHCP or a static address. Applies on restart.")

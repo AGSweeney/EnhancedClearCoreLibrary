@@ -25,3 +25,5 @@ These are bench checks, not a continuous-integration suite. The Python bridge an
 | `/joint_states` while both axes moved 0 → 0.030 m → 0 | XRCE through a micro-ROS agent, publisher node `clearcore_ros` only | Passed. Board endpoints matched. No alerts. |
 | `ros2_control` `forward_position_controller` or `joint_trajectory_controller` | hardware plugin | Not run as a hardware goal. |
 | Cancellation, connection loss, restart, homing, recovery | either ROS path | Not an automated matrix. Homing and probing exist on the session API. |
+
+This file does not include per-axis joint names, a rotary flag, direction, gear, or offset. Those fields are in later sources. A later image still loads a version 1 or version 2 blob from this revision.

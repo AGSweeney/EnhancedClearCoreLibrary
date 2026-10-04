@@ -448,6 +448,48 @@ static void ApplyKey(const char *js, const jsmntok_t *toks, int ntok, int keyInd
         memcpy(dst, js + val->start, (size_t)n);
         dst[n] = '\0';
         *flag = true;
+    } else if (KeyAxis(js, key, "name_", &axis)) {
+        if (val->type != JSMN_STRING) {
+            req->error = "joint name must be a string";
+            return;
+        }
+        const int n = val->end - val->start;
+        if (n <= 0 || n >= (int)sizeof(req->cfg.name[axis])) {
+            req->error = "joint name must be 1..15 letters, digits, or _";
+            return;
+        }
+        memcpy(req->cfg.name[axis], js + val->start, (size_t)n);
+        req->cfg.name[axis][n] = '\0';
+        req->cfg.hasName[axis] = true;
+    } else if (KeyAxis(js, key, "rotary_", &axis)) {
+        double d = 0;
+        if (!ParseDouble(js, val, &d) || (d != 0.0 && d != 1.0)) {
+            req->error = "rotary must be 0 or 1";
+            return;
+        }
+        req->cfg.hasRotary[axis] = true;
+        req->cfg.rotary[axis] = d == 1.0;
+    } else if (KeyAxis(js, key, "direction_", &axis)) {
+        double d = 0;
+        if (!ParseDouble(js, val, &d) || (d != 1.0 && d != -1.0)) {
+            req->error = "direction must be -1 or 1";
+            return;
+        }
+        req->cfg.hasDirection[axis] = true;
+        req->cfg.direction[axis] = (int8_t)d;
+    } else if (KeyAxis(js, key, "gear_", &axis) || KeyAxis(js, key, "offset_", &axis)) {
+        double d = 0;
+        if (!ParseDouble(js, val, &d)) {
+            req->error = "expected a number";
+            return;
+        }
+        if (js[key->start] == 'g') {
+            req->cfg.hasGear[axis] = true;
+            req->cfg.gear[axis] = d;
+        } else {
+            req->cfg.hasOffset[axis] = true;
+            req->cfg.offset[axis] = d;
+        }
     }
 }
 

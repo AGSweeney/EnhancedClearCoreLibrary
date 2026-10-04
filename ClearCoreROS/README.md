@@ -21,6 +21,8 @@ Three host programs talk to the same firmware. Only one of them should own motio
 
 The session port accepts one TCP client. The bridge and the `ros2_control` plugin cannot both hold it. Stop the bridge and `joint_state_broadcaster` before treating `/joint_states` as the agent topic.
 
+Defaults. `name_x` through `name_a`, `rotary_*`, `direction_*`, `gear_*`, and `offset_*` change the map. The bridge reads `names` from `get_config` after it connects.
+
 | Joint | Motor | Unit |
 |-------|-------|------|
 | `joint_x` | M0 | meters |
@@ -77,7 +79,7 @@ These stay clear of ClearAI (9100–9102) and ClearCNC (8888, 8889, 10040).
 
 DHCP is the compile-time default. If DHCP fails, the address falls back to `192.168.0.109`. `configure-network` saves `dhcp` or `static` in NVM. The new address is used after `restart`. `get_config` reports the saved address. While the mode is `dhcp`, that field stays `0.0.0.0` and the live address is the lease.
 
-`configure` and `test-mode` are saved in the same blob and restored on boot. `reset-config` restores the compile defaults and clears the blob. The motors must be disabled for `reset-config` and for changes to `axis_mask`, `steps_per_rev`, or `pitch_mm`. NVM writes need a supply above the ClearCore undervoltage lockout.
+`configure` and `test-mode` are saved in the same blob and restored on boot. `reset-config` restores the compile defaults and clears the blob. The motors must be disabled for `reset-config` and for changes to `axis_mask`, `steps_per_rev`, `pitch_mm`, `rotary_*`, `direction_*`, `gear_*`, or `offset_*`. A joint name can change while enabled. NVM writes need a supply above the ClearCore undervoltage lockout. Version 3 of the blob stores the joint map. A version 1 or version 2 blob still loads, and the map stays at the defaults until the next save.
 
 The bench board is static at **172.16.82.114**, netmask `255.255.255.0`, gateway `172.16.82.1`.
 
@@ -105,9 +107,15 @@ python host\ccros_cli.py --host 172.16.82.114 --timeout 20 call move_arc --param
 python host\ccros_cli.py --host 172.16.82.114 --timeout 20 call wait_idle --params "{\"timeout_ms\":20000}"
 ```
 
-`move_arc` requires both X and Y. `i` and `j` are the center offset from the start, in meters. Two independent joint moves are not that arc. `feed_mps` is meters per second along the path.
+`move_arc` requires both X and Y, both linear, with the same gear. `i` and `j` are the center offset from the start, in joint units. Two independent joint moves are not that arc. `feed_mps` is joint units per second along the path. `est_ms` is the longer axis component at that feed, not the path duration.
 
-Soft limits and limit switches are `configure` fields, in joint units. `pos-lim-x 8` assigns a digital input. `0` clears it. `clear-limits` clears every soft limit and every switch assignment. Limits are stored in NVM version 2.
+`configure` also takes `--name-x`, `--rotary-x`, `--direction-x`, `--gear-x`, and `--offset-x`, and the same suffixes for `y`, `z`, and `a`. The bridge reads `names` from `get_config`. The released `0.1.0` image does not have these fields.
+
+On the bench, flashing the joint-map image kept the saved static address `172.16.82.114` and the stored limits from the version 2 blob. With the motors disabled, M0 was set to the name `shoulder`, direction `-1`, gear `2`, and offset `0.01` m. Status reported `0.010` m at zero steps. After enable, a move to `0.012` m and back to `0.010` m matched those positions. The map was then restored to `joint_x` through `joint_a`, direction `+1`, gear `1`, and offset `0`, and status reported `0`.
+
+A later run at those defaults moved a 30 mm square at 30 mm/s, one axis at a time, then a coordinated diagonal to (30 mm, 30 mm) and back. Every endpoint matched at 0.001 mm. During the diagonal the largest |Y−X| was 0.007 mm. Each diagonal took about 1.6 s while `est_ms` stayed 1000. The motors were left disabled, test mode off, with no alerts.
+
+Soft limits and limit switches are `configure` fields, in joint units. `pos-lim-x 8` assigns a digital input. `0` clears it. `clear-limits` clears every soft limit and every switch assignment. Limits are stored from NVM version 2 onward.
 
 ```powershell
 python host\ccros_cli.py --host 172.16.82.114 configure --min-x -0.05 --max-x 0.05
@@ -162,7 +170,7 @@ Services on the node: `enable`, `disable`, `stop`, `estop`, `clear_alerts`.
 
 ### ros2_control
 
-`clearcore_hardware` exports a position command and position, velocity, and effort state. Effort is HLFB duty scaled to -1..1. The launch file starts `joint_state_broadcaster` and `forward_position_controller` for `joint_x` and `joint_y`.
+`clearcore_hardware` exports a position command and position, velocity, and effort state. Effort is HLFB duty scaled to -1..1. Joint names come from the hardware parameters `name_x`, `name_y`, `name_z`, and `name_a` (defaults `joint_x` through `joint_a`). `rotary_*`, `direction_*`, `gear_*`, and `offset_*` are sent with `configure` on activate. The launch file starts `joint_state_broadcaster` and `forward_position_controller` for `joint_x` and `joint_y`.
 
 ```bash
 ros2 launch clearcore_hardware hardware.launch.py host:=172.16.82.114

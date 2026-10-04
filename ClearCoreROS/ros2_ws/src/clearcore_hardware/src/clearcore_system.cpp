@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <cctype>
 #include <cerrno>
 #include <chrono>
 #include <cmath>
@@ -143,18 +144,61 @@ hardware_interface::CallbackReturn ClearCoreSystemHardware::on_init(
   axis_mask_ = std::stoi(param("axis_mask", "3"));
   velocity_stream_ = param("stream_mode", "position") == "velocity";
 
-  const char * names[4] = {"joint_x", "joint_y", "joint_z", "joint_a"};
+  const char suffix[4] = {'x', 'y', 'z', 'a'};
+  const char * fallback[4] = {"joint_x", "joint_y", "joint_z", "joint_a"};
+  auto name_ok = [](const std::string & name) {
+    if (name.empty() || name.size() > 15) {
+      return false;
+    }
+    for (unsigned char c : name) {
+      if (!(std::isalnum(c) || c == '_')) {
+        return false;
+      }
+    }
+    return true;
+  };
+  for (int a = 0; a < 4; ++a) {
+    const std::string tail(1, suffix[a]);
+    joint_name_[a] = param("name_" + tail, fallback[a]);
+    if (!name_ok(joint_name_[a])) {
+      RCLCPP_ERROR(
+        rclcpp::get_logger("clearcore_system"),
+        "name_%c must be 1..15 letters, digits, or _", suffix[a]);
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+    rotary_[a] = param("rotary_" + tail, a == 3 ? "1" : "0") == "1";
+    direction_[a] = param("direction_" + tail, "1") == "-1" ? -1 : 1;
+    gear_[a] = param("gear_" + tail, "1");
+    offset_[a] = param("offset_" + tail, "0");
+    auto number_ok = [](const std::string & text) {
+      if (text.empty() || text.size() > 16) {
+        return false;
+      }
+      for (unsigned char c : text) {
+        if (!(std::isdigit(c) || c == '.' || c == '-' || c == '+')) {
+          return false;
+        }
+      }
+      return true;
+    };
+    if (!number_ok(gear_[a]) || !number_ok(offset_[a])) {
+      RCLCPP_ERROR(
+        rclcpp::get_logger("clearcore_system"),
+        "gear_%c and offset_%c must be plain numbers", suffix[a], suffix[a]);
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+  }
   for (const auto & joint : info_.joints) {
     int axis = -1;
     for (int a = 0; a < 4; ++a) {
-      if (joint.name == names[a]) {
+      if (joint.name == joint_name_[a]) {
         axis = a;
       }
     }
     if (axis < 0) {
       RCLCPP_ERROR(
         rclcpp::get_logger("clearcore_system"),
-        "joint '%s' is not joint_x/y/z/a", joint.name.c_str());
+        "joint '%s' does not match name_x/y/z/a", joint.name.c_str());
       return hardware_interface::CallbackReturn::ERROR;
     }
     bool has_position = false;
@@ -268,7 +312,16 @@ hardware_interface::CallbackReturn ClearCoreSystemHardware::on_activate(
       << ",\"vel_steps\":" << param("vel_steps", "27000")
       << ",\"accel_steps\":" << param("accel_steps", "250000")
       << ",\"decel_steps\":" << param("decel_steps", param("accel_steps", "250000"))
-      << ",\"watchdog_ms\":" << param("watchdog_ms", "500") << "}";
+      << ",\"watchdog_ms\":" << param("watchdog_ms", "500");
+  const char suffix[4] = {'x', 'y', 'z', 'a'};
+  for (int a = 0; a < 4; ++a) {
+    cfg << ",\"name_" << suffix[a] << "\":\"" << joint_name_[a] << "\""
+        << ",\"rotary_" << suffix[a] << "\":" << (rotary_[a] ? 1 : 0)
+        << ",\"direction_" << suffix[a] << "\":" << direction_[a]
+        << ",\"gear_" << suffix[a] << "\":" << gear_[a]
+        << ",\"offset_" << suffix[a] << "\":" << offset_[a];
+  }
+  cfg << "}";
   /* clear_alerts is the recovery from a watchdog latch. It is part of
    * activate, not of the realtime read loop. */
   const std::string test_mode = param("test_mode", "false");

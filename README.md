@@ -54,7 +54,7 @@ Ethernet support uses the LwIP stack. Use the ethernet API from libClearCore for
 | **GRBLCompatibleExample** | GRBL-style firmware: G0/G1/G2/G03, $ commands, jogging ($J=), homing ($H), gSender-friendly. Serial only. See `GRBLCompatibleExample/README.md`. |
 | **ProjectTemplate** | Minimal Microchip Studio template. Put your code in `main.cpp`. |
 | **ClearAI_Controller** | JSON-RPC Lines firmware so an LLM can command an XY gantry (Code as Policies primitives), plus ClearAI/LocoRix MCP servers. See `ClearAI_Controller/README.md` and `ClearAI_Controller/docs/`. |
-| **ClearCoreROS** | ClearCore firmware for M0–M3 as ROS 2 joints. JSON-RPC session, binary joint stream, NVM mechanics and static IP, soft limits and limit switches, coordinated XY lines and arcs, homing and probing, and an XRCE-DDS `JointState` publisher. Hardware runs have shown two-axis `FollowJointTrajectory` and `/joint_states` through a micro-ROS agent. See `ClearCoreROS/README.md`. |
+| **ClearCoreROS** | ClearCore firmware for M0–M3 as ROS 2 joints. JSON-RPC session, binary joint stream, NVM mechanics and static IP, per-axis joint name, direction, gear, and offset, soft limits and limit switches, coordinated XY lines and arcs, homing and probing, and an XRCE-DDS `JointState` publisher. Hardware runs have shown two-axis `FollowJointTrajectory` and `/joint_states` through a micro-ROS agent. See `ClearCoreROS/README.md`. |
 
 Open the matching `.atsln`, set the project as **Startup Project**, then **Start Without Debugging (Ctrl+Alt+F5)** to build, flash, and run.
 

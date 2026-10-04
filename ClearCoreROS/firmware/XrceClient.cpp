@@ -2,7 +2,7 @@
 /*
  * Minimal XRCE-DDS 1.0 client. It speaks the same messages as
  * Micro-XRCE-DDS-Client v2.4.3: CREATE_CLIENT, CREATE with XML, WRITE_DATA.
- * The payload is sensor_msgs/JointState for joint_x, joint_y, joint_z, joint_a.
+ * The payload is sensor_msgs/JointState. Joint names come from the motor map.
  */
 
 #include "XrceClient.h"
@@ -281,10 +281,10 @@ static void SendJointState() {
     PutU32(&body, (ms % 1000u) * 1000000u);
     PutStr(&body, "");
     PutU32(&body, 4);
-    PutStr(&body, "joint_x");
-    PutStr(&body, "joint_y");
-    PutStr(&body, "joint_z");
-    PutStr(&body, "joint_a");
+    PutStr(&body, MotionJointName(0));
+    PutStr(&body, MotionJointName(1));
+    PutStr(&body, MotionJointName(2));
+    PutStr(&body, MotionJointName(3));
     PutU32(&body, 4);
     for (uint8_t i = 0; i < 4; i++) {
         PutF64(&body, st.position[i]);

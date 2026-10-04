@@ -11,7 +11,9 @@ ClearCore (ATSAME53) does not run a ROS 2 graph. DDS and `rclcpp` do not fit the
 | `joint_z` | M2 | prismatic | meters |
 | `joint_a` | M3 | revolute | radians |
 
-Zero is the pose at firmware boot (`PositionRefSet(0)`). Commands are absolute. The host converts a trajectory into these units; the firmware converts to steps with nearest-step rounding on the absolute target.
+Those names, types, and units are the defaults. `configure` can rename each axis, mark it rotary, and set direction, gear, and offset. The reported joint value is `direction * gear * motor + offset`, with `direction` equal to `-1` or `1` and `gear` greater than 0. A command converts back with `motor = direction * (joint - offset) / gear`. `i` and `j` are joint-space deltas, so the offset is not applied to them. Soft limits stay in joint units.
+
+Zero motor position is the pose at firmware boot (`PositionRefSet(0)`), which reports as the offset. Commands are absolute in joint units. The firmware converts to steps with nearest-step rounding on the absolute motor target.
 
 Default mechanics match ClearAI: 800 steps/rev, 5 mm pitch, 27000 steps/s, 250000 steps/s². That is 160000 steps per meter on X/Y/Z, so 0.01 m is exactly 1600 steps.
 
@@ -60,7 +62,7 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 | Method | Params | Result |
 |--------|--------|--------|
 | `get_capabilities` | — | protocol, ports, joint names, units, `axis_mask`, `nvm` |
-| `get_config` | — | mechanics, watchdog, estop, test mode, `nvm` / `nvm_valid` / `nvm_version`, network, soft limits, limit-switch pins |
+| `get_config` | — | mechanics, watchdog, estop, test mode, `nvm` / `nvm_valid` / `nvm_version`, network, soft limits, limit-switch pins, `names`, `rotary`, `direction`, `gear`, `offset` |
 | `get_status` | — | flags, `alert_reg`, `alerts`, `travel_limit`, `xrce`, position/velocity/effort |
 | `configure` | see below | `{"ok":true}` and the live configuration is written to NVM |
 | `reset_config` | — | compile defaults, and the NVM blob is cleared. Motors must be disabled. |
@@ -87,7 +89,12 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 |-------|---------|
 | `axis_mask` | bits 0..3 = X Y Z A. Range 1..15. Requires motors disabled. |
 | `steps_per_rev` | one number (all axes) or four numbers. Requires disabled. |
-| `pitch_mm` | linear pitch. Axis A is always revolute and ignores pitch. Requires disabled. |
+| `pitch_mm` | linear pitch. A rotary axis ignores pitch. Requires disabled. |
+| `name_x`, `name_y`, `name_z`, `name_a` | Joint name, 1..15 letters, digits, or `_`. Names must be unique. |
+| `rotary_x` … `rotary_a` | `0` prismatic (meters), `1` revolute (radians). Requires disabled. Default is rotary on A only. |
+| `direction_x` … `direction_a` | `1` or `-1`. Requires disabled. Positive joint motion follows the sign. |
+| `gear_x` … `gear_a` | Joint units per motor unit. Must be greater than 0. Requires disabled. |
+| `offset_x` … `offset_a` | Added after the gear, in joint units. Requires disabled. |
 | `vel_steps`, `accel_steps`, `decel_steps` | step generator limits. Applied immediately. |
 | `watchdog_ms` | `0` disables. Default 500. |
 | `estop_di6` | `0` off, `1` fault when DI-6 is low (default), `2` fault when DI-6 is high. |
@@ -96,7 +103,7 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 | `clear_limits` | `true` clears every soft limit and every limit-switch assignment. |
 | `pos_lim_x` … `pos_lim_a`, `neg_lim_x` … `neg_lim_a` | Digital input for that direction. `0` or `255` disables it. `1`..`12` are IO-0…IO-5, DI-6…DI-8, and A-9…A-12. The pin is forced to a digital input. |
 
-`configure`, `set_test_mode`, and `configure_network` write one blob (`magic` `CROS`) at `NvmManager` user offset 0. Version 1 is mechanics and network. Version 2 adds the soft limits and limit-switch pins. Boot still loads a version 1 blob and treats limits as unset. An unrecognized blob, including a ClearAI `CAIC` blob, is left untouched and the compile defaults stay in effect. A successful save writes version 2 and replaces those bytes. `get_capabilities` reports `nvm` true after a blob has been loaded or saved. `nvm_valid` is true when the stored blob passes the version and range checks. NVM writes require a supply above the ClearCore undervoltage lockout; a low supply returns `nvm write failed`.
+`configure`, `set_test_mode`, and `configure_network` write one blob (`magic` `CROS`) at `NvmManager` user offset 0. Version 1 is mechanics and network. Version 2 adds the soft limits and limit-switch pins. Version 3 adds the joint name, rotary flag, direction, gear, and offset. Boot still loads a version 1 blob and treats limits and the joint map as defaults. A version 2 blob keeps its limits and uses the default map. An unrecognized blob, including a ClearAI `CAIC` blob, is left untouched and the compile defaults stay in effect. A successful save writes version 3 and replaces those bytes. `get_capabilities` reports `nvm` true after a blob has been loaded or saved. `nvm_valid` is true when the stored blob passes the version and range checks. NVM writes require a supply above the ClearCore undervoltage lockout; a low supply returns `nvm write failed`.
 
 `configure_network` with `mode:"static"` requires `ip_address` and `netmask` when none are already stored. `gateway` may be omitted. The running Ethernet stack is not changed in place. Call `restart` after saving. `mode:"dhcp"` is the boot default.
 
@@ -198,9 +205,9 @@ The watchdog trips only while a goal is unfinished or a velocity command is nonz
 
 ## Coordinated XY, homing, and probing
 
-`move_linear` takes absolute `x`,`y`,`z`,`a` in meters and radians. When both X and Y are in `axis_mask` and enabled, those two axes run on the coordinated planner so the path is one straight line. Otherwise each named axis moves on its own trapezoid. Z and A are always independent. Two independent trapezoids are not a circular arc: constant cruise speeds draw a straight line, and the accel and decel ramps only bend that line. A circular arc is `move_arc`, which locks X and Y to one radius. `x` and `y` are the end point, `i` and `j` are the center offset from the start in meters, and `cw` selects direction. It requires both X and Y. Both calls return `est_ms` and `coordinated`, and they do not wait. `wait_idle` blocks until motion has been still for 20 ms, or until `timeout_ms` (default 60000). `feed_mps` is the path speed in meters per second. Omitted, the move uses `vel_steps`.
+`move_linear` takes absolute `x`,`y`,`z`,`a` in joint units. When both X and Y are in `axis_mask` and enabled, both are linear, and their gears match, those two axes run on the coordinated planner so the path is one straight line in motor space. Otherwise each named axis moves on its own trapezoid. Z and A are always independent. Two independent trapezoids are not a circular arc: constant cruise speeds draw a straight line, and the accel and decel ramps only bend that line. A circular arc is `move_arc`, which locks X and Y to one radius. `x` and `y` are the end point, `i` and `j` are the center offset from the start in joint units, and `cw` selects direction. It requires both X and Y, both linear, with the same gear. Both calls return `est_ms` and `coordinated`, and they do not wait. `est_ms` is the longer single-axis time at `feed_mps`, not the coordinated path time. A 30 mm diagonal at 0.03 m/s reports 1000 and takes about 1.6 s. `wait_idle` blocks until motion has been still for 20 ms, or until `timeout_ms` (default 60000). `feed_mps` is the path speed in joint units per second. Omitted, the move uses `vel_steps`.
 
-`home` seeks the limit switch configured for `axis` (`x`,`y`,`z`,`a`) and `dir` (`pos` or `neg`). `seek` and `backoff` are in that joint's units (meters or radians). Defaults are a 1 m / 1 rad seek, no backoff, and a 30 s timeout. `zero` defaults to true and sets that joint's generated position to 0 after the seek. The seek ignores soft limits. It still reads the switch when test mode is on.
+`home` seeks the limit switch configured for `axis` (`x`,`y`,`z`,`a`) and `dir` (`pos` or `neg`). `dir` is the joint direction: with `direction` `-1`, the motor runs the other way and the seek watches that motor's limit. `seek` and `backoff` are in that joint's units (meters or radians) and are divided by `gear`. Defaults are a 1 m / 1 rad seek, no backoff, and a 30 s timeout. `zero` defaults to true and sets that joint's generated position to 0 after the seek. The seek ignores soft limits. It still reads the switch when test mode is on.
 
 `probe` seeks until digital input `pin` (1..12) reads `active` (`high` by default, or `low`). The pin cannot be one already assigned as a limit. `zero` defaults to false. A hit stops that axis. Hardware estop aborts the seek. The call blocks, so a following `stop` is not read until it returns.
 
@@ -214,7 +221,7 @@ The board publishes the four joints to a micro-ROS agent. The ClearCore is an XR
 
 The client queues up to 12 inbound datagrams through lwIP. A real agent answers one request with several UDP packets. `EthernetUdp` keeps only the latest packet, so this socket does not use it. If the queue is full, a later datagram is dropped and the earlier ones are kept.
 
-The publish is `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The names are `joint_x`, `joint_y`, `joint_z`, and `joint_a`. X, Y, and Z are meters. A is radians. The sample is the same generated-step state as the binary frame. The stamp is time since boot, not a synchronized host clock. The body has no CDR encapsulation header. Fast DDS adds that header. A second encapsulation makes a ROS subscriber reject the sample.
+The publish is `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The four names are the configured joint names. Position and velocity are joint units. The sample is the same generated-step state as the binary frame, after direction, gear, and offset. The stamp is time since boot, not a synchronized host clock. The body has no CDR encapsulation header. Fast DDS adds that header. A second encapsulation makes a ROS subscriber reject the sample.
 
 A reliable heartbeat is sent about once a second. If no agent packet arrives for 3 s, the client drops the session and sends `CREATE_CLIENT` again. `get_status` reports `xrce` as `off`, `connecting`, `creating`, or `streaming`.
 

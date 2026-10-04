@@ -33,7 +33,7 @@ from clearcore_bridge.follow import (
     sample_trajectory,
     state_block_reason,
 )
-from clearcore_bridge.wire import AXIS, JOINTS, SessionClient, StreamClient
+from clearcore_bridge.wire import AXIS, JOINTS, ROTARY, SessionClient, StreamClient, apply_joint_map
 
 
 class ClearCoreBridge(Node):
@@ -156,6 +156,9 @@ class ClearCoreBridge(Node):
                 },
             )
             session.call("set_test_mode", {"on": bool(self.get_parameter("test_mode").value)})
+            cfg = session.call("get_config")
+            if isinstance(cfg, dict):
+                apply_joint_map(cfg.get("names"), cfg.get("rotary"))
             session.call("enable")
             stream = StreamClient(self._host, self._stream_port, 2.0)
         except Exception as exc:  # noqa: BLE001
@@ -402,7 +405,7 @@ class ClearCoreBridge(Node):
             pass
 
     def _default_tol(self, name: str) -> float:
-        return self._tol_rad if AXIS[name] == 3 else self._tol_m
+        return self._tol_rad if ROTARY[AXIS[name]] else self._tol_m
 
     def _publish_feedback(self, goal_handle, names, commanded, state) -> None:
         feedback = FollowJointTrajectory.Feedback()
