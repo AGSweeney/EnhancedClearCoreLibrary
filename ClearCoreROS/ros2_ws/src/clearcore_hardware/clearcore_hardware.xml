@@ -4,7 +4,7 @@
          type="clearcore_hardware::ClearCoreSystemHardware"
          base_class_type="hardware_interface::SystemInterface">
     <description>
-      ClearCore position-command hardware interface. State effort is HLFB duty scaled to -1..1.
+      ClearCore position-command hardware interface. HLFB duty is state interface hlfb_duty (-1..1), not JointState effort.
     </description>
   </class>
 </library>

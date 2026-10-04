@@ -113,7 +113,7 @@ A limit switch is active when the input reads high. Motion toward an active swit
 
 Only axes in `axis_mask` are enabled and included in `alert_reg`. A disabled motor's `motor_disabled` alert is not reported, same as ClearAI.
 
-`effort` in status and in the state frame is HLFB duty divided by 100, in -1..1. It is a torque proxy, not a calibrated Newton-meter reading. Unknown HLFB duty is reported as 0.
+`effort` in `get_status` and in the state frame is HLFB duty divided by 100, in -1..1. It is a torque proxy, not a calibrated Newton-meter reading. Unknown HLFB duty is reported as 0. ROS `sensor_msgs/JointState.effort` stays empty: that field is N or N·m. The same duty is published on `/hlfb_duty` (`rt/hlfb_duty` for XRCE) as `JointState.effort` on that diagnostic topic only.
 
 ## Stream frames
 
@@ -221,7 +221,7 @@ The board publishes the four joints to a micro-ROS agent. The ClearCore is an XR
 
 The client queues up to 12 inbound datagrams through lwIP. A real agent answers one request with several UDP packets. `EthernetUdp` keeps only the latest packet, so this socket does not use it. If the queue is full, a later datagram is dropped and the earlier ones are kept.
 
-The publish is `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The four names are the configured joint names. Position and velocity are joint units. The sample is the same generated-step state as the binary frame, after direction, gear, and offset.
+The publish is `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz. The four names are the configured joint names. Position and velocity are joint units. The sample is the same generated-step state as the binary frame, after direction, gear, and offset. `effort` is an empty array. Normalized HLFB duty is a second `JointState` on `rt/hlfb_duty`, with empty position and velocity and duty in `effort`. That topic is not N or N·m.
 
 The stamp is the agent's system clock, not ROS time. XRCE `TIMESTAMP` / `TIMESTAMP_REPLY` measures round-trip delay against the agent process. After the first reply, `header.stamp` is that agent epoch plus `(board_ms - t1_ms) * 1e6`, and `frame_id` is empty. With `use_sim_time:=true`, ROS follows `/clock`; these stamps do not pause or jump with simulation. They are for deployments that use the agent's wall clock.
 
@@ -231,7 +231,7 @@ The body has no CDR encapsulation header. Fast DDS adds that header. A second en
 
 A reliable heartbeat is sent about once a second. If no agent packet arrives for 3 s, the client drops the session and sends `CREATE_CLIENT` again. `get_status` reports `xrce` as `off`, `connecting`, `creating`, or `streaming`.
 
-`host/xrce_check.py` answers the session and prints the sample. It is not a DDS bridge. A micro-ROS agent is what places `/joint_states` on a ROS graph, from the node `clearcore_ros`. `clearcore_bridge` also publishes `/joint_states`, for the joints in `axis_mask`, stamped when the host receives the sample. `joint_state_broadcaster` publishes that topic from `ros2_control`. Stop those other publishers before treating `/joint_states` as the agent stream.
+`host/xrce_check.py` answers the session and prints the sample. It is not a DDS bridge. A micro-ROS agent is what places `/joint_states` and `/hlfb_duty` on a ROS graph, from the node `clearcore_ros`. `clearcore_bridge` also publishes `/joint_states`, for the joints in `axis_mask`, stamped when the host receives the sample, with empty `effort`, and `/hlfb_duty` with the HLFB proxy. `joint_state_broadcaster` publishes `/joint_states` from `ros2_control` without effort; HLFB is the extra state `hlfb_duty` on `/dynamic_joint_states`. Stop those other publishers before treating `/joint_states` as the agent stream.
 
 On the bench, with only `clearcore_ros` publishing, both installed axes moved from 0 to 0.030 m and back to 0. The agent samples reached those same endpoints, the board status matched, and there were no alerts.
 

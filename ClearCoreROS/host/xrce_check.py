@@ -85,11 +85,17 @@ def reply_timestamp(session: int, seq: int, t1_sec: int, t1_nsec: int) -> bytes:
     return header + body
 
 
+def writer_id(payload: bytes) -> int:
+    if len(payload) < 4:
+        return 0
+    return (payload[2] << 4) | (payload[3] >> 4)
+
+
 def joint_from_write(payload: bytes) -> str | None:
     """Decode WRITE_DATA. The first four bytes are the XRCE request and object id.
 
-    The JointState body starts at byte 4. Fast DDS adds the CDR encapsulation,
-    so this body has none. Alignment is from that first body byte.
+    Writer 1 is rt/joint_states (empty effort). Writer 2 is rt/hlfb_duty
+    (HLFB/100 in effort, empty position and velocity).
     """
     if len(payload) < 8:
         return None
@@ -102,12 +108,26 @@ def joint_from_write(payload: bytes) -> str | None:
         names = [cdr.string() for _ in range(count)]
         npos = cdr.u32()
         pos = [cdr.f64() for _ in range(npos)]
+        nvel = cdr.u32()
+        _vel = [cdr.f64() for _ in range(nvel)]
+        neff = cdr.u32()
+        eff = [cdr.f64() for _ in range(neff)]
     except (struct.error, IndexError, UnicodeDecodeError):
         return None
     if frame == "unsync" or sec == 0:
         return None
-    joints = " ".join(f"{name}={value:.5f}" for name, value in zip(names, pos))
-    return f"sec={sec} nsec={nsec} frame={frame!r} {joints}"
+    wid = writer_id(payload)
+    if wid == 1:
+        if neff != 0:
+            return None
+        joints = " ".join(f"{name}={value:.5f}" for name, value in zip(names, pos))
+        return f"JOINT sec={sec} nsec={nsec} effort_len={neff} {joints}"
+    if wid == 2:
+        if npos != 0 or nvel != 0:
+            return None
+        duty = " ".join(f"{name}={value:.4f}" for name, value in zip(names, eff))
+        return f"HLFB sec={sec} nsec={nsec} {duty}"
+    return None
 
 
 def main() -> None:
@@ -118,12 +138,13 @@ def main() -> None:
     print(f"listening {port}", flush=True)
     deadline = time.time() + 20
     samples = 0
+    hlfb = 0
     addr = None
     sync_reply: bytes | None = None
     sync_addr = None
     sync_due: float | None = None
     sync_sent = False
-    while time.time() < deadline and samples < 3:
+    while time.time() < deadline and (samples < 3 or hlfb < 1):
         if sync_reply is not None and sync_due is not None and time.time() >= sync_due:
             sock.sendto(sync_reply, sync_addr)
             print("TIMESTAMP_REPLY", flush=True)
@@ -177,13 +198,18 @@ def main() -> None:
                 text = joint_from_write(payload)
                 if text is None:
                     raise SystemExit("unsynced or invalid JointState")
-                samples += 1
-                print("JOINT", text, flush=True)
+                print(text, flush=True)
+                if text.startswith("JOINT"):
+                    samples += 1
+                elif text.startswith("HLFB"):
+                    hlfb += 1
         if reply is not None:
             sock.sendto(reply, addr)
     if samples < 1:
         raise SystemExit("no JointState sample")
-    print(f"XRCE_OK samples={samples}", flush=True)
+    if hlfb < 1:
+        raise SystemExit("no hlfb_duty sample")
+    print(f"XRCE_OK samples={samples} hlfb={hlfb}", flush=True)
 
 
 if __name__ == "__main__":

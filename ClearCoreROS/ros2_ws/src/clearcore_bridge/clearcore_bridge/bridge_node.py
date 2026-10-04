@@ -82,6 +82,7 @@ class ClearCoreBridge(Node):
 
         group = ReentrantCallbackGroup()
         self._pub = self.create_publisher(JointState, "joint_states", 10)
+        self._hlfb_pub = self.create_publisher(JointState, "hlfb_duty", 10)
         self.create_timer(0.05, self._publish_state, callback_group=group)
         self.create_timer(2.0, self._ensure_connected, callback_group=group)
         for name, method in (
@@ -221,8 +222,15 @@ class ClearCoreBridge(Node):
             msg.name.append(name)
             msg.position.append(float(state["position"][axis]))
             msg.velocity.append(float(state["velocity"][axis]))
-            msg.effort.append(float(state["effort"][axis]))
+        duty = JointState()
+        duty.header.stamp = stamp
+        for axis, name in enumerate(JOINTS):
+            if (self._mask & (1 << axis)) == 0:
+                continue
+            duty.name.append(name)
+            duty.effort.append(float(state["effort"][axis]))
         self._pub.publish(msg)
+        self._hlfb_pub.publish(duty)
 
     def _execute(self, goal_handle):
         gid = _goal_key(goal_handle)

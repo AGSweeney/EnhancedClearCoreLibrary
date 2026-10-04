@@ -40,6 +40,12 @@ static const char kPublisherXml[] =
 static const char kWriterXml[] =
     "<dds><data_writer><topic><kind>NO_KEY</kind><name>rt/joint_states</name>"
     "<dataType>sensor_msgs::msg::dds_::JointState_</dataType></topic></data_writer></dds>";
+static const char kHlfbTopicXml[] =
+    "<dds><topic><name>rt/hlfb_duty</name>"
+    "<dataType>sensor_msgs::msg::dds_::JointState_</dataType></topic></dds>";
+static const char kHlfbWriterXml[] =
+    "<dds><data_writer><topic><kind>NO_KEY</kind><name>rt/hlfb_duty</name>"
+    "<dataType>sensor_msgs::msg::dds_::JointState_</dataType></topic></data_writer></dds>";
 
 enum XrceState {
     XRCE_OFF = 0,
@@ -48,6 +54,8 @@ enum XrceState {
     XRCE_CREATE_TOPIC,
     XRCE_CREATE_PUB,
     XRCE_CREATE_WRITER,
+    XRCE_CREATE_TOPIC_HLFB,
+    XRCE_CREATE_WRITER_HLFB,
     XRCE_STREAM
 };
 
@@ -300,6 +308,44 @@ static void SendReliableHeartbeat() {
     }
 }
 
+static void PutStamp(XrceBuf *body, uint32_t ms) {
+    int64_t stampNs = g_agentOffsetNs + BoardNs(ms);
+    if (stampNs < 0) {
+        stampNs = 0;
+    }
+    PutU32(body, (uint32_t)(stampNs / 1000000000LL));
+    PutU32(body, (uint32_t)(stampNs % 1000000000LL));
+    PutStr(body, "");
+}
+
+static void PutNames(XrceBuf *body) {
+    PutU32(body, 4);
+    PutStr(body, MotionJointName(0));
+    PutStr(body, MotionJointName(1));
+    PutStr(body, MotionJointName(2));
+    PutStr(body, MotionJointName(3));
+}
+
+static bool SendWriter(uint16_t writerId, const uint8_t *body, uint16_t n) {
+    uint8_t frame[640];
+    XrceBuf b = {frame, 0, sizeof(frame)};
+    Header(&b, XRCE_STREAM_BEST_EFFORT, g_bestEffortSeq);
+    const uint16_t sub = BeginSub(&b, 7, 0);
+    const uint16_t req = NextRequest();
+    PutU8(&b, (uint8_t)(req >> 8));
+    PutU8(&b, (uint8_t)req);
+    uint8_t writer[2];
+    ObjectRaw(writerId, XRCE_KIND_DATAWRITER, writer);
+    PutRaw(&b, writer, 2);
+    PutRaw(&b, body, n);
+    EndSub(&b, sub);
+    if (!UdpSend(frame, b.n)) {
+        return false;
+    }
+    g_bestEffortSeq = (uint16_t)(g_bestEffortSeq + 1u);
+    return true;
+}
+
 static void SendJointState() {
     if (!g_timeSynced) {
         return;
@@ -310,19 +356,10 @@ static void SendJointState() {
     XrceBuf body = {raw, 0, sizeof(raw)};
     /* Fast DDS adds the CDR encapsulation. Alignment is from the start of this body.
      * Stamps are agent system time: agent_epoch_ns + (board_ms - t1_ms) * 1e6.
-     * They do not follow ROS /clock. */
-    int64_t stampNs = g_agentOffsetNs + BoardNs(st.time_ms);
-    if (stampNs < 0) {
-        stampNs = 0;
-    }
-    PutU32(&body, (uint32_t)(stampNs / 1000000000LL));
-    PutU32(&body, (uint32_t)(stampNs % 1000000000LL));
-    PutStr(&body, "");
-    PutU32(&body, 4);
-    PutStr(&body, MotionJointName(0));
-    PutStr(&body, MotionJointName(1));
-    PutStr(&body, MotionJointName(2));
-    PutStr(&body, MotionJointName(3));
+     * They do not follow ROS /clock. JointState.effort stays empty; HLFB duty is
+     * rt/hlfb_duty, not N or N·m. */
+    PutStamp(&body, st.time_ms);
+    PutNames(&body);
     PutU32(&body, 4);
     for (uint8_t i = 0; i < 4; i++) {
         PutF64(&body, st.position[i]);
@@ -331,25 +368,21 @@ static void SendJointState() {
     for (uint8_t i = 0; i < 4; i++) {
         PutF64(&body, st.velocity[i]);
     }
+    PutU32(&body, 0);
+    if (!SendWriter(1, body.data, body.n)) {
+        return;
+    }
+
+    body.n = 0;
+    PutStamp(&body, st.time_ms);
+    PutNames(&body);
+    PutU32(&body, 0);
+    PutU32(&body, 0);
     PutU32(&body, 4);
     for (uint8_t i = 0; i < 4; i++) {
         PutF64(&body, st.effort[i]);
     }
-
-    uint8_t frame[640];
-    XrceBuf b = {frame, 0, sizeof(frame)};
-    Header(&b, XRCE_STREAM_BEST_EFFORT, g_bestEffortSeq);
-    const uint16_t sub = BeginSub(&b, 7, 0);
-    const uint16_t req = NextRequest();
-    PutU8(&b, (uint8_t)(req >> 8));
-    PutU8(&b, (uint8_t)req);
-    uint8_t writer[2];
-    ObjectRaw(1, XRCE_KIND_DATAWRITER, writer);
-    PutRaw(&b, writer, 2);
-    PutRaw(&b, body.data, body.n);
-    EndSub(&b, sub);
-    if (UdpSend(frame, b.n)) {
-        g_bestEffortSeq = (uint16_t)(g_bestEffortSeq + 1u);
+    if (SendWriter(2, body.data, body.n)) {
         g_lastPubMs = Milliseconds();
     }
 }
@@ -405,6 +438,12 @@ static void StartCreate(XrceState next, bool newRequest) {
     } else if (next == XRCE_CREATE_WRITER) {
         ObjectRaw(1, XRCE_KIND_DATAWRITER, self);
         SendCreate(XRCE_KIND_DATAWRITER, self, pub, 0, kWriterXml);
+    } else if (next == XRCE_CREATE_TOPIC_HLFB) {
+        ObjectRaw(2, XRCE_KIND_TOPIC, self);
+        SendCreate(XRCE_KIND_TOPIC, self, part, 0, kHlfbTopicXml);
+    } else if (next == XRCE_CREATE_WRITER_HLFB) {
+        ObjectRaw(2, XRCE_KIND_DATAWRITER, self);
+        SendCreate(XRCE_KIND_DATAWRITER, self, pub, 0, kHlfbWriterXml);
     }
     g_state = next;
 }
@@ -419,6 +458,10 @@ static void Advance() {
     } else if (g_state == XRCE_CREATE_PUB) {
         StartCreate(XRCE_CREATE_WRITER, true);
     } else if (g_state == XRCE_CREATE_WRITER) {
+        StartCreate(XRCE_CREATE_TOPIC_HLFB, true);
+    } else if (g_state == XRCE_CREATE_TOPIC_HLFB) {
+        StartCreate(XRCE_CREATE_WRITER_HLFB, true);
+    } else if (g_state == XRCE_CREATE_WRITER_HLFB) {
         g_state = XRCE_STREAM;
         g_lastPubMs = 0;
         g_lastHeartbeatMs = Milliseconds();
@@ -580,7 +623,9 @@ const char *XrceStateName() {
         case XRCE_CREATE_PART:
         case XRCE_CREATE_TOPIC:
         case XRCE_CREATE_PUB:
-        case XRCE_CREATE_WRITER: return "creating";
+        case XRCE_CREATE_WRITER:
+        case XRCE_CREATE_TOPIC_HLFB:
+        case XRCE_CREATE_WRITER_HLFB: return "creating";
         case XRCE_STREAM: return "streaming";
         case XRCE_OFF:
         default: return "off";

@@ -65,7 +65,7 @@ private:
   std::vector<double> hw_cmd_;
   std::vector<double> hw_pos_;
   std::vector<double> hw_vel_;
-  std::vector<double> hw_eff_;
+  std::vector<double> hw_hlfb_;
   std::vector<double> last_cmd_;
 
   void close_all();

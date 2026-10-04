@@ -133,7 +133,7 @@ Timed tracking compares generated position with `q_latched + v_latched * (time_m
 
 ## XRCE-DDS
 
-`xrce-connect` publishes `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz after TIMESTAMP_REPLY. The board binds UDP 9203 and sends to the agent. X, Y, and Z are meters. A is radians. Stamps are the agent's system clock plus board elapsed time, not ROS `/clock`. Until that reply, the topic is withheld and `get_status` reports `xrce_time` as `unsync`. After it, `xrce_time` is `synced` and `frame_id` is empty. The 50 ms spacing is the publish period, not a clock-offset check. The body has no CDR encapsulation; Fast DDS adds it. Commands stay on the session and the binary stream.
+`xrce-connect` publishes `sensor_msgs/JointState` on `rt/joint_states` at 20 Hz after TIMESTAMP_REPLY. The board binds UDP 9203 and sends to the agent. X, Y, and Z are meters. A is radians. `effort` is empty. Normalized HLFB duty is `rt/hlfb_duty`. Stamps are the agent's system clock plus board elapsed time, not ROS `/clock`. Until that reply, the topics are withheld and `get_status` reports `xrce_time` as `unsync`. After it, `xrce_time` is `synced` and `frame_id` is empty. The 50 ms spacing is the publish period, not a clock-offset check. The body has no CDR encapsulation; Fast DDS adds it. Commands stay on the session and the binary stream.
 
 ```powershell
 python host\xrce_check.py 9204
@@ -157,7 +157,7 @@ source install/setup.bash
 
 ### Trajectory action
 
-`clearcore_bridge` connects, enables, publishes `/joint_states`, and serves `follow_joint_trajectory`. The action follows `time_from_start`. Point velocities are spline boundaries. When accelerations are set they are quintic boundaries, not a cap on the feedforward. Path tolerance is generated position versus the time-advanced received reference in that state frame, not versus the host schedule. Action feedback pairs the current host schedule sample with the latest received position, so that gap is not the 0.05 mm local tracking result. A second goal is rejected until the first finishes. A result `error_code` of 0 is `SUCCESSFUL`. Joint state stamps are the time the sample was received. A stale, disabled, faulted, or tripped sample is not a finished move. `enable` fails unless HLFB is asserted. Pass `test_mode:=true` on a bare motor. Launch always writes that parameter, including false, because test mode is stored in NVM.
+`clearcore_bridge` connects, enables, publishes `/joint_states` with empty `effort`, publishes `/hlfb_duty` with HLFB duty in `effort`, and serves `follow_joint_trajectory`. The action follows `time_from_start`. Point velocities are spline boundaries. When accelerations are set they are quintic boundaries, not a cap on the feedforward. Path tolerance is generated position versus the time-advanced received reference in that state frame, not versus the host schedule. Action feedback pairs the current host schedule sample with the latest received position, so that gap is not the 0.05 mm local tracking result. A second goal is rejected until the first finishes. A result `error_code` of 0 is `SUCCESSFUL`. Joint state stamps are the time the sample was received. A stale, disabled, faulted, or tripped sample is not a finished move. `enable` fails unless HLFB is asserted. Pass `test_mode:=true` on a bare motor. Launch always writes that parameter, including false, because test mode is stored in NVM.
 
 A two-axis goal on the bench ran out and back to the origin. X and Y stayed within about 0.01 mm of each other in the feedback printout. The action returned success. That run does not exercise the XRCE publisher.
 
@@ -170,7 +170,7 @@ Services on the node: `enable`, `disable`, `stop`, `estop`, `clear_alerts`.
 
 ### ros2_control
 
-`clearcore_hardware` exports a position command and position, velocity, and effort state. Effort is HLFB duty scaled to -1..1. Joint names come from the hardware parameters `name_x`, `name_y`, `name_z`, and `name_a` (defaults `joint_x` through `joint_a`). `rotary_*`, `direction_*`, `gear_*`, and `offset_*` are sent with `configure` on activate. `hardware.launch.py` starts `joint_state_broadcaster` and `forward_position_controller` for `joint_x` and `joint_y`.
+`clearcore_hardware` exports a position command and position, velocity, and `hlfb_duty` state. `hlfb_duty` is HLFB / 100 (−1..1), not N or N·m. `joint_state_broadcaster` therefore leaves `/joint_states` effort empty. Joint names come from the hardware parameters `name_x`, `name_y`, `name_z`, and `name_a` (defaults `joint_x` through `joint_a`). `rotary_*`, `direction_*`, `gear_*`, and `offset_*` are sent with `configure` on activate. `hardware.launch.py` starts `joint_state_broadcaster` and `forward_position_controller` for `joint_x` and `joint_y`.
 
 ```bash
 ros2 launch clearcore_hardware hardware.launch.py host:=172.16.82.114

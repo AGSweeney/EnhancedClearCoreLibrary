@@ -222,7 +222,7 @@ hardware_interface::CallbackReturn ClearCoreSystemHardware::on_init(
   hw_cmd_.assign(n, 0.0);
   hw_pos_.assign(n, 0.0);
   hw_vel_.assign(n, 0.0);
-  hw_eff_.assign(n, 0.0);
+  hw_hlfb_.assign(n, 0.0);
   last_cmd_.assign(n, 0.0);
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -234,7 +234,7 @@ ClearCoreSystemHardware::export_state_interfaces()
   for (size_t i = 0; i < info_.joints.size(); ++i) {
     states.emplace_back(info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_pos_[i]);
     states.emplace_back(info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &hw_vel_[i]);
-    states.emplace_back(info_.joints[i].name, hardware_interface::HW_IF_EFFORT, &hw_eff_[i]);
+    states.emplace_back(info_.joints[i].name, "hlfb_duty", &hw_hlfb_[i]);
   }
   return states;
 }
@@ -428,7 +428,7 @@ hardware_interface::return_type ClearCoreSystemHardware::drain_stream()
         const int axis = axis_of_joint_[i];
         hw_pos_[i] = get_f32(p + 12 + (axis * 4));
         hw_vel_[i] = get_f32(p + 28 + (axis * 4));
-        hw_eff_[i] = get_f32(p + 44 + (axis * 4));
+        hw_hlfb_[i] = get_f32(p + 44 + (axis * 4));
       }
       have_state_ = true;
     }
