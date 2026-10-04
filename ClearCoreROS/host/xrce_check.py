@@ -73,19 +73,24 @@ class Cdr:
 
 
 def joint_from_write(payload: bytes) -> str | None:
+    """Decode WRITE_DATA. The first four bytes are the XRCE request and object id.
+
+    The JointState body starts at byte 4. Fast DDS adds the CDR encapsulation,
+    so this body has none. Alignment is from that first body byte.
+    """
     if len(payload) < 8:
         return None
-    cdr = Cdr(payload, 4)  # CDR origin is the encapsulation byte
-    if cdr.data[cdr.i : cdr.i + 2] != b"\x00\x01":
+    cdr = Cdr(payload, 4)
+    try:
+        _sec = cdr.u32()
+        _nsec = cdr.u32()
+        _frame = cdr.string()
+        count = cdr.u32()
+        names = [cdr.string() for _ in range(count)]
+        npos = cdr.u32()
+        pos = [cdr.f64() for _ in range(npos)]
+    except (struct.error, IndexError, UnicodeDecodeError):
         return None
-    cdr.i += 4
-    _sec = cdr.u32()
-    _nsec = cdr.u32()
-    _frame = cdr.string()
-    count = cdr.u32()
-    names = [cdr.string() for _ in range(count)]
-    npos = cdr.u32()
-    pos = [cdr.f64() for _ in range(npos)]
     return " ".join(f"{name}={value:.5f}" for name, value in zip(names, pos))
 
 
@@ -109,8 +114,8 @@ def main() -> None:
         stream = data[1]
         seq = data[2] | (data[3] << 8)
         i = 4 if session >= 0x80 else 8
-        # One reply datagram. The ClearCore UDP port keeps a single packet, so a
-        # second sendto in this burst would replace STATUS before the board reads it.
+        # One reply datagram per received message. CREATE and its heartbeat share
+        # a packet, and this reply already carries STATUS and the ACKNACK.
         reply = None
         while i + 4 <= len(data):
             while i % 4 and i < len(data):
