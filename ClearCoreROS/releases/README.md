@@ -2,6 +2,32 @@
 
 Prebuilt firmware for the first-motor guide. You do not need Microchip Studio to flash the current file.
 
+## 0.1.2
+
+| | |
+|--|--|
+| File | `ClearCoreROS-0.1.2.bin` |
+| SHA-256 | `85ed5e5bba52e6bc40b0188f8cb2890b7c4e10394ecc93be87cff74948c37f34` |
+| Length | 285052 |
+| Protocol | `1.0` (`CCROS_PROTOCOL_VERSION`) |
+| Firmware sources | `5ecef62` |
+| Host package | `clearcore_bridge` `0.1.0` |
+
+This image keeps the 0.1.1 joint map and NVM version 3. It withholds XRCE `rt/joint_states` until `TIMESTAMP_REPLY`. Stamps are the agent's system clock, not ROS `/clock`. Until then `get_status` reports `xrce_time` as `unsync`. `host/ccros_cli.py` from this tree is the matching bench client.
+
+Flash instructions are in [../docs/FIRST_MOTOR.md](../docs/FIRST_MOTOR.md).
+
+### What this revision was run on
+
+These are bench checks, not a continuous-integration suite. The Python bridge and `ros2_control` are different programs.
+
+| Check | Path | Result on the bench |
+|-------|------|---------------------|
+| Flash over a version 3 blob from 0.1.1 | session `get_status` | Static `172.16.82.114`, `axis_mask` 3, motors disabled, `test_mode` false. |
+| XRCE publish withheld until `TIMESTAMP_REPLY`, then three samples | `host/xrce_check.py` (0.4 s delayed reply) | No `JointState` before the reply. After it, epoch stamps ~50 ms apart (20 Hz period, not a clock-offset measurement). Status went `streaming` / `unsync`, then `synced`. Motors left disabled. |
+| Mapping, first-motor 10 mm, two-axis `joint_trajectory_controller` | session / `ros2_control` | Not re-run on this `.bin`. Motion path is unchanged from 0.1.1. |
+| `ros2_control` cancellation, connection loss, restart, homing, recovery | hardware plugin | Not an automated matrix. Homing and probing exist on the session API. |
+
 ## 0.1.1
 
 | | |
@@ -13,7 +39,7 @@ Prebuilt firmware for the first-motor guide. You do not need Microchip Studio to
 | Firmware sources | `0bf5dbf` |
 | Host package | `clearcore_bridge` `0.1.0` |
 
-This image adds the joint map: `name_*`, `rotary_*`, `direction_*`, `gear_*`, and `offset_*`. NVM version 3 stores that map. Boot still loads a version 1 or version 2 blob and keeps its network settings and limits. The map stays at the defaults until the next save. `host/ccros_cli.py` from this tree is the matching bench client.
+This image adds the joint map: `name_*`, `rotary_*`, `direction_*`, `gear_*`, and `offset_*`. NVM version 3 stores that map. Boot still loads a version 1 or version 2 blob and keeps its network settings and limits. The map stays at the defaults until the next save. The first-motor guide uses 0.1.2.
 
 Flash instructions are in [../docs/FIRST_MOTOR.md](../docs/FIRST_MOTOR.md).
 
@@ -41,7 +67,7 @@ These are bench checks, not a continuous-integration suite. The Python bridge an
 | Firmware sources | `fb52394` |
 | Host package | `clearcore_bridge` `0.1.0` |
 
-This file has no per-axis joint name, rotary flag, direction, gear, or offset. The first-motor guide uses 0.1.1.
+This file has no per-axis joint name, rotary flag, direction, gear, or offset. The first-motor guide uses 0.1.2.
 
 | Check | Path | Result on the bench |
 |-------|------|---------------------|

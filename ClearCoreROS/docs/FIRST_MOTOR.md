@@ -10,7 +10,7 @@ Reported position is generated steps (`PositionRefCommanded`), not a shaft encod
 
 - A ClearCore and one ClearPath motor.
 - Python 3.10 or newer on the computer that will talk to the board.
-- This repository at a revision that lists firmware `0.1.1` in [../releases/README.md](../releases/README.md). The firmware sources for that image are git `0bf5dbf`.
+- This repository at a revision that lists firmware `0.1.2` in [../releases/README.md](../releases/README.md). The firmware sources for that image are git `5ecef62`.
 - The motor's power supply, and a way to stop the shaft if it runs the wrong direction. Keep a physical estop in the circuit.
 
 The computer and the ClearCore must be on the same Ethernet network. USB is only for flashing and for the serial log.
@@ -33,21 +33,21 @@ DI-6 is the estop input. The default (`estop_di6` 1) treats DI-6 **low** as esto
 
 ## 3. Flash
 
-The file is [../releases/ClearCoreROS-0.1.1.bin](../releases/ClearCoreROS-0.1.1.bin). Confirm the SHA-256 in [../releases/README.md](../releases/README.md) before flashing. Flashing replaces the application on the board. User NVM is kept, including a version 1 or version 2 blob. A ClearAI configuration blob is not applied. The first `configure` after an older blob saves version 3 and keeps the network settings and limits you do not change.
+The file is [../releases/ClearCoreROS-0.1.2.bin](../releases/ClearCoreROS-0.1.2.bin). Confirm the SHA-256 in [../releases/README.md](../releases/README.md) before flashing. Flashing replaces the application on the board. User NVM is kept, including a version 1 or version 2 blob. A ClearAI configuration blob is not applied. The first `configure` after an older blob saves version 3 and keeps the network settings and limits you do not change.
 
 The running board is USB VID `2890`, PID `8022`. The bootloader is PID `0022`. The application is written at offset `0x4000`.
 
 On Windows, from the repository root:
 
 ```powershell
-.\Tools\flash_clearcore.cmd .\ClearCoreROS\releases\ClearCoreROS-0.1.1.bin
+.\Tools\flash_clearcore.cmd .\ClearCoreROS\releases\ClearCoreROS-0.1.2.bin
 ```
 
 On Linux, install `bossac` (the BOSSA command-line tool), then enter the bootloader and write the image. The USB port name changes when the bootloader enumerates. If the first command is aimed at the running application, it drops the port; wait, then run the write against the bootloader port.
 
 ```bash
 bossac --info --debug --port=/dev/ttyACM0 --arduino-erase
-bossac --info --debug --port=/dev/ttyACM0 --usb-port --write --erase --verify --offset=0x4000 --reset ClearCoreROS/releases/ClearCoreROS-0.1.1.bin
+bossac --info --debug --port=/dev/ttyACM0 --usb-port --write --erase --verify --offset=0x4000 --reset ClearCoreROS/releases/ClearCoreROS-0.1.2.bin
 ```
 
 The Windows script was the one used on the bench. The Linux lines are the same `bossac` invocation.
