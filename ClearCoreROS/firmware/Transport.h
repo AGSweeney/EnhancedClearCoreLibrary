@@ -11,5 +11,8 @@ void TransportInitEthernet();
 void TransportPoll();
 void TransportSendLine(const char *line);
 bool TransportReadLine(char *outLine, uint16_t maxLen);
+/* Session/stream Accept and Close counts since boot (TcpData ownership). */
+void TransportTcpCounters(uint32_t *sessionAccepts, uint32_t *sessionCloses,
+                          uint32_t *streamAccepts, uint32_t *streamCloses);
 
 #endif

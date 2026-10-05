@@ -25,6 +25,11 @@ static EthernetUdp g_discoveryUdp;
 static bool g_ethernetReady = false;
 static bool g_sessionConnected = false;
 static bool g_streamConnected = false;
+/* Accept()/Close() ownership counters. Assignment does not free TcpData. */
+static uint32_t g_sessionAccepts = 0;
+static uint32_t g_sessionCloses = 0;
+static uint32_t g_streamAccepts = 0;
+static uint32_t g_streamCloses = 0;
 
 static char g_usbLine[CCROS_MAX_LINE];
 static uint16_t g_usbIndex = 0;
@@ -112,33 +117,59 @@ void TransportInitEthernet() {
     SerialPort.SendLine(EthernetMgr.LocalIp().StringValue());
 }
 
+static void CloseSessionClient() {
+    /* Remote FIN leaves TcpData allocated until Close(). Destructor does not. */
+    if (g_sessionConnected || g_sessionClient.Connected()) {
+        g_sessionCloses++;
+    }
+    g_sessionClient.Close();
+    g_sessionConnected = false;
+}
+
+static void CloseStreamClient(bool notifyLost) {
+    if (g_streamConnected) {
+        if (notifyLost) {
+            MotionStreamLost();
+        }
+        g_streamCloses++;
+    }
+    g_streamClient.Close();
+    g_streamConnected = false;
+}
+
 static void PollSessionAccept() {
     if (!g_sessionConnected || !g_sessionClient.Connected()) {
         EthernetTcpClient next = g_sessionServer.Accept();
         if (next.Connected()) {
+            /* Accept() transfers the client out of the server list. Free any
+             * previous TcpData before the pointer is overwritten. */
+            CloseSessionClient();
             g_sessionClient = next;
             g_sessionConnected = true;
+            g_sessionAccepts++;
             g_tcpIndex = 0;
         } else {
-            g_sessionConnected = false;
+            CloseSessionClient();
         }
     }
 }
 
 static void PollStream() {
-    const bool was = g_streamConnected && g_streamClient.Connected();
-    if (!was) {
+    const bool live = g_streamClient.Connected();
+    const bool owned = g_streamConnected;
+    if (!owned || !live) {
         EthernetTcpClient next = g_streamServer.Accept();
         if (next.Connected()) {
+            /* A replacement must still run stream-loss on the old owner.
+             * Previously Accept-success skipped MotionStreamLost(). */
+            CloseStreamClient(owned);
             g_streamClient = next;
             g_streamConnected = true;
+            g_streamAccepts++;
             g_rxLen = 0;
             g_lastStateMs = 0;
         } else {
-            if (g_streamConnected) {
-                MotionStreamLost();
-            }
-            g_streamConnected = false;
+            CloseStreamClient(owned);
             return;
         }
     }
@@ -243,4 +274,20 @@ bool TransportReadLine(char *outLine, uint16_t maxLen) {
         return true;
     }
     return false;
+}
+
+void TransportTcpCounters(uint32_t *sessionAccepts, uint32_t *sessionCloses,
+                          uint32_t *streamAccepts, uint32_t *streamCloses) {
+    if (sessionAccepts) {
+        *sessionAccepts = g_sessionAccepts;
+    }
+    if (sessionCloses) {
+        *sessionCloses = g_sessionCloses;
+    }
+    if (streamAccepts) {
+        *streamAccepts = g_streamAccepts;
+    }
+    if (streamCloses) {
+        *streamCloses = g_streamCloses;
+    }
 }

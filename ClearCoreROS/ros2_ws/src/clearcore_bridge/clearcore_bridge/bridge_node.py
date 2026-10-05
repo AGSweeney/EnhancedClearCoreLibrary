@@ -513,7 +513,11 @@ def main() -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        # destroy_node / SIGINT can already shut the context down.
+        if hasattr(rclpy, "try_shutdown"):
+            rclpy.try_shutdown()
+        elif rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

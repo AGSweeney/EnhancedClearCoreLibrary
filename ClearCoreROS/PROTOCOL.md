@@ -63,7 +63,7 @@ Failure uses `"error":{"code":-32000,"message":"..."}`. Unknown methods use `-32
 |--------|--------|--------|
 | `get_capabilities` | — | protocol, ports, joint names, units, `axis_mask`, `nvm` |
 | `get_config` | — | mechanics, watchdog, estop, test mode, `nvm` / `nvm_valid` / `nvm_version`, network, soft limits, limit-switch pins, `names`, `rotary`, `direction`, `gear`, `offset` |
-| `get_status` | — | flags, `alert_reg`, `alerts`, `travel_limit`, `xrce`, `xrce_time`, position/velocity/effort |
+| `get_status` | — | flags, `alert_reg`, `alerts`, `travel_limit`, `xrce`, `xrce_time`, `tcp_session_accepts` / `tcp_session_closes` / `tcp_stream_accepts` / `tcp_stream_closes` (Accept/Close ownership counts since boot), position/velocity/effort, and `axes[]` per motor (`alert_reg`, `motor_in_fault`, `alerts_present`, `status_enabled`, `steps_active`, `hlfb`, `hlfb_duty`). Session accepts may exceed closes by one while the status RPC’s own TCP connection is still open; Close runs after the reply when the client disconnects. Use `host/diag_disable_hlfb_capture.py` to sample `axes[]` through disable without `clear_alerts`. |
 | `configure` | see below | `{"ok":true}` and the live configuration is written to NVM |
 | `reset_config` | — | compile defaults, and the NVM blob is cleared. Motors must be disabled. |
 | `configure_network` | `mode` `dhcp` or `static`, plus `ip_address`, `netmask`, `gateway` | saved network settings. `applies_on` is `restart` |

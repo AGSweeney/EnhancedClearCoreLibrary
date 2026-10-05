@@ -17,6 +17,7 @@
 #include "ClearCore.h"
 #include "NvmManager.h"
 #include "SysTiming.h"
+#include "Transport.h"
 #include "XrceClient.h"
 
 #include <math.h>
@@ -2382,18 +2383,76 @@ void MotionFillConfigJson(char *buf, uint16_t len) {
              g_offset[0], g_offset[1], g_offset[2], g_offset[3]);
 }
 
+static const char *HlfbStateName(MotorDriver::HlfbStates s) {
+    switch (s) {
+        case MotorDriver::HLFB_DEASSERTED: return "deasserted";
+        case MotorDriver::HLFB_ASSERTED: return "asserted";
+        case MotorDriver::HLFB_HAS_MEASUREMENT: return "has_measurement";
+        default: return "unknown";
+    }
+}
+
 void MotionFillStatusJson(char *buf, uint16_t len) {
     CcrosState st;
     MotionFillState(&st);
     char alerts[96];
     FormatAlerts(alerts, sizeof(alerts));
+    uint32_t sessAcc = 0, sessClose = 0, strmAcc = 0, strmClose = 0;
+    TransportTcpCounters(&sessAcc, &sessClose, &strmAcc, &strmClose);
+
+    /* Per-axis AlertReg / StatusReg / HLFB for disable-vs-motion fault timing. */
+    char axes[1024];
+    axes[0] = '\0';
+    size_t used = 0;
+    for (uint8_t a = 0; a < CCROS_AXIS_COUNT; a++) {
+        MotorDriver *m = MotorFor(a);
+        const uint32_t alertBits = AlertBits(a);
+        uint32_t statusReg = 0;
+        MotorDriver::HlfbStates hlfb = MotorDriver::HLFB_UNKNOWN;
+        float duty = 0.f;
+        if (m) {
+            statusReg = m->StatusReg().reg;
+            hlfb = m->HlfbState();
+            duty = m->HlfbPercent();
+            if (!(duty >= -100.f && duty <= 100.f)) {
+                duty = 0.f;
+            }
+        }
+        const MotorDriver::StatusRegMotor sr(statusReg);
+        char one[256];
+        const int n = snprintf(
+            one, sizeof(one),
+            "%s{\"axis\":%u,\"name\":\"%s\",\"on\":%s,\"alert_reg\":%lu,"
+            "\"motor_in_fault\":%s,\"alerts_present\":%s,\"status_enabled\":%s,"
+            "\"steps_active\":%s,\"hlfb\":\"%s\",\"hlfb_duty\":%.4f}",
+            (used == 0) ? "" : ",",
+            (unsigned)a, AxisName(a),
+            AxisOn(a) ? "true" : "false",
+            (unsigned long)alertBits,
+            sr.bit.MotorInFault ? "true" : "false",
+            sr.bit.AlertsPresent ? "true" : "false",
+            sr.bit.Enabled ? "true" : "false",
+            sr.bit.StepsActive ? "true" : "false",
+            HlfbStateName(hlfb),
+            duty / 100.f);
+        if (n < 0 || (size_t)n >= sizeof(one) || used + (size_t)n + 1 >= sizeof(axes)) {
+            break;
+        }
+        memcpy(axes + used, one, (size_t)n);
+        used += (size_t)n;
+        axes[used] = '\0';
+    }
+
     snprintf(buf, len,
              "{\"enabled\":%s,\"moving\":%s,\"estop\":%s,\"fault\":%s,"
              "\"watchdog\":%s,\"test_mode\":%s,\"axis_mask\":%u,\"alert_reg\":%lu,"
              "\"alerts\":\"%s\",\"travel_limit\":\"%s\",\"xrce\":\"%s\",\"xrce_time\":\"%s\",\"last_cmd_seq\":%u,"
+             "\"tcp_session_accepts\":%lu,\"tcp_session_closes\":%lu,"
+             "\"tcp_stream_accepts\":%lu,\"tcp_stream_closes\":%lu,"
              "\"position\":[%.6f,%.6f,%.6f,%.6f],"
              "\"velocity\":[%.6f,%.6f,%.6f,%.6f],"
-             "\"effort\":[%.4f,%.4f,%.4f,%.4f]}",
+             "\"effort\":[%.4f,%.4f,%.4f,%.4f],"
+             "\"axes\":[%s]}",
              (st.flags & CCROS_FLAG_ENABLED) ? "true" : "false",
              (st.flags & CCROS_FLAG_MOVING) ? "true" : "false",
              (st.flags & CCROS_FLAG_ESTOP) ? "true" : "false",
@@ -2405,7 +2464,10 @@ void MotionFillStatusJson(char *buf, uint16_t len) {
              XrceStateName(),
              XrceTimeSynced() ? "synced" : "unsync",
              (unsigned)g_lastCmdSeq,
+             (unsigned long)sessAcc, (unsigned long)sessClose,
+             (unsigned long)strmAcc, (unsigned long)strmClose,
              st.position[0], st.position[1], st.position[2], st.position[3],
              st.velocity[0], st.velocity[1], st.velocity[2], st.velocity[3],
-             st.effort[0], st.effort[1], st.effort[2], st.effort[3]);
+             st.effort[0], st.effort[1], st.effort[2], st.effort[3],
+             axes);
 }
