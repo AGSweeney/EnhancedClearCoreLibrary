@@ -1,0 +1,91 @@
+{
+  "label": "origin_mid",
+  "note": "Status immediately before clear_alerts",
+  "status": {
+    "enabled": true,
+    "moving": false,
+    "estop": false,
+    "fault": false,
+    "watchdog": false,
+    "test_mode": false,
+    "axis_mask": 3,
+    "alert_reg": 0,
+    "alerts": "none",
+    "travel_limit": "none",
+    "xrce": "off",
+    "xrce_time": "unsync",
+    "last_cmd_seq": 236,
+    "tcp_session_accepts": 1560,
+    "tcp_session_closes": 1559,
+    "tcp_stream_accepts": 56,
+    "tcp_stream_closes": 56,
+    "position": [
+      0.005106,
+      0.005106,
+      0.0,
+      0.0
+    ],
+    "velocity": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "effort": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "axes": [
+      {
+        "axis": 0,
+        "name": "x",
+        "on": true,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": false,
+        "status_enabled": true,
+        "steps_active": false,
+        "hlfb": "asserted",
+        "hlfb_duty": 0.0
+      },
+      {
+        "axis": 1,
+        "name": "y",
+        "on": true,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": false,
+        "status_enabled": true,
+        "steps_active": false,
+        "hlfb": "asserted",
+        "hlfb_duty": 0.0
+      },
+      {
+        "axis": 2,
+        "name": "z",
+        "on": false,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": true,
+        "status_enabled": false,
+        "steps_active": false,
+        "hlfb": "deasserted",
+        "hlfb_duty": 0.0
+      },
+      {
+        "axis": 3,
+        "name": "a",
+        "on": false,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": true,
+        "status_enabled": false,
+        "steps_active": false,
+        "hlfb": "deasserted",
+        "hlfb_duty": 0.0
+      }
+    ]
+  }
+}

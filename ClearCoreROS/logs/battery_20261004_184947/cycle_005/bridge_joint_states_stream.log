@@ -1,0 +1,368 @@
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 173151583
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.0
+- 0.0
+velocity:
+- 0.0
+- 0.0
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 228101576
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.0
+- 0.0
+velocity:
+- 0.0
+- 0.0
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 283129557
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.0
+- 0.0
+velocity:
+- 0.0
+- 0.0
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 320409027
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.0
+- 0.0
+velocity:
+- 0.0
+- 0.0
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 375420480
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.0
+- 0.0
+velocity:
+- 0.0
+- 0.0
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 430445972
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.0
+- 0.0
+velocity:
+- 0.0
+- 0.0
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 485254345
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.00014375000318977982
+- 0.00014375000318977982
+velocity:
+- 0.005937499925494194
+- 0.005937499925494194
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 521421691
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.00038750001112930477
+- 0.00038750001112930477
+velocity:
+- 0.005937499925494194
+- 0.005937499925494194
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 576696570
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.0007562499959021807
+- 0.0007562499959021807
+velocity:
+- 0.0062500000931322575
+- 0.0062500000931322575
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 632102195
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.0011312500573694706
+- 0.0011312500573694706
+velocity:
+- 0.006562499795109034
+- 0.0062500000931322575
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 686514652
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.001500000013038516
+- 0.001500000013038516
+velocity:
+- 0.0062500000931322575
+- 0.0062500000931322575
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 724665490
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.0017687500221654773
+- 0.0017687500221654773
+velocity:
+- 0.006874999962747097
+- 0.006562499795109034
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 779013901
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.00215000007301569
+- 0.00215000007301569
+velocity:
+- 0.0062500000931322575
+- 0.006562499795109034
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 835431254
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.002556249964982271
+- 0.002556249964982271
+velocity:
+- 0.006562499795109034
+- 0.006562499795109034
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 871701642
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.0028250000905245543
+- 0.0028250000905245543
+velocity:
+- 0.006562499795109034
+- 0.006562499795109034
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 926935558
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.00323750008828938
+- 0.0032312499824911356
+velocity:
+- 0.006562499795109034
+- 0.006562499795109034
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157958
+    nanosec: 982331934
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.003650000086054206
+- 0.003650000086054206
+velocity:
+- 0.0068452381528913975
+- 0.0068452381528913975
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157959
+    nanosec: 19600029
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.003931249957531691
+- 0.003931249957531691
+velocity:
+- 0.006874999962747097
+- 0.006874999962747097
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157959
+    nanosec: 74096933
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.004350000061094761
+- 0.004350000061094761
+velocity:
+- 0.006874999962747097
+- 0.006874999962747097
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157959
+    nanosec: 129304810
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.004781249910593033
+- 0.004781249910593033
+velocity:
+- 0.0071875001303851604
+- 0.0071875001303851604
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157959
+    nanosec: 185842031
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.005125000141561031
+- 0.005125000141561031
+velocity:
+- 0.0024999999441206455
+- 0.002812500111758709
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157959
+    nanosec: 221652024
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.005125000141561031
+- 0.005125000141561031
+velocity:
+- 0.0
+- 0.0
+effort: []
+---
+header:
+  stamp:
+    sec: 1791157959
+    nanosec: 277228937
+  frame_id: ''
+name:
+- joint_x
+- joint_y
+position:
+- 0.005125000141561031
+- 0.005125000141561031
+velocity:
+- 0.0
+- 0.0
+effort: []
+---

@@ -1,0 +1,11 @@
+{
+  "sample_count": 308,
+  "peak_abs_yx_m": 1.2498348951339722e-05,
+  "peak_abs_yx_mm": 0.012498348951339722,
+  "gap_count": 307,
+  "gap_max_ms": 49.26285100009409,
+  "gap_mean_ms": 19.962257257327973,
+  "gaps_over_150ms": 0,
+  "gaps_over_150ms_values": [],
+  "note": "Positions are generated-step / PositionRefCommanded joint units, not shaft-encoder measurements."
+}

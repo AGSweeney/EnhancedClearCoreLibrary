@@ -1,0 +1,488 @@
+[
+  {
+    "t_s": 52.25817619099996,
+    "where": "cycle002_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 52.271277853000015,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 100.32720889999996,
+    "where": "cycle003_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 100.336399196,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 149.225697383,
+    "where": "cycle004_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 149.23503547999996,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 196.73066239700006,
+    "where": "cycle005_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 196.74099098700003,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 245.102858912,
+    "where": "cycle006_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 245.11587650399997,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 294.21439772400004,
+    "where": "cycle007_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 294.22464952000007,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 343.748468161,
+    "where": "cycle008_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 343.760610948,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 393.302912438,
+    "where": "cycle009_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 393.314130311,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 442.233257033,
+    "where": "cycle010_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 442.24343338000006,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 490.758586554,
+    "where": "cycle011_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 490.76954647499997,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 538.1546470479999,
+    "where": "cycle012_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 538.1665325749999,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 583.8715619170001,
+    "where": "cycle013_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 583.8843917610001,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 632.023957066,
+    "where": "cycle014_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 632.0377498649999,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 679.5603494999999,
+    "where": "cycle015_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 679.5740368959999,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 726.4899412379999,
+    "where": "cycle016_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 726.499101667,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 773.5081095940001,
+    "where": "cycle017_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 773.51910702,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 819.830508747,
+    "where": "cycle018_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 819.8415678990001,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 867.099676849,
+    "where": "cycle019_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 867.115437328,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 914.357276694,
+    "where": "cycle020_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 914.368335771,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 963.294894039,
+    "where": "cycle021_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 963.3077227570001,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1011.3879469510001,
+    "where": "cycle022_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1011.3970282680001,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1059.1562603829998,
+    "where": "cycle023_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1059.1663992089998,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1108.4125007779999,
+    "where": "cycle024_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1108.4244123180001,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1155.5479243710001,
+    "where": "cycle025_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1155.5599079429999,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1207.858000054,
+    "where": "cycle026_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1207.8690423040002,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1255.2950678359998,
+    "where": "cycle027_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1255.3061041370001,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1302.1777490160002,
+    "where": "cycle028_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1302.1887566300002,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1352.8380622210002,
+    "where": "cycle029_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1352.8500462420002,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1401.2962644489999,
+    "where": "cycle030_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1401.311071559,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1449.0337457629998,
+    "where": "cycle031_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1449.044751291,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1496.964523133,
+    "where": "cycle032_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1496.976453926,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1544.424901158,
+    "where": "cycle033_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1544.4377383709998,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1591.6839248709998,
+    "where": "cycle034_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1591.694931677,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1638.517610339,
+    "where": "cycle035_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1638.5286344369997,
+    "where": "origin_pre_pre_clear",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1684.454332236,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1694.4685618849999,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1704.4831521,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1714.4977410389997,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1724.511398347,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1734.525913736,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1744.540432458,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1754.5541369049997,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1764.5675380079997,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1774.5811734539998,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1784.59612586,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1794.611196111,
+    "where": "tail",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 1801.535800997,
+    "where": "finalize",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  }
+]

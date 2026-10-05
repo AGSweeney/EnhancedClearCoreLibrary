@@ -1,0 +1,9 @@
+[INFO] [launch]: All log files can be found below /home/adam/.ros/log/2026-10-04-20-40-55-966835-DESKTOP-HF5K4CO-76838
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [bridge-1]: process started with pid [76875]
+[bridge-1] [INFO] [1791164456.831081111] [clearcore_bridge]: ClearCoreROS bridge -> 172.16.82.114:9200 mask=3
+[bridge-1] [INFO] [1791164458.727879234] [clearcore_bridge]: connected and enabled
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [bridge-1]: sending signal 'SIGINT' to process[bridge-1]
+[bridge-1] The following exception was never retrieved: Failed to publish: publisher's context is invalid, at /home/runner/conda-bld/bld/rattler-build_ros-jazzy-rcl_1788192738/work/ros-jazzy-rcl/src/work/src/rcl/publisher.c:423
+[INFO] [bridge-1]: process has finished cleanly [pid 76875]

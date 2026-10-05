@@ -1,0 +1,2350 @@
+{
+  "host": "172.16.82.114",
+  "started_utc": "2026-10-05T00:34:14.065284+00:00",
+  "duration_s_target": 1800,
+  "revisions": {
+    "host_packages": {
+      "clearcore_bridge": "0.1.0",
+      "clearcore_hardware": "0.1.0"
+    },
+    "protocol": "1.0",
+    "git_head": "09cdadf2b63945acea8a981227261a6473c1e81b",
+    "discover": "CLEARCORE_ROS ClearCoreROS IP=172.16.82.114 TCP=9200 STREAM=9201 FW=1.0",
+    "get_config_nvm": {
+      "nvm": true,
+      "nvm_valid": true,
+      "nvm_version": 3,
+      "axis_mask": 3,
+      "test_mode": false,
+      "names": [
+        "joint_x",
+        "joint_y",
+        "joint_z",
+        "joint_a"
+      ],
+      "ip_address": "172.16.82.114"
+    },
+    "firmware_protocol_fw": "1.0"
+  },
+  "cycles": [
+    {
+      "cycle": 1,
+      "t_start_s": 0.06,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.006251037120819092,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791160487.817726540] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791160487.833925468] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.006 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 122,
+          "gap_max_ms": 69.61353999986386,
+          "gap_mean_ms": 49.99889812396692,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 306,
+          "gap_max_ms": 47.54511300006925,
+          "gap_mean_ms": 19.965530757375834,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 33.266,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 0
+    },
+    {
+      "cycle": 2,
+      "t_start_s": 48.274,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006250105798244476,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012499993317760527,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.056,
+          "reported_end_y_mm": -0.063,
+          "reported_peak_abs_yx_mm": 0.012,
+          "result_line": "[INFO] [1791160542.927542215] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791160542.941491297] [send_trajectory_goal]: samples=203 x_mm=[-0.15, 30.15] y_mm=[-0.16, 30.15] peak_|Y-X|_mm=0.012 end_mm=(-0.056, -0.063)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 122,
+          "gap_max_ms": 92.75555599970176,
+          "gap_mean_ms": 50.00014736363535,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 311,
+          "gap_max_ms": 46.052768000208744,
+          "gap_mean_ms": 19.964379477419097,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 81.211,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 3,
+      "t_start_s": 96.219,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.006251037120819092,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791160594.491824567] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791160594.505957906] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.16] y_mm=[-0.15, 30.16] peak_|Y-X|_mm=0.006 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 124,
+          "gap_max_ms": 79.03095699975893,
+          "gap_mean_ms": 49.998045487804696,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 306,
+          "gap_max_ms": 40.002185000048485,
+          "gap_mean_ms": 19.964019068853215,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 129.178,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 4,
+      "t_start_s": 144.185,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006250105798244476,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500000593718141,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791160649.073837242] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791160649.089197678] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.16] y_mm=[-0.15, 30.16] peak_|Y-X|_mm=0.006 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 110,
+          "gap_max_ms": 78.66246399999,
+          "gap_mean_ms": 49.99830822935777,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 308,
+          "gap_max_ms": 59.78546699998333,
+          "gap_mean_ms": 20.00034384364949,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 176.595,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 5,
+      "t_start_s": 191.603,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.156,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791160699.664365077] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791160699.679648162] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.15] y_mm=[-0.16, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.150, -0.156)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 111,
+          "gap_max_ms": 57.9745259997253,
+          "gap_mean_ms": 49.7003514545461,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 305,
+          "gap_max_ms": 59.031586999935826,
+          "gap_mean_ms": 19.93542109868348,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 223.617,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 6,
+      "t_start_s": 238.625,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012499993317760527,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.087,
+          "reported_end_y_mm": -0.094,
+          "reported_peak_abs_yx_mm": 0.012,
+          "result_line": "[INFO] [1791160754.126564366] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791160754.141379718] [send_trajectory_goal]: samples=203 x_mm=[-0.15, 30.16] y_mm=[-0.16, 30.15] peak_|Y-X|_mm=0.012 end_mm=(-0.087, -0.094)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 116,
+          "gap_max_ms": 74.65725700012626,
+          "gap_mean_ms": 49.998429026088516,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 310,
+          "gap_max_ms": 49.86492400030329,
+          "gap_mean_ms": 19.951552964401838,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 270.882,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 7,
+      "t_start_s": 285.889,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.012500211596488953,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.156,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791160805.069657111] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791160805.085178057] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.15] y_mm=[-0.16, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.150, -0.156)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 117,
+          "gap_max_ms": 99.42088900015733,
+          "gap_mean_ms": 49.69984427586088,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 307,
+          "gap_max_ms": 43.44449200016243,
+          "gap_mean_ms": 19.99977832026185,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 318.258,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 8,
+      "t_start_s": 333.264,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.006251037120819092,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.1,
+          "reported_end_y_mm": -0.1,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791160860.736630292] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791160860.751636097] [send_trajectory_goal]: samples=212 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.006 end_mm=(-0.100, -0.100)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 117,
+          "gap_max_ms": 71.96059400030208,
+          "gap_mean_ms": 49.99917311206916,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 318,
+          "gap_max_ms": 21.927852999851893,
+          "gap_mean_ms": 19.96246726813879,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 366.729,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 9,
+      "t_start_s": 381.736,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.006251037120819092,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.081,
+          "reported_end_y_mm": -0.081,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791160913.949459834] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791160913.963234790] [send_trajectory_goal]: samples=213 x_mm=[-0.15, 30.16] y_mm=[-0.15, 30.16] peak_|Y-X|_mm=0.006 end_mm=(-0.081, -0.081)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 117,
+          "gap_max_ms": 69.80593200023577,
+          "gap_mean_ms": 49.70069116379348,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 373,
+          "gap_max_ms": 56.58303700010947,
+          "gap_mean_ms": 19.951252010752885,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 416.359,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 10,
+      "t_start_s": 431.366,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.006251037120819092,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.063,
+          "reported_end_y_mm": -0.063,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791160968.996621488] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791160969.011510886] [send_trajectory_goal]: samples=213 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.006 end_mm=(-0.063, -0.063)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 116,
+          "gap_max_ms": 101.7903510000906,
+          "gap_mean_ms": 49.99811766086999,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 334,
+          "gap_max_ms": 28.746233000219945,
+          "gap_mean_ms": 19.94163634534615,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 464.237,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 11,
+      "t_start_s": 479.245,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.006251037120819092,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.156,
+          "reported_end_y_mm": -0.156,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791161021.427554789] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161021.441881942] [send_trajectory_goal]: samples=210 x_mm=[-0.16, 30.15] y_mm=[-0.16, 30.15] peak_|Y-X|_mm=0.006 end_mm=(-0.156, -0.156)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 110,
+          "gap_max_ms": 80.901871000151,
+          "gap_mean_ms": 49.67666993578184,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 359,
+          "gap_max_ms": 49.4512450000002,
+          "gap_mean_ms": 19.95445843575344,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 513.122,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 12,
+      "t_start_s": 528.13,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006250105798244476,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500000593718141,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.1,
+          "reported_end_y_mm": -0.087,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161076.232376273] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161076.255481747] [send_trajectory_goal]: samples=202 x_mm=[-0.16, 30.16] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.100, -0.087)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 110,
+          "gap_max_ms": 88.63485199981369,
+          "gap_mean_ms": 50.00015946789146,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 344,
+          "gap_max_ms": 59.94209400023465,
+          "gap_mean_ms": 19.955751909620993,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 560.748,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 13,
+      "t_start_s": 575.756,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161128.874732418] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161128.889272895] [send_trajectory_goal]: samples=210 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 124,
+          "gap_max_ms": 82.50781499964432,
+          "gap_mean_ms": 49.72322991870083,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 373,
+          "gap_max_ms": 25.91717100040114,
+          "gap_mean_ms": 19.965459088709434,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 609.774,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 14,
+      "t_start_s": 624.781,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161184.581638594] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161184.596652481] [send_trajectory_goal]: samples=206 x_mm=[-0.15, 30.16] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 121,
+          "gap_max_ms": 59.18140999983734,
+          "gap_mean_ms": 49.99815917500049,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 360,
+          "gap_max_ms": 39.145898000242596,
+          "gap_mean_ms": 20.000017704735157,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 658.318,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 15,
+      "t_start_s": 673.327,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006250105798244476,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161235.987925934] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161236.002718411] [send_trajectory_goal]: samples=210 x_mm=[-0.15, 30.16] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 109,
+          "gap_max_ms": 72.46674699990763,
+          "gap_mean_ms": 49.672600314815334,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 358,
+          "gap_max_ms": 49.9462930001755,
+          "gap_mean_ms": 19.962089184874085,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 706.161,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 16,
+      "t_start_s": 721.168,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006250105798244476,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012499993317760527,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.119,
+          "reported_end_y_mm": -0.131,
+          "reported_peak_abs_yx_mm": 0.012,
+          "result_line": "[INFO] [1791161290.484040690] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161290.507391825] [send_trajectory_goal]: samples=202 x_mm=[-0.15, 30.16] y_mm=[-0.16, 30.16] peak_|Y-X|_mm=0.012 end_mm=(-0.119, -0.131)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 116,
+          "gap_max_ms": 54.29981699990094,
+          "gap_mean_ms": 49.99996115652127,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 311,
+          "gap_max_ms": 57.470276999993075,
+          "gap_mean_ms": 19.93806676129034,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 753.515,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 17,
+      "t_start_s": 768.523,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161342.457876233] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161342.472821907] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.16] peak_|Y-X|_mm=0.013 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 118,
+          "gap_max_ms": 75.27051799979745,
+          "gap_mean_ms": 49.719898230767626,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 306,
+          "gap_max_ms": 23.83523199978299,
+          "gap_mean_ms": 19.947520459016708,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 801.875,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 18,
+      "t_start_s": 816.883,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.094,
+          "reported_end_y_mm": -0.087,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161397.833682905] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161397.847746976] [send_trajectory_goal]: samples=203 x_mm=[-0.16, 30.15] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.094, -0.087)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 115,
+          "gap_max_ms": 67.60656300002665,
+          "gap_mean_ms": 50.00173121052604,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 310,
+          "gap_max_ms": 47.43995300032111,
+          "gap_mean_ms": 19.99954197411003,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 850.09,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 19,
+      "t_start_s": 865.096,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.006251037120819092,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791161448.276026436] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161448.290213141] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.006 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 110,
+          "gap_max_ms": 71.46072000023196,
+          "gap_mean_ms": 49.70114648623842,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 305,
+          "gap_max_ms": 40.41534399993907,
+          "gap_mean_ms": 19.960588871710844,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 896.961,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 20,
+      "t_start_s": 911.968,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006250105798244476,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.006251037120819092,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791161498.967047922] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161498.980810974] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.006 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 115,
+          "gap_max_ms": 61.75527200002762,
+          "gap_mean_ms": 50.00043350000133,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 303,
+          "gap_max_ms": 25.45851800005039,
+          "gap_mean_ms": 19.998799347682592,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 944.022,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 21,
+      "t_start_s": 959.029,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.006251037120819092,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.075,
+          "reported_end_y_mm": -0.075,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791161553.465669273] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161553.480986333] [send_trajectory_goal]: samples=203 x_mm=[-0.16, 30.15] y_mm=[-0.16, 30.15] peak_|Y-X|_mm=0.006 end_mm=(-0.075, -0.075)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 115,
+          "gap_max_ms": 53.511459000219475,
+          "gap_mean_ms": 49.99909820175593,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 307,
+          "gap_max_ms": 23.983025000234193,
+          "gap_mean_ms": 19.999679483661048,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 991.379,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 22,
+      "t_start_s": 1006.386,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.156,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161603.677438264] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161603.692945516] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.15] y_mm=[-0.16, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.150, -0.156)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 108,
+          "gap_max_ms": 77.89794100017389,
+          "gap_mean_ms": 49.99684467289864,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 302,
+          "gap_max_ms": 49.45398300014858,
+          "gap_mean_ms": 19.999520109634787,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1038.011,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 23,
+      "t_start_s": 1053.017,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006250105798244476,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.094,
+          "reported_end_y_mm": -0.106,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161659.311541657] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161659.325252904] [send_trajectory_goal]: samples=212 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.094, -0.106)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 121,
+          "gap_max_ms": 75.46933900039221,
+          "gap_mean_ms": 50.00042244999653,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 365,
+          "gap_max_ms": 22.22564300018348,
+          "gap_mean_ms": 19.970169362636625,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1086.461,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 24,
+      "t_start_s": 1101.468,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.087,
+          "reported_end_y_mm": -0.087,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161710.168778627] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161710.186973019] [send_trajectory_goal]: samples=203 x_mm=[-0.16, 30.15] y_mm=[-0.16, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.087, -0.087)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 116,
+          "gap_max_ms": 70.7796890001191,
+          "gap_mean_ms": 49.99691059130545,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 308,
+          "gap_max_ms": 29.190949999701843,
+          "gap_mean_ms": 19.956592107492437,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1133.738,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 25,
+      "t_start_s": 1148.746,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161765.941194890] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161765.956639992] [send_trajectory_goal]: samples=210 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.16] peak_|Y-X|_mm=0.013 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 122,
+          "gap_max_ms": 69.89741699999286,
+          "gap_mean_ms": 50.00133269421226,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 363,
+          "gap_max_ms": 49.30855100019471,
+          "gap_mean_ms": 19.954816665745685,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1182.332,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 26,
+      "t_start_s": 1197.34,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012499993317760527,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791161815.779305219] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161815.792992326] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.16] y_mm=[-0.15, 30.16] peak_|Y-X|_mm=0.006 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 120,
+          "gap_max_ms": 79.83731100011937,
+          "gap_mean_ms": 49.99816632773157,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 320,
+          "gap_max_ms": 26.98047600006248,
+          "gap_mean_ms": 19.999486645767412,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1228.586,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 27,
+      "t_start_s": 1243.592,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500007869675756,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.125,
+          "reported_end_y_mm": -0.112,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161869.642790157] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161869.656806825] [send_trajectory_goal]: samples=202 x_mm=[-0.15, 30.16] y_mm=[-0.15, 30.16] peak_|Y-X|_mm=0.013 end_mm=(-0.125, -0.112)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 107,
+          "gap_max_ms": 89.42018900006588,
+          "gap_mean_ms": 50.00024982075716,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 307,
+          "gap_max_ms": 36.926351000147406,
+          "gap_mean_ms": 19.999087937908758,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1275.296,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 28,
+      "t_start_s": 1290.303,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.087,
+          "reported_end_y_mm": -0.087,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791161922.169706724] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161922.183824863] [send_trajectory_goal]: samples=203 x_mm=[-0.15, 30.16] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.087, -0.087)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 124,
+          "gap_max_ms": 99.72203100005572,
+          "gap_mean_ms": 49.99838926829117,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 306,
+          "gap_max_ms": 40.07236600000397,
+          "gap_mean_ms": 19.99936932459038,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1324.223,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 29,
+      "t_start_s": 1339.232,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006250105798244476,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012498348951339722,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.075,
+          "reported_end_y_mm": -0.075,
+          "reported_peak_abs_yx_mm": 0.012,
+          "result_line": "[INFO] [1791161976.403418248] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791161976.417398519] [send_trajectory_goal]: samples=203 x_mm=[-0.15, 30.15] y_mm=[-0.16, 30.16] peak_|Y-X|_mm=0.012 end_mm=(-0.075, -0.075)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 115,
+          "gap_max_ms": 56.65496299980077,
+          "gap_mean_ms": 49.99931404386029,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 308,
+          "gap_max_ms": 49.26285100009409,
+          "gap_mean_ms": 19.962257257327973,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1371.29,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 30,
+      "t_start_s": 1386.297,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006250105798244476,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791162027.442129596] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791162027.457358087] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 118,
+          "gap_max_ms": 72.42195199978596,
+          "gap_mean_ms": 49.99704520512626,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 307,
+          "gap_max_ms": 25.660591999894677,
+          "gap_mean_ms": 19.99900789215656,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1418.784,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 31,
+      "t_start_s": 1433.792,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500007869675756,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791162082.162394181] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791162082.175889528] [send_trajectory_goal]: samples=210 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.006 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 122,
+          "gap_max_ms": 88.60625999977856,
+          "gap_mean_ms": 50.001738421486166,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 358,
+          "gap_max_ms": 25.69527300011032,
+          "gap_mean_ms": 19.999497434173847,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1466.331,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 32,
+      "t_start_s": 1481.338,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.006251037120819092,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.15,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.006,
+          "result_line": "[INFO] [1791162133.183587105] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791162133.198605537] [send_trajectory_goal]: samples=200 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.16] peak_|Y-X|_mm=0.006 end_mm=(-0.150, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 118,
+          "gap_max_ms": 57.49855000021853,
+          "gap_mean_ms": 49.72539886324755,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 308,
+          "gap_max_ms": 69.36657999995077,
+          "gap_mean_ms": 20.000125071660907,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1513.766,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 33,
+      "t_start_s": 1528.772,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.119,
+          "reported_end_y_mm": -0.125,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791162189.989311694] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791162190.004384211] [send_trajectory_goal]: samples=203 x_mm=[-0.15, 30.15] y_mm=[-0.15, 30.16] peak_|Y-X|_mm=0.013 end_mm=(-0.119, -0.125)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 108,
+          "gap_max_ms": 74.32892399992852,
+          "gap_mean_ms": 49.994923457939606,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 306,
+          "gap_max_ms": 48.94377100026759,
+          "gap_mean_ms": 19.945431373770454,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1563.414,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 34,
+      "t_start_s": 1578.421,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500000593718141,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.087,
+          "reported_end_y_mm": -0.1,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791162245.263080703] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791162245.279382537] [send_trajectory_goal]: samples=212 x_mm=[-0.15, 30.16] y_mm=[-0.16, 30.16] peak_|Y-X|_mm=0.013 end_mm=(-0.087, -0.100)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 115,
+          "gap_max_ms": 60.69861800006038,
+          "gap_mean_ms": 49.68627541228144,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 373,
+          "gap_max_ms": 38.893551000001025,
+          "gap_mean_ms": 19.963879077955248,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1615.125,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 35,
+      "t_start_s": 1630.133,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006250105798244476,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012500211596488953,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.156,
+          "reported_end_y_mm": -0.15,
+          "reported_peak_abs_yx_mm": 0.013,
+          "result_line": "[INFO] [1791162299.248564035] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791162299.262911652] [send_trajectory_goal]: samples=200 x_mm=[-0.16, 30.15] y_mm=[-0.15, 30.15] peak_|Y-X|_mm=0.013 end_mm=(-0.156, -0.150)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 108,
+          "gap_max_ms": 98.87849699953222,
+          "gap_mean_ms": 49.99939890654855,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 305,
+          "gap_max_ms": 49.112100999991526,
+          "gap_mean_ms": 19.9989473190774,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1661.915,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    },
+    {
+      "cycle": 36,
+      "t_start_s": 1676.924,
+      "steps": {
+        "origin_pre": true,
+        "bridge_ready": true,
+        "bridge_fjt": true,
+        "bridge_cancel": true,
+        "origin_mid": true,
+        "jtc_ready": true,
+        "jtc": true,
+        "origin_post": true
+      },
+      "metrics": {
+        "bridge_peak_abs_yx_mm": 0.006251037120819092,
+        "jtc_peak_abs_yx_mm_from_sampler": 0.012498348951339722,
+        "jtc_reported_endpoint": {
+          "reported_end_x_mm": -0.081,
+          "reported_end_y_mm": -0.081,
+          "reported_peak_abs_yx_mm": 0.012,
+          "result_line": "[INFO] [1791162350.056672834] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+          "samples_line": "[INFO] [1791162350.071991342] [send_trajectory_goal]: samples=203 x_mm=[-0.15, 30.15] y_mm=[-0.16, 30.16] peak_|Y-X|_mm=0.012 end_mm=(-0.081, -0.081)",
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "session_origin_check"
+        },
+        "origin_return": {
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "err_mm": 0.0,
+          "ok": true,
+          "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+          "separate_from": "jtc_reported_endpoint"
+        },
+        "bridge_state_gaps": {
+          "sample_count": 114,
+          "gap_max_ms": 86.34167899981549,
+          "gap_mean_ms": 49.998601097350544,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        },
+        "jtc_state_gaps": {
+          "sample_count": 309,
+          "gap_max_ms": 41.07970600034605,
+          "gap_mean_ms": 19.999926983765754,
+          "gaps_over_150ms": 0,
+          "gaps_over_150ms_values": []
+        }
+      },
+      "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+      "ok": true,
+      "t_end_s": 1709.136,
+      "reconnects_this_cycle": 0,
+      "watchdog_events_this_cycle": 0,
+      "alert_events_this_cycle": 2
+    }
+  ],
+  "counts": {
+    "cycles_started": 36,
+    "cycles_completed": 36,
+    "cycles_ok": 36,
+    "cycles_failed": 0,
+    "reconnects": 0,
+    "bridge_fjt_ok": 36,
+    "bridge_fjt_fail": 0,
+    "bridge_cancel_ok": 36,
+    "bridge_cancel_fail": 0,
+    "jtc_ok": 36,
+    "jtc_fail": 0,
+    "origin_ok": 108,
+    "origin_fail": 0,
+    "watchdog_events": 0,
+    "alert_events": 79,
+    "state_gaps_over_150ms": 0
+  },
+  "failures": [],
+  "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+  "ended_utc": "2026-10-05T01:07:36.314951+00:00",
+  "duration_s_actual": 1801.541,
+  "final": {
+    "status": {
+      "enabled": false,
+      "moving": false,
+      "estop": false,
+      "fault": true,
+      "watchdog": false,
+      "test_mode": false,
+      "axis_mask": 3,
+      "alert_reg": 32,
+      "alerts": "motor_faulted",
+      "travel_limit": "none",
+      "xrce": "off",
+      "xrce_time": "unsync",
+      "last_cmd_seq": 533,
+      "tcp_session_accepts": 3145,
+      "tcp_session_closes": 3144,
+      "tcp_stream_accepts": 556,
+      "tcp_stream_closes": 556,
+      "position": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "velocity": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "effort": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "status_known": true,
+    "config": {
+      "nvm": true,
+      "nvm_valid": true,
+      "nvm_version": 3,
+      "axis_mask": 3,
+      "steps_per_rev": [
+        800,
+        800,
+        800,
+        800
+      ],
+      "pitch_mm": [
+        5.0,
+        5.0,
+        5.0,
+        5.0
+      ],
+      "vel_steps": 27000,
+      "accel_steps": 250000,
+      "decel_steps": 250000,
+      "watchdog_ms": 500,
+      "estop_di6": 1,
+      "test_mode": false,
+      "enabled": false,
+      "network_mode": "static",
+      "ip_address": "172.16.82.114",
+      "netmask": "255.255.255.0",
+      "gateway": "172.16.82.1",
+      "limit_flags": 0,
+      "limits_min": [
+        -0.02,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "limits_max": [
+        0.03,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pos_lim_di": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "neg_lim_di": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "names": [
+        "joint_x",
+        "joint_y",
+        "joint_z",
+        "joint_a"
+      ],
+      "rotary": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "direction": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "gear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "disabled_state": {
+      "enabled": false,
+      "test_mode_status": false,
+      "test_mode_config": false,
+      "moving": false,
+      "watchdog": false,
+      "alerts": "motor_faulted",
+      "position_m": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "names": [
+        "joint_x",
+        "joint_y",
+        "joint_z",
+        "joint_a"
+      ],
+      "axis_mask": 3
+    },
+    "checks": {
+      "status_known": true,
+      "enabled_false": true,
+      "test_mode_false": true,
+      "names_default": true,
+      "axis_mask_3": true,
+      "no_alerts": false,
+      "no_watchdog": true
+    },
+    "check_details": {
+      "no_alerts": false,
+      "enabled": false,
+      "watchdog": false
+    }
+  },
+  "log_dir": "/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/logs/battery_20261004_193414",
+  "origin_return_errors_mm": [
+    {
+      "cycle": 1,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 2,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 3,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 4,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 5,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 6,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 7,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 8,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 9,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 10,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 11,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 12,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 13,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 14,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 15,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 16,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 17,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 18,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 19,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 20,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 21,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 22,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 23,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 24,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 25,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 26,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 27,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 28,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 29,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 30,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 31,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 32,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 33,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 34,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 35,
+      "origin_return_err_mm": 0.0
+    },
+    {
+      "cycle": 36,
+      "origin_return_err_mm": 0.0
+    }
+  ],
+  "verdicts": {
+    "motion_ok": true,
+    "connection_ok": true,
+    "final_disabled_verified": true,
+    "alerts_clear": false,
+    "motor_faulted_observations": 79,
+    "alert_observations": 79,
+    "alert_observations_note": "Counts are log rows, not unique fault events; pre/pre_clear may duplicate one latch; tail may resample it."
+  },
+  "ok": true,
+  "ok_includes_alerts_clear": false
+}

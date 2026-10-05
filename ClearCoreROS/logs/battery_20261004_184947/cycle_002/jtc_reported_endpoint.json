@@ -1,0 +1,9 @@
+{
+  "reported_end_x_mm": -0.125,
+  "reported_end_y_mm": -0.125,
+  "reported_peak_abs_yx_mm": 0.006,
+  "result_line": "[INFO] [1791157850.467746303] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+  "samples_line": "[INFO] [1791157850.483312852] [send_trajectory_goal]: samples=202 x_mm=[-0.14, 30.14] y_mm=[-0.14, 30.14] peak_|Y-X|_mm=0.006 end_mm=(-0.125, -0.125)",
+  "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+  "separate_from": "session_origin_check"
+}

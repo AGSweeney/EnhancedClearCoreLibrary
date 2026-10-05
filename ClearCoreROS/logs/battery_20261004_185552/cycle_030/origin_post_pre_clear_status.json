@@ -1,0 +1,41 @@
+{
+  "label": "origin_post",
+  "note": "Status immediately before clear_alerts",
+  "status": {
+    "enabled": false,
+    "moving": false,
+    "estop": false,
+    "fault": false,
+    "watchdog": false,
+    "test_mode": false,
+    "axis_mask": 3,
+    "alert_reg": 0,
+    "alerts": "none",
+    "travel_limit": "none",
+    "xrce": "off",
+    "xrce_time": "unsync",
+    "last_cmd_seq": 533,
+    "tcp_session_accepts": 1668,
+    "tcp_session_closes": 1667,
+    "tcp_stream_accepts": 474,
+    "tcp_stream_closes": 474,
+    "position": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "velocity": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "effort": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}

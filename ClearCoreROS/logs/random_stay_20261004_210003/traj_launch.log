@@ -1,0 +1,53 @@
+[INFO] [launch]: All log files can be found below /home/adam/.ros/log/2026-10-04-21-00-05-060517-DESKTOP-HF5K4CO-93786
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [robot_state_publisher-1]: process started with pid [93803]
+[INFO] [ros2_control_node-2]: process started with pid [93805]
+[INFO] [spawner-3]: process started with pid [93807]
+[INFO] [spawner-4]: process started with pid [93809]
+[robot_state_publisher-1] [INFO] [1791165605.543164813] [robot_state_publisher]: Robot initialized
+[ros2_control_node-2] [INFO] [1791165605.566867060] [controller_manager]: Using Steady (Monotonic) clock for triggering controller manager cycles.
+[ros2_control_node-2] [INFO] [1791165605.661082463] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[ros2_control_node-2] [INFO] [1791165605.661130353] [controller_manager]: update rate is 50 Hz
+[ros2_control_node-2] [INFO] [1791165605.661134947] [controller_manager]: Overruns handling is : enabled
+[ros2_control_node-2] [INFO] [1791165605.661137409] [controller_manager]: Spawning controller_manager RT thread with scheduler priority: 50
+[ros2_control_node-2] [WARN] [1791165605.661241972] [controller_manager]: Could not enable FIFO RT scheduling policy: with error number <1>(Operation not permitted). See [https://control.ros.org/master/doc/ros2_control/controller_manager/doc/userdoc.html] for details on how to enable realtime scheduling.
+[ros2_control_node-2] [INFO] [1791165605.687331933] [controller_manager]: Received robot description from topic.
+[ros2_control_node-2] [INFO] [1791165605.687402316] [controller_manager]: Enforcing command limits is disabled. Command limits from URDF will be ignored.
+[ros2_control_node-2] [INFO] [1791165605.717699763] [controller_manager]: Loading hardware 'ClearCore' 
+[ros2_control_node-2] [INFO] [1791165605.818504153] [controller_manager]: Loaded hardware 'ClearCore' from plugin 'clearcore_hardware/ClearCoreSystemHardware'
+[ros2_control_node-2] [INFO] [1791165605.818596710] [controller_manager]: Initialize hardware 'ClearCore' 
+[spawner-4] [INFO] [1791165605.974525223] [spawner_joint_trajectory_controller]: waiting for service /controller_manager/list_controllers to become available...
+[ros2_control_node-2] [INFO] [1791165606.033066068] [controller_manager]: Successful initialization of hardware 'ClearCore'
+[ros2_control_node-2] [INFO] [1791165606.033234845] [controller_manager]: Activating component 'ClearCore'.
+[ros2_control_node-2] [INFO] [1791165606.033240636] [resource_manager]: 'configure' hardware 'ClearCore' 
+[ros2_control_node-2] [INFO] [1791165606.033243026] [resource_manager]: Successful 'configure' of hardware 'ClearCore'
+[ros2_control_node-2] [INFO] [1791165606.033245192] [resource_manager]: 'activate' hardware 'ClearCore' 
+[ros2_control_node-2] [INFO] [1791165606.068152683] [resource_manager]: Successful 'activate' of hardware 'ClearCore'
+[ros2_control_node-2] [INFO] [1791165606.068191655] [controller_manager]: Registering statistics for : ClearCore
+[ros2_control_node-2] [INFO] [1791165606.068292470] [controller_manager]: Resource Manager has been successfully initialized. Starting Controller Manager services...
+[ros2_control_node-2] [INFO] [1791165606.226015698] [controller_manager]: Loading controller : 'joint_trajectory_controller' of type 'joint_trajectory_controller/JointTrajectoryController'
+[ros2_control_node-2] [INFO] [1791165606.226079667] [controller_manager]: Loading controller 'joint_trajectory_controller'
+[ros2_control_node-2] [INFO] [1791165606.232756116] [controller_manager]: Controller 'joint_trajectory_controller' node arguments: --ros-args --params-file /mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/ros2_ws/install/clearcore_hardware/share/clearcore_hardware/config/controllers.yaml --params-file /tmp/launch_params_gsrdtf51 
+[spawner-4] [INFO] [1791165606.288389438] [spawner_joint_trajectory_controller]: Loaded joint_trajectory_controller
+[ros2_control_node-2] [INFO] [1791165606.289304906] [controller_manager]: Configuring controller: 'joint_trajectory_controller'
+[ros2_control_node-2] [INFO] [1791165606.289396922] [joint_trajectory_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[ros2_control_node-2] [INFO] [1791165606.289415390] [joint_trajectory_controller]: Command interfaces are [position] and state interfaces are [position velocity].
+[ros2_control_node-2] [INFO] [1791165606.289426850] [joint_trajectory_controller]: Using 'splines' interpolation method.
+[ros2_control_node-2] [INFO] [1791165606.291683092] [joint_trajectory_controller]: Action status changes will be monitored at 20.00 Hz.
+[ros2_control_node-2] [INFO] [1791165606.295621435] [joint_trajectory_controller]: Setting initial scaling factor to 1.000000
+[ros2_control_node-2] [INFO] [1791165606.295642916] [joint_trajectory_controller]: No scaling interface set. This controller will not read speed scaling from the hardware.
+[ros2_control_node-2] [INFO] [1791165606.308527405] [controller_manager]: Activating controllers: [ joint_trajectory_controller ]
+[ros2_control_node-2] [INFO] [1791165606.327527679] [controller_manager]: Successfully switched controllers!
+[spawner-4] [INFO] [1791165606.348268619] [spawner_joint_trajectory_controller]: Configured and activated joint_trajectory_controller
+[spawner-3] [INFO] [1791165606.440896867] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[INFO] [spawner-4]: process has finished cleanly [pid 93809]
+[ros2_control_node-2] [INFO] [1791165606.901016366] [controller_manager]: Loading controller : 'joint_state_broadcaster' of type 'joint_state_broadcaster/JointStateBroadcaster'
+[ros2_control_node-2] [INFO] [1791165606.901052891] [controller_manager]: Loading controller 'joint_state_broadcaster'
+[ros2_control_node-2] [INFO] [1791165606.923452835] [controller_manager]: Controller 'joint_state_broadcaster' node arguments: --ros-args --params-file /mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/ros2_ws/install/clearcore_hardware/share/clearcore_hardware/config/controllers.yaml --params-file /tmp/launch_params_gsrdtf51 
+[spawner-3] [INFO] [1791165606.948452589] [spawner_joint_state_broadcaster]: Loaded joint_state_broadcaster
+[ros2_control_node-2] [INFO] [1791165606.949309051] [controller_manager]: Configuring controller: 'joint_state_broadcaster'
+[ros2_control_node-2] [INFO] [1791165606.949374250] [joint_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+[ros2_control_node-2] [INFO] [1791165606.968519368] [controller_manager]: Activating controllers: [ joint_state_broadcaster ]
+[ros2_control_node-2] [INFO] [1791165606.987503844] [controller_manager]: Successfully switched controllers!
+[spawner-3] [INFO] [1791165607.008113086] [spawner_joint_state_broadcaster]: Configured and activated joint_state_broadcaster
+[INFO] [spawner-3]: process has finished cleanly [pid 93807]

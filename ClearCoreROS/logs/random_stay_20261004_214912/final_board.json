@@ -1,0 +1,19 @@
+{
+  "status_end_before_teardown": {
+    "note": "session get_status is not used while JTC owns TCP 9200",
+    "last_xy_m": [
+      0.002662499900907278,
+      0.013193749822676182
+    ],
+    "samples": 89740
+  },
+  "final_after_disable": null,
+  "status_known": false,
+  "checks": {
+    "status_known": false,
+    "enabled_false": false,
+    "test_mode_false": false,
+    "names_default": false,
+    "axis_mask_3": false
+  }
+}

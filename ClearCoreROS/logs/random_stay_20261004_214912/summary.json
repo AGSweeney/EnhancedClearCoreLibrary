@@ -1,0 +1,40 @@
+{
+  "kind": "ros_random_stay_enabled",
+  "duration_s_target": 1800,
+  "seed": 1791168552,
+  "log_dir": "/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/logs/random_stay_20261004_214912",
+  "ended_utc": "2026-10-05T03:22:36.349365+00:00",
+  "goals_ok": 1151,
+  "goals_fail": 0,
+  "enabled_drops": 0,
+  "alert_events": [],
+  "peak_abs_yx_mm": 26.450000470504165,
+  "samples": 89740,
+  "failures": [],
+  "verdicts": {
+    "motion_ok": true,
+    "stayed_enabled": true,
+    "no_midrun_disconnect": true,
+    "final_disabled_verified": false,
+    "alerts_clear": false
+  },
+  "final": {
+    "status_end_before_teardown": {
+      "note": "session get_status is not used while JTC owns TCP 9200",
+      "last_xy_m": [
+        0.002662499900907278,
+        0.013193749822676182
+      ],
+      "samples": 89740
+    },
+    "final_after_disable": null,
+    "status_known": false,
+    "checks": {
+      "status_known": false,
+      "enabled_false": false,
+      "test_mode_false": false,
+      "names_default": false,
+      "axis_mask_3": false
+    }
+  }
+}

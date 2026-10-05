@@ -1,0 +1,9 @@
+[INFO] [launch]: All log files can be found below /home/adam/.ros/log/2026-10-04-19-05-40-238157-DESKTOP-HF5K4CO-10236
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [bridge-1]: process started with pid [10273]
+[bridge-1] [INFO] [1791158741.003677958] [clearcore_bridge]: ClearCoreROS bridge -> 172.16.82.114:9200 mask=3
+[bridge-1] [INFO] [1791158744.949249150] [clearcore_bridge]: connected and enabled
+[bridge-1] [WARN] [1791158746.972700668] [clearcore_bridge]: connect failed: timed out
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [bridge-1]: sending signal 'SIGINT' to process[bridge-1]
+[INFO] [bridge-1]: process has finished cleanly [pid 10273]

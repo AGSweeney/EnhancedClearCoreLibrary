@@ -1,0 +1,10 @@
+waiting for /mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/logs/battery_20261004_202712/summary.json
+bring-up battery finished; starting stay-enabled random 30m
+RANDOM_STAY_ENABLED log_dir=/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/logs/random_stay_20261004_210003 duration_s=1800 seed=1791165603
+[     0.0s] start {"duration_s": 1800, "seed": 1791165603, "host": "172.16.82.114"}
+[     4.0s] jtc action ready
+[     6.0s] get_status failed {"error": "timed out"}
+[     6.0s] board not enabled after JTC start {"status": {}}
+[     8.0s] end-of-run status (before ROS teardown) {"enabled": null, "alerts": null}
+ROS_RANDOM_STAY_ENABLED_FAILED
+SUMMARY /mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/logs/random_stay_20261004_210003/summary.json

@@ -1,0 +1,49 @@
+{
+  "label": "origin_mid",
+  "ok": true,
+  "return_x_m": 0.0,
+  "return_y_m": 0.0,
+  "return_err_m": 0.0,
+  "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+  "separate_from": "jtc_reported_endpoint",
+  "return_x_mm": 0.0,
+  "return_y_mm": 0.0,
+  "return_err_mm": 0.0,
+  "status": {
+    "enabled": false,
+    "moving": false,
+    "estop": false,
+    "fault": false,
+    "watchdog": false,
+    "test_mode": false,
+    "axis_mask": 3,
+    "alert_reg": 0,
+    "alerts": "none",
+    "travel_limit": "none",
+    "xrce": "off",
+    "xrce_time": "unsync",
+    "last_cmd_seq": 236,
+    "tcp_session_accepts": 1086,
+    "tcp_session_closes": 1085,
+    "tcp_stream_accepts": 439,
+    "tcp_stream_closes": 439,
+    "position": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "velocity": [
+      -0.044565,
+      -0.044565,
+      0.0,
+      0.0
+    ],
+    "effort": [
+      0.0306,
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}

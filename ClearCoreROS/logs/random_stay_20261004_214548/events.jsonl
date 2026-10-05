@@ -1,0 +1,6 @@
+{"t_s": 0.005, "utc": "2026-10-05T02:45:49.783228+00:00", "msg": "start", "duration_s": 1800, "seed": 1791168348, "host": "172.16.82.114"}
+{"t_s": 4.006, "utc": "2026-10-05T02:45:53.783816+00:00", "msg": "jtc action ready"}
+{"t_s": 16.522, "utc": "2026-10-05T02:46:09.883194+00:00", "msg": "get_status failed", "error": "timed out"}
+{"t_s": 25.532, "utc": "2026-10-05T02:46:18.893323+00:00", "msg": "get_status failed", "error": "[Errno 104] Connection reset by peer"}
+{"t_s": 26.033, "utc": "2026-10-05T02:46:19.394124+00:00", "msg": "board not enabled after JTC start", "status": {}}
+{"t_s": 26.038, "utc": "2026-10-05T02:46:19.399023+00:00", "msg": "end-of-run status (before ROS teardown)", "enabled": null, "alerts": null}

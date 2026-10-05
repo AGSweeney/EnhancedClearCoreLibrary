@@ -1,0 +1,17 @@
+{
+  "utc": "2026-10-05T00:34:09.491254+00:00",
+  "purpose": "Re-run battery after both M0/M1 set to ASGH Position w/ Measured Torque",
+  "before_clear": {
+    "enabled": false,
+    "alerts": "motor_faulted",
+    "fault": true,
+    "alert_reg": 32
+  },
+  "after_clear": {
+    "enabled": false,
+    "alerts": "none",
+    "fault": false,
+    "alert_reg": 0,
+    "test_mode": false
+  }
+}

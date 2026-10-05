@@ -1,0 +1,44 @@
+[
+  {
+    "t_s": 40.69635417700002,
+    "where": "cycle002_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 77.86934237400001,
+    "where": "cycle003_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 153.85827745699999,
+    "where": "cycle005_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 190.638496058,
+    "where": "cycle006_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 212.02665057400003,
+    "where": "cycle006_post",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 228.573788357,
+    "where": "cycle007_pre",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  },
+  {
+    "t_s": 254.231869468,
+    "where": "finalize",
+    "kind": "alert",
+    "alerts": "motor_faulted"
+  }
+]

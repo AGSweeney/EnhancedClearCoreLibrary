@@ -1,0 +1,5 @@
+{"t_s": 0.004, "utc": "2026-10-05T02:00:04.739414+00:00", "msg": "start", "duration_s": 1800, "seed": 1791165603, "host": "172.16.82.114"}
+{"t_s": 4.004, "utc": "2026-10-05T02:00:08.740120+00:00", "msg": "jtc action ready"}
+{"t_s": 6.01, "utc": "2026-10-05T02:00:10.745234+00:00", "msg": "get_status failed", "error": "timed out"}
+{"t_s": 6.01, "utc": "2026-10-05T02:00:10.746055+00:00", "msg": "board not enabled after JTC start", "status": {}}
+{"t_s": 8.015, "utc": "2026-10-05T02:00:12.750568+00:00", "msg": "end-of-run status (before ROS teardown)", "enabled": null, "alerts": null}

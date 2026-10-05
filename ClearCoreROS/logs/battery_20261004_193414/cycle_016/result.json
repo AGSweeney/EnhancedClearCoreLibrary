@@ -1,0 +1,55 @@
+{
+  "cycle": 16,
+  "t_start_s": 721.168,
+  "steps": {
+    "origin_pre": true,
+    "bridge_ready": true,
+    "bridge_fjt": true,
+    "bridge_cancel": true,
+    "origin_mid": true,
+    "jtc_ready": true,
+    "jtc": true,
+    "origin_post": true
+  },
+  "metrics": {
+    "bridge_peak_abs_yx_mm": 0.006250105798244476,
+    "jtc_peak_abs_yx_mm_from_sampler": 0.012499993317760527,
+    "jtc_reported_endpoint": {
+      "reported_end_x_mm": -0.119,
+      "reported_end_y_mm": -0.131,
+      "reported_peak_abs_yx_mm": 0.012,
+      "result_line": "[INFO] [1791161290.484040690] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+      "samples_line": "[INFO] [1791161290.507391825] [send_trajectory_goal]: samples=202 x_mm=[-0.15, 30.16] y_mm=[-0.16, 30.16] peak_|Y-X|_mm=0.012 end_mm=(-0.119, -0.131)",
+      "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+      "separate_from": "session_origin_check"
+    },
+    "origin_return": {
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "err_mm": 0.0,
+      "ok": true,
+      "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+      "separate_from": "jtc_reported_endpoint"
+    },
+    "bridge_state_gaps": {
+      "sample_count": 116,
+      "gap_max_ms": 54.29981699990094,
+      "gap_mean_ms": 49.99996115652127,
+      "gaps_over_150ms": 0,
+      "gaps_over_150ms_values": []
+    },
+    "jtc_state_gaps": {
+      "sample_count": 311,
+      "gap_max_ms": 57.470276999993075,
+      "gap_mean_ms": 19.93806676129034,
+      "gaps_over_150ms": 0,
+      "gaps_over_150ms_values": []
+    }
+  },
+  "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+  "ok": true,
+  "t_end_s": 753.515,
+  "reconnects_this_cycle": 0,
+  "watchdog_events_this_cycle": 0,
+  "alert_events_this_cycle": 2
+}

@@ -1,0 +1,134 @@
+{
+  "kind": "ros_random_stay_enabled",
+  "duration_s_target": 1800,
+  "seed": 1791168348,
+  "log_dir": "/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/logs/random_stay_20261004_214548",
+  "ended_utc": "2026-10-05T02:46:20.435253+00:00",
+  "goals_ok": 0,
+  "goals_fail": 0,
+  "enabled_drops": 0,
+  "alert_events": [],
+  "peak_abs_yx_mm": 0.0,
+  "samples": 0,
+  "failures": [
+    {
+      "t_s": 16.523187290998976,
+      "error": "timed out"
+    },
+    {
+      "t_s": 25.533193571000083,
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "t_s": 26.034210223999253,
+      "step": "not_enabled_at_start"
+    }
+  ],
+  "verdicts": {
+    "motion_ok": false,
+    "stayed_enabled": true,
+    "no_midrun_disconnect": true,
+    "final_disabled_verified": true,
+    "alerts_clear": true
+  },
+  "final": {
+    "status_end_before_teardown": {
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    "final_after_disable": {
+      "enabled": false,
+      "moving": false,
+      "estop": false,
+      "fault": false,
+      "watchdog": false,
+      "test_mode": false,
+      "axis_mask": 3,
+      "alert_reg": 0,
+      "alerts": "none",
+      "travel_limit": "none",
+      "xrce": "off",
+      "xrce_time": "unsync",
+      "last_cmd_seq": 619,
+      "tcp_session_accepts": 1854,
+      "tcp_session_closes": 1853,
+      "tcp_stream_accepts": 73,
+      "tcp_stream_closes": 73,
+      "position": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "velocity": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "effort": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "axes": [
+        {
+          "axis": 0,
+          "name": "x",
+          "on": true,
+          "alert_reg": 0,
+          "motor_in_fault": false,
+          "alerts_present": false,
+          "status_enabled": false,
+          "steps_active": false,
+          "hlfb": "deasserted",
+          "hlfb_duty": 0.0
+        },
+        {
+          "axis": 1,
+          "name": "y",
+          "on": true,
+          "alert_reg": 0,
+          "motor_in_fault": false,
+          "alerts_present": false,
+          "status_enabled": false,
+          "steps_active": false,
+          "hlfb": "deasserted",
+          "hlfb_duty": 0.0
+        },
+        {
+          "axis": 2,
+          "name": "z",
+          "on": false,
+          "alert_reg": 0,
+          "motor_in_fault": false,
+          "alerts_present": false,
+          "status_enabled": false,
+          "steps_active": false,
+          "hlfb": "deasserted",
+          "hlfb_duty": 0.0
+        },
+        {
+          "axis": 3,
+          "name": "a",
+          "on": false,
+          "alert_reg": 0,
+          "motor_in_fault": false,
+          "alerts_present": false,
+          "status_enabled": false,
+          "steps_active": false,
+          "hlfb": "deasserted",
+          "hlfb_duty": 0.0
+        }
+      ]
+    },
+    "status_known": true,
+    "checks": {
+      "status_known": true,
+      "enabled_false": true,
+      "test_mode_false": true,
+      "names_default": true,
+      "axis_mask_3": true
+    }
+  }
+}

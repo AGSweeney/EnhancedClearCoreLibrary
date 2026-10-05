@@ -1,0 +1,99 @@
+{
+  "label": "origin_post",
+  "ok": true,
+  "return_x_m": 0.0,
+  "return_y_m": 0.0,
+  "return_err_m": 0.0,
+  "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+  "separate_from": "jtc_reported_endpoint",
+  "return_x_mm": 0.0,
+  "return_y_mm": 0.0,
+  "return_err_mm": 0.0,
+  "status": {
+    "enabled": false,
+    "moving": false,
+    "estop": false,
+    "fault": false,
+    "watchdog": false,
+    "test_mode": false,
+    "axis_mask": 3,
+    "alert_reg": 0,
+    "alerts": "none",
+    "travel_limit": "none",
+    "xrce": "off",
+    "xrce_time": "unsync",
+    "last_cmd_seq": 672,
+    "tcp_session_accepts": 847,
+    "tcp_session_closes": 846,
+    "tcp_stream_accepts": 15,
+    "tcp_stream_closes": 15,
+    "position": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "velocity": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "effort": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "axes": [
+      {
+        "axis": 0,
+        "name": "x",
+        "on": true,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": false,
+        "status_enabled": false,
+        "steps_active": false,
+        "hlfb": "asserted",
+        "hlfb_duty": 0.0
+      },
+      {
+        "axis": 1,
+        "name": "y",
+        "on": true,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": false,
+        "status_enabled": false,
+        "steps_active": false,
+        "hlfb": "asserted",
+        "hlfb_duty": 0.0
+      },
+      {
+        "axis": 2,
+        "name": "z",
+        "on": false,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": false,
+        "status_enabled": false,
+        "steps_active": false,
+        "hlfb": "deasserted",
+        "hlfb_duty": 0.0
+      },
+      {
+        "axis": 3,
+        "name": "a",
+        "on": false,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": false,
+        "status_enabled": false,
+        "steps_active": false,
+        "hlfb": "deasserted",
+        "hlfb_duty": 0.0
+      }
+    ]
+  }
+}

@@ -1,0 +1,865 @@
+[     0.0s] battery start {"duration_s": 1800, "host": "172.16.82.114", "log_dir": "/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/logs/battery_20261004_202712", "ws": "/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/ros2_ws"}
+[     0.1s] revisions {"discover": "CLEARCORE_ROS ClearCoreROS IP=172.16.82.114 TCP=9200 STREAM=9201 FW=1.0", "firmware_protocol_fw": "1.0", "git_head": "09cdadf2b63945acea8a981227261a6473c1e81b", "host_packages": {"clearcore_bridge": "0.1.0", "clearcore_hardware": "0.1.0"}, "protocol": "1.0"}
+[     0.1s] board start {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.01, 0.01], "pos_mm": [10.0, 10.0], "test_mode": false, "watchdog": false}
+[     0.1s] ===== cycle 1 start ===== {"remaining_s": 1799.9}
+[     1.6s] ros stopped {"reason": "cycle_1_start"}
+[     1.6s] board cycle001_pre {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.01, 0.01], "pos_mm": [10.0, 10.0], "test_mode": false, "watchdog": false}
+[     1.9s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[     3.5s] ready bridge action (main)
+[     5.5s] ready bridge connected (main)
+[     8.0s] ready bridge fresh joint_states (main)
+[    13.5s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[    15.2s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[    15.3s] bridge sampler {"gap_max_ms": 66.48160299937445, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.012500000593718141}
+[    17.0s] ros stopped {"reason": "cycle_1_after_bridge"}
+[    18.2s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[    19.9s] ready jtc action (main)
+[    19.9s] ready jtc hardware live (main)
+[    22.2s] ready jtc fresh joint_states (main)
+[    29.4s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[    29.6s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[    31.2s] ros stopped {"reason": "cycle_1_after_jtc"}
+[    32.3s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[    32.3s] board cycle001_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[    32.3s] ===== cycle 1 end ===== {"alert_events": 0, "bridge_peak_abs_yx_mm": 0.012500000593718141, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[    47.3s] ===== cycle 2 start ===== {"remaining_s": 1752.7}
+[    48.8s] ros stopped {"reason": "cycle_2_start"}
+[    48.8s] ALERT {"alerts": "motor_faulted", "where": "cycle002_pre"}
+[    48.8s] board cycle002_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[    48.8s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[    48.8s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[    48.9s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[    50.3s] ready bridge action (main)
+[    52.3s] ready bridge connected (main)
+[    54.8s] ready bridge fresh joint_states (main)
+[    59.9s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[    61.6s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[    61.7s] bridge sampler {"gap_max_ms": 50.77356499987218, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[    63.4s] ros stopped {"reason": "cycle_2_after_bridge"}
+[    64.7s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[    68.3s] ready jtc action (main)
+[    68.3s] ready jtc hardware live (main)
+[    70.7s] ready jtc fresh joint_states (main)
+[    79.2s] jtc done {"jtc_reported_end_mm": [-0.106, -0.106], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[    79.4s] jtc sampler {"jtc_reported_end_mm": [-0.106, -0.106], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[    81.1s] ros stopped {"reason": "cycle_2_after_jtc"}
+[    82.2s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[    82.2s] board cycle002_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[    82.2s] ===== cycle 2 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.106, -0.106], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[    97.2s] ===== cycle 3 start ===== {"remaining_s": 1702.8}
+[    98.7s] ros stopped {"reason": "cycle_3_start"}
+[    98.7s] ALERT {"alerts": "motor_faulted", "where": "cycle003_pre"}
+[    98.7s] board cycle003_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[    98.7s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[    98.7s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[    98.8s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   100.3s] ready bridge action (main)
+[   102.3s] ready bridge connected (main)
+[   104.7s] ready bridge fresh joint_states (main)
+[   109.8s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   111.5s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   111.7s] bridge sampler {"gap_max_ms": 374.9239819999275, "gaps_over_150ms": 1, "peak_abs_yx_mm": 0.006251037120819092}
+[   113.4s] ros stopped {"reason": "cycle_3_after_bridge"}
+[   114.6s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   117.2s] ready jtc action (main)
+[   117.2s] ready jtc hardware live (main)
+[   127.2s] timeout waiting for jtc fresh joint_states (main)
+[   127.2s] reconnect jtc
+[   129.0s] ros stopped {"reason": "jtc_reconnect"}
+[   134.7s] ready jtc action (retry)
+[   134.7s] ready jtc hardware live (retry)
+[   139.7s] ready jtc fresh joint_states (retry)
+[   147.0s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   147.2s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   148.8s] ros stopped {"reason": "cycle_3_after_jtc"}
+[   149.9s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   149.9s] board cycle003_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   149.9s] ===== cycle 3 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 1, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 1, "watchdog_events": 0}
+[   164.9s] ===== cycle 4 start ===== {"remaining_s": 1635.1}
+[   166.4s] ros stopped {"reason": "cycle_4_start"}
+[   166.4s] ALERT {"alerts": "motor_faulted", "where": "cycle004_pre"}
+[   166.4s] board cycle004_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   166.5s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   166.5s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   166.5s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   168.0s] ready bridge action (main)
+[   170.0s] ready bridge connected (main)
+[   172.4s] ready bridge fresh joint_states (main)
+[   177.7s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   179.4s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   179.5s] bridge sampler {"gap_max_ms": 71.99640899943915, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[   181.2s] ros stopped {"reason": "cycle_4_after_bridge"}
+[   182.5s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   185.1s] ready jtc action (main)
+[   185.1s] ready jtc hardware live (main)
+[   187.6s] ready jtc fresh joint_states (main)
+[   196.2s] jtc done {"jtc_reported_end_mm": [-0.056, -0.056], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   196.4s] jtc sampler {"jtc_reported_end_mm": [-0.056, -0.056], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   198.0s] ros stopped {"reason": "cycle_4_after_jtc"}
+[   199.1s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   199.1s] board cycle004_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   199.1s] ===== cycle 4 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.056, -0.056], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   214.1s] ===== cycle 5 start ===== {"remaining_s": 1585.9}
+[   215.6s] ros stopped {"reason": "cycle_5_start"}
+[   215.6s] ALERT {"alerts": "motor_faulted", "where": "cycle005_pre"}
+[   215.7s] board cycle005_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   215.7s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   215.7s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   215.7s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   217.1s] ready bridge action (main)
+[   219.1s] ready bridge connected (main)
+[   221.6s] ready bridge fresh joint_states (main)
+[   226.9s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   228.5s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   228.7s] bridge sampler {"gap_max_ms": 61.1833069997374, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[   230.4s] ros stopped {"reason": "cycle_5_after_bridge"}
+[   231.6s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   237.5s] ready jtc action (main)
+[   237.5s] ready jtc hardware live (main)
+[   240.3s] ready jtc fresh joint_states (main)
+[   247.7s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   247.9s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   249.6s] ros stopped {"reason": "cycle_5_after_jtc"}
+[   250.6s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   250.6s] board cycle005_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   250.6s] ===== cycle 5 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   265.6s] ===== cycle 6 start ===== {"remaining_s": 1534.4}
+[   267.2s] ros stopped {"reason": "cycle_6_start"}
+[   267.2s] ALERT {"alerts": "motor_faulted", "where": "cycle006_pre"}
+[   267.2s] board cycle006_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   267.2s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   267.2s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   267.2s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   268.7s] ready bridge action (main)
+[   270.7s] ready bridge connected (main)
+[   273.0s] ready bridge fresh joint_states (main)
+[   278.2s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   279.9s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   280.0s] bridge sampler {"gap_max_ms": 76.52621699980955, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[   281.7s] ros stopped {"reason": "cycle_6_after_bridge"}
+[   282.8s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   286.5s] ready jtc action (main)
+[   286.5s] ready jtc hardware live (main)
+[   289.4s] ready jtc fresh joint_states (main)
+[   296.6s] jtc done {"jtc_reported_end_mm": [-0.069, -0.069], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   296.8s] jtc sampler {"jtc_reported_end_mm": [-0.069, -0.069], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   298.5s] ros stopped {"reason": "cycle_6_after_jtc"}
+[   299.5s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   299.6s] board cycle006_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   299.6s] ===== cycle 6 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.069, -0.069], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   314.6s] ===== cycle 7 start ===== {"remaining_s": 1485.4}
+[   316.1s] ros stopped {"reason": "cycle_7_start"}
+[   316.1s] ALERT {"alerts": "motor_faulted", "where": "cycle007_pre"}
+[   316.1s] board cycle007_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   316.1s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   316.1s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   316.1s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   317.6s] ready bridge action (main)
+[   319.6s] ready bridge connected (main)
+[   322.0s] ready bridge fresh joint_states (main)
+[   327.3s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   328.9s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   329.1s] bridge sampler {"gap_max_ms": 74.09447000009095, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[   330.7s] ros stopped {"reason": "cycle_7_after_bridge"}
+[   332.0s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   334.6s] ready jtc action (main)
+[   334.6s] ready jtc hardware live (main)
+[   337.0s] ready jtc fresh joint_states (main)
+[   347.2s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   347.4s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   349.1s] ros stopped {"reason": "cycle_7_after_jtc"}
+[   350.1s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   350.1s] board cycle007_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   350.1s] ===== cycle 7 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   365.1s] ===== cycle 8 start ===== {"remaining_s": 1434.9}
+[   366.6s] ros stopped {"reason": "cycle_8_start"}
+[   366.7s] ALERT {"alerts": "motor_faulted", "where": "cycle008_pre"}
+[   366.7s] board cycle008_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   366.7s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   366.7s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   366.7s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   368.2s] ready bridge action (main)
+[   370.2s] ready bridge connected (main)
+[   376.3s] ready bridge fresh joint_states (main)
+[   381.8s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   383.4s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   383.6s] bridge sampler {"gap_max_ms": 87.09952400022303, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[   385.3s] ros stopped {"reason": "cycle_8_after_bridge"}
+[   386.5s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   389.2s] ready jtc action (main)
+[   389.2s] ready jtc hardware live (main)
+[   391.9s] ready jtc fresh joint_states (main)
+[   399.0s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   399.2s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   400.9s] ros stopped {"reason": "cycle_8_after_jtc"}
+[   401.9s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   401.9s] board cycle008_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   401.9s] ===== cycle 8 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   416.9s] ===== cycle 9 start ===== {"remaining_s": 1383.1}
+[   418.5s] ros stopped {"reason": "cycle_9_start"}
+[   418.5s] ALERT {"alerts": "motor_faulted", "where": "cycle009_pre"}
+[   418.5s] board cycle009_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   418.5s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   418.5s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   418.5s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   420.0s] ready bridge action (main)
+[   422.0s] ready bridge connected (main)
+[   424.4s] ready bridge fresh joint_states (main)
+[   430.2s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   431.8s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   432.0s] bridge sampler {"gap_max_ms": 86.8555879997075, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[   433.7s] ros stopped {"reason": "cycle_9_after_bridge"}
+[   434.9s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   437.6s] ready jtc action (main)
+[   437.6s] ready jtc hardware live (main)
+[   440.0s] ready jtc fresh joint_states (main)
+[   448.2s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   448.4s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   450.1s] ros stopped {"reason": "cycle_9_after_jtc"}
+[   451.1s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   451.1s] board cycle009_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   451.1s] ===== cycle 9 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   466.1s] ===== cycle 10 start ===== {"remaining_s": 1333.9}
+[   467.6s] ros stopped {"reason": "cycle_10_start"}
+[   467.6s] ALERT {"alerts": "motor_faulted", "where": "cycle010_pre"}
+[   467.7s] board cycle010_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   467.7s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   467.7s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   467.7s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   469.2s] ready bridge action (main)
+[   471.2s] ready bridge connected (main)
+[   473.6s] ready bridge fresh joint_states (main)
+[   478.8s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   480.4s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   480.6s] bridge sampler {"gap_max_ms": 76.40512800026045, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[   482.3s] ros stopped {"reason": "cycle_10_after_bridge"}
+[   483.5s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   486.1s] ready jtc action (main)
+[   486.1s] ready jtc hardware live (main)
+[   488.5s] ready jtc fresh joint_states (main)
+[   495.6s] jtc done {"jtc_reported_end_mm": [-0.063, -0.063], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   495.8s] jtc sampler {"jtc_reported_end_mm": [-0.063, -0.063], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   497.5s] ros stopped {"reason": "cycle_10_after_jtc"}
+[   498.5s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   498.6s] board cycle010_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   498.6s] ===== cycle 10 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.063, -0.063], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   513.6s] ===== cycle 11 start ===== {"remaining_s": 1286.4}
+[   515.1s] ros stopped {"reason": "cycle_11_start"}
+[   515.1s] ALERT {"alerts": "motor_faulted", "where": "cycle011_pre"}
+[   515.1s] board cycle011_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   515.1s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   515.1s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   515.2s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   516.6s] ready bridge action (main)
+[   518.6s] ready bridge connected (main)
+[   521.0s] ready bridge fresh joint_states (main)
+[   526.2s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   527.8s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   528.0s] bridge sampler {"gap_max_ms": 86.29326400023274, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[   529.7s] ros stopped {"reason": "cycle_11_after_bridge"}
+[   530.8s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   533.4s] ready jtc action (main)
+[   533.4s] ready jtc hardware live (main)
+[   535.7s] ready jtc fresh joint_states (main)
+[   542.8s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   543.0s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   544.7s] ros stopped {"reason": "cycle_11_after_jtc"}
+[   545.7s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   545.8s] board cycle011_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   545.8s] ===== cycle 11 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   560.8s] ===== cycle 12 start ===== {"remaining_s": 1239.2}
+[   562.3s] ros stopped {"reason": "cycle_12_start"}
+[   562.3s] ALERT {"alerts": "motor_faulted", "where": "cycle012_pre"}
+[   562.3s] board cycle012_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   562.3s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   562.3s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   562.4s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   563.8s] ready bridge action (main)
+[   565.8s] ready bridge connected (main)
+[   568.2s] ready bridge fresh joint_states (main)
+[   573.8s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   575.4s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   575.5s] bridge sampler {"gap_max_ms": 82.0727150003222, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[   577.2s] ros stopped {"reason": "cycle_12_after_bridge"}
+[   578.5s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   581.1s] ready jtc action (main)
+[   581.1s] ready jtc hardware live (main)
+[   583.5s] ready jtc fresh joint_states (main)
+[   592.0s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   592.1s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   593.8s] ros stopped {"reason": "cycle_12_after_jtc"}
+[   594.9s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   594.9s] board cycle012_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   594.9s] ===== cycle 12 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   609.9s] ===== cycle 13 start ===== {"remaining_s": 1190.1}
+[   611.4s] ros stopped {"reason": "cycle_13_start"}
+[   611.4s] ALERT {"alerts": "motor_faulted", "where": "cycle013_pre"}
+[   611.4s] board cycle013_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   611.4s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   611.4s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   611.5s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   613.0s] ready bridge action (main)
+[   615.0s] ready bridge connected (main)
+[   617.4s] ready bridge fresh joint_states (main)
+[   622.9s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   624.5s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   624.7s] bridge sampler {"gap_max_ms": 90.33716999965691, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[   626.3s] ros stopped {"reason": "cycle_13_after_bridge"}
+[   627.6s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   630.2s] ready jtc action (main)
+[   630.2s] ready jtc hardware live (main)
+[   632.6s] ready jtc fresh joint_states (main)
+[   640.6s] jtc done {"jtc_reported_end_mm": [-0.112, -0.112], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   640.8s] jtc sampler {"jtc_reported_end_mm": [-0.112, -0.112], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   642.5s] ros stopped {"reason": "cycle_13_after_jtc"}
+[   643.5s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   643.5s] board cycle013_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   643.5s] ===== cycle 13 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.112, -0.112], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   658.5s] ===== cycle 14 start ===== {"remaining_s": 1141.5}
+[   660.1s] ros stopped {"reason": "cycle_14_start"}
+[   660.1s] ALERT {"alerts": "motor_faulted", "where": "cycle014_pre"}
+[   660.1s] board cycle014_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   660.1s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   660.1s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   660.1s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   661.6s] ready bridge action (main)
+[   663.6s] ready bridge connected (main)
+[   666.0s] ready bridge fresh joint_states (main)
+[   671.2s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   672.9s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   673.0s] bridge sampler {"gap_max_ms": 77.99631899979431, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[   674.7s] ros stopped {"reason": "cycle_14_after_bridge"}
+[   676.0s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   678.6s] ready jtc action (main)
+[   678.6s] ready jtc hardware live (main)
+[   681.0s] ready jtc fresh joint_states (main)
+[   688.1s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   688.3s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   689.9s] ros stopped {"reason": "cycle_14_after_jtc"}
+[   691.0s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   691.0s] board cycle014_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   691.0s] ===== cycle 14 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   706.0s] ===== cycle 15 start ===== {"remaining_s": 1094.0}
+[   707.5s] ros stopped {"reason": "cycle_15_start"}
+[   707.5s] ALERT {"alerts": "motor_faulted", "where": "cycle015_pre"}
+[   707.5s] board cycle015_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   707.6s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   707.6s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   707.6s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   709.0s] ready bridge action (main)
+[   711.0s] ready bridge connected (main)
+[   713.4s] ready bridge fresh joint_states (main)
+[   718.6s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   720.2s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   720.4s] bridge sampler {"gap_max_ms": 71.36857800014695, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[   722.1s] ros stopped {"reason": "cycle_15_after_bridge"}
+[   723.3s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   725.9s] ready jtc action (main)
+[   725.9s] ready jtc hardware live (main)
+[   728.3s] ready jtc fresh joint_states (main)
+[   735.8s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   735.9s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   737.6s] ros stopped {"reason": "cycle_15_after_jtc"}
+[   738.7s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   738.7s] board cycle015_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   738.7s] ===== cycle 15 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   753.7s] ===== cycle 16 start ===== {"remaining_s": 1046.3}
+[   755.2s] ros stopped {"reason": "cycle_16_start"}
+[   755.2s] ALERT {"alerts": "motor_faulted", "where": "cycle016_pre"}
+[   755.2s] board cycle016_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   755.2s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   755.2s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   755.3s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   756.7s] ready bridge action (main)
+[   758.7s] ready bridge connected (main)
+[   761.2s] ready bridge fresh joint_states (main)
+[   766.4s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   768.0s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   768.2s] bridge sampler {"gap_max_ms": 85.28321999983746, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[   769.9s] ros stopped {"reason": "cycle_16_after_bridge"}
+[   771.1s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   773.7s] ready jtc action (main)
+[   773.7s] ready jtc hardware live (main)
+[   776.2s] ready jtc fresh joint_states (main)
+[   784.4s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   784.6s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   786.3s] ros stopped {"reason": "cycle_16_after_jtc"}
+[   787.3s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   787.3s] board cycle016_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   787.4s] ===== cycle 16 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   802.4s] ===== cycle 17 start ===== {"remaining_s": 997.6}
+[   803.9s] ros stopped {"reason": "cycle_17_start"}
+[   803.9s] ALERT {"alerts": "motor_faulted", "where": "cycle017_pre"}
+[   803.9s] board cycle017_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   803.9s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   803.9s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   803.9s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   805.4s] ready bridge action (main)
+[   805.9s] ready bridge connected (main)
+[   808.3s] ready bridge fresh joint_states (main)
+[   813.8s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   815.1s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   815.3s] bridge sampler {"gap_max_ms": 55.18777399993269, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[   816.9s] ros stopped {"reason": "cycle_17_after_bridge"}
+[   818.2s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   821.9s] ready jtc action (main)
+[   821.9s] ready jtc hardware live (main)
+[   824.3s] ready jtc fresh joint_states (main)
+[   832.5s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   832.7s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   834.4s] ros stopped {"reason": "cycle_17_after_jtc"}
+[   835.4s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   835.4s] board cycle017_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   835.5s] ===== cycle 17 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   850.5s] ===== cycle 18 start ===== {"remaining_s": 949.5}
+[   852.0s] ros stopped {"reason": "cycle_18_start"}
+[   852.0s] ALERT {"alerts": "motor_faulted", "where": "cycle018_pre"}
+[   852.0s] board cycle018_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   852.0s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   852.0s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   852.0s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   853.6s] ready bridge action (main)
+[   855.6s] ready bridge connected (main)
+[   858.0s] ready bridge fresh joint_states (main)
+[   863.2s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   864.8s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   865.0s] bridge sampler {"gap_max_ms": 73.03868399958446, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[   866.6s] ros stopped {"reason": "cycle_18_after_bridge"}
+[   867.9s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   870.5s] ready jtc action (main)
+[   870.5s] ready jtc hardware live (main)
+[   872.9s] ready jtc fresh joint_states (main)
+[   880.0s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   880.2s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   881.9s] ros stopped {"reason": "cycle_18_after_jtc"}
+[   882.9s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   883.0s] board cycle018_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   883.0s] ===== cycle 18 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   898.0s] ===== cycle 19 start ===== {"remaining_s": 902.0}
+[   899.5s] ros stopped {"reason": "cycle_19_start"}
+[   899.5s] ALERT {"alerts": "motor_faulted", "where": "cycle019_pre"}
+[   899.5s] board cycle019_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   899.5s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   899.5s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   899.5s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   901.0s] ready bridge action (main)
+[   902.5s] ready bridge connected (main)
+[   904.9s] ready bridge fresh joint_states (main)
+[   910.1s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   911.8s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   912.0s] bridge sampler {"gap_max_ms": 356.16162400037865, "gaps_over_150ms": 1, "peak_abs_yx_mm": 0.006250105798244476}
+[   913.7s] ros stopped {"reason": "cycle_19_after_bridge"}
+[   914.9s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   920.5s] ready jtc action (main)
+[   920.5s] ready jtc hardware live (main)
+[   922.9s] ready jtc fresh joint_states (main)
+[   930.0s] jtc done {"jtc_reported_end_mm": [-0.125, -0.125], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   930.2s] jtc sampler {"jtc_reported_end_mm": [-0.125, -0.125], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   931.9s] ros stopped {"reason": "cycle_19_after_jtc"}
+[   932.9s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   932.9s] board cycle019_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   932.9s] ===== cycle 19 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 1, "jtc_reported_end_mm": [-0.125, -0.125], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   947.9s] ===== cycle 20 start ===== {"remaining_s": 852.1}
+[   949.5s] ros stopped {"reason": "cycle_20_start"}
+[   949.5s] ALERT {"alerts": "motor_faulted", "where": "cycle020_pre"}
+[   949.5s] board cycle020_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   949.5s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   949.5s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   949.5s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   951.0s] ready bridge action (main)
+[   953.0s] ready bridge connected (main)
+[   955.4s] ready bridge fresh joint_states (main)
+[   961.3s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[   962.9s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[   963.1s] bridge sampler {"gap_max_ms": 68.59761299983802, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[   964.7s] ros stopped {"reason": "cycle_20_after_bridge"}
+[   966.0s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   968.7s] ready jtc action (main)
+[   968.7s] ready jtc hardware live (main)
+[   971.0s] ready jtc fresh joint_states (main)
+[   978.2s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[   978.4s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[   980.1s] ros stopped {"reason": "cycle_20_after_jtc"}
+[   981.1s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   981.1s] board cycle020_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   981.1s] ===== cycle 20 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[   996.1s] ===== cycle 21 start ===== {"remaining_s": 803.9}
+[   997.6s] ros stopped {"reason": "cycle_21_start"}
+[   997.7s] ALERT {"alerts": "motor_faulted", "where": "cycle021_pre"}
+[   997.7s] board cycle021_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[   997.7s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[   997.7s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[   997.7s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[   999.2s] ready bridge action (main)
+[   999.2s] ready bridge connected (main)
+[  1001.5s] ready bridge fresh joint_states (main)
+[  1007.0s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1008.4s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1008.6s] bridge sampler {"gap_max_ms": 61.141304000557284, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[  1010.2s] ros stopped {"reason": "cycle_21_after_bridge"}
+[  1011.5s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1014.1s] ready jtc action (main)
+[  1014.1s] ready jtc hardware live (main)
+[  1016.4s] ready jtc fresh joint_states (main)
+[  1023.9s] jtc done {"jtc_reported_end_mm": [-0.087, -0.087], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1024.1s] jtc sampler {"jtc_reported_end_mm": [-0.087, -0.087], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1025.8s] ros stopped {"reason": "cycle_21_after_jtc"}
+[  1026.8s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1026.8s] board cycle021_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1026.8s] ===== cycle 21 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.087, -0.087], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1041.8s] ===== cycle 22 start ===== {"remaining_s": 758.2}
+[  1043.4s] ros stopped {"reason": "cycle_22_start"}
+[  1043.4s] ALERT {"alerts": "motor_faulted", "where": "cycle022_pre"}
+[  1043.4s] board cycle022_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1043.4s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1043.4s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1043.4s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1044.9s] ready bridge action (main)
+[  1046.9s] ready bridge connected (main)
+[  1049.3s] ready bridge fresh joint_states (main)
+[  1054.5s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1056.1s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1056.2s] bridge sampler {"gap_max_ms": 80.40444400012348, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[  1057.9s] ros stopped {"reason": "cycle_22_after_bridge"}
+[  1059.2s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1061.8s] ready jtc action (main)
+[  1061.8s] ready jtc hardware live (main)
+[  1066.6s] ready jtc fresh joint_states (main)
+[  1073.8s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1073.9s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1075.6s] ros stopped {"reason": "cycle_22_after_jtc"}
+[  1076.7s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1076.7s] board cycle022_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1076.7s] ===== cycle 22 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1091.7s] ===== cycle 23 start ===== {"remaining_s": 708.3}
+[  1093.2s] ros stopped {"reason": "cycle_23_start"}
+[  1093.2s] ALERT {"alerts": "motor_faulted", "where": "cycle023_pre"}
+[  1093.2s] board cycle023_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1093.2s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1093.2s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1093.3s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1095.7s] ready bridge action (main)
+[  1096.2s] ready bridge connected (main)
+[  1098.6s] ready bridge fresh joint_states (main)
+[  1104.1s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1105.8s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1106.0s] bridge sampler {"gap_max_ms": 79.61235900074826, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[  1107.6s] ros stopped {"reason": "cycle_23_after_bridge"}
+[  1108.9s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1111.5s] ready jtc action (main)
+[  1111.5s] ready jtc hardware live (main)
+[  1113.9s] ready jtc fresh joint_states (main)
+[  1121.2s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1121.4s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1123.1s] ros stopped {"reason": "cycle_23_after_jtc"}
+[  1124.1s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1124.2s] board cycle023_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1124.2s] ===== cycle 23 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1139.2s] ===== cycle 24 start ===== {"remaining_s": 660.8}
+[  1140.7s] ros stopped {"reason": "cycle_24_start"}
+[  1140.7s] ALERT {"alerts": "motor_faulted", "where": "cycle024_pre"}
+[  1140.7s] board cycle024_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1140.7s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1140.7s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1140.8s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1142.2s] ready bridge action (main)
+[  1144.2s] ready bridge connected (main)
+[  1146.7s] ready bridge fresh joint_states (main)
+[  1151.8s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1153.5s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1153.6s] bridge sampler {"gap_max_ms": 77.28279899947665, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[  1155.3s] ros stopped {"reason": "cycle_24_after_bridge"}
+[  1156.6s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1160.2s] ready jtc action (main)
+[  1160.2s] ready jtc hardware live (main)
+[  1162.5s] ready jtc fresh joint_states (main)
+[  1169.6s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1169.8s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1171.5s] ros stopped {"reason": "cycle_24_after_jtc"}
+[  1172.5s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1172.5s] board cycle024_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1172.5s] ===== cycle 24 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1187.5s] ===== cycle 25 start ===== {"remaining_s": 612.5}
+[  1189.1s] ros stopped {"reason": "cycle_25_start"}
+[  1189.1s] ALERT {"alerts": "motor_faulted", "where": "cycle025_pre"}
+[  1189.1s] board cycle025_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1189.1s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1189.1s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1189.1s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1190.5s] ready bridge action (main)
+[  1192.5s] ready bridge connected (main)
+[  1194.9s] ready bridge fresh joint_states (main)
+[  1200.1s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1201.8s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1202.0s] bridge sampler {"gap_max_ms": 67.69036000059714, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[  1203.6s] ros stopped {"reason": "cycle_25_after_bridge"}
+[  1204.9s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1207.5s] ready jtc action (main)
+[  1207.5s] ready jtc hardware live (main)
+[  1209.9s] ready jtc fresh joint_states (main)
+[  1217.1s] jtc done {"jtc_reported_end_mm": [-0.063, -0.063], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1217.3s] jtc sampler {"jtc_reported_end_mm": [-0.063, -0.063], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1219.0s] ros stopped {"reason": "cycle_25_after_jtc"}
+[  1220.0s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1220.1s] board cycle025_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1220.1s] ===== cycle 25 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.063, -0.063], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1235.1s] ===== cycle 26 start ===== {"remaining_s": 564.9}
+[  1236.6s] ros stopped {"reason": "cycle_26_start"}
+[  1236.6s] ALERT {"alerts": "motor_faulted", "where": "cycle026_pre"}
+[  1236.6s] board cycle026_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1236.6s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1236.6s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1236.7s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1238.1s] ready bridge action (main)
+[  1240.1s] ready bridge connected (main)
+[  1242.5s] ready bridge fresh joint_states (main)
+[  1247.7s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1249.4s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1249.5s] bridge sampler {"gap_max_ms": 66.5239690006274, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[  1251.2s] ros stopped {"reason": "cycle_26_after_bridge"}
+[  1252.3s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1254.9s] ready jtc action (main)
+[  1254.9s] ready jtc hardware live (main)
+[  1257.3s] ready jtc fresh joint_states (main)
+[  1264.5s] jtc done {"jtc_reported_end_mm": [-0.106, -0.106], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1264.7s] jtc sampler {"jtc_reported_end_mm": [-0.106, -0.106], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1274.2s] ros stopped {"reason": "cycle_26_after_jtc"}
+[  1275.3s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1275.3s] board cycle026_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1275.3s] ===== cycle 26 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.106, -0.106], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1290.3s] ===== cycle 27 start ===== {"remaining_s": 509.7}
+[  1291.8s] ros stopped {"reason": "cycle_27_start"}
+[  1291.8s] ALERT {"alerts": "motor_faulted", "where": "cycle027_pre"}
+[  1291.8s] board cycle027_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1291.8s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1291.8s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1291.9s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1293.4s] ready bridge action (main)
+[  1295.4s] ready bridge connected (main)
+[  1297.8s] ready bridge fresh joint_states (main)
+[  1303.3s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1304.6s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1304.8s] bridge sampler {"gap_max_ms": 82.99426100074925, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[  1306.4s] ros stopped {"reason": "cycle_27_after_bridge"}
+[  1307.7s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1310.2s] ready jtc action (main)
+[  1310.2s] ready jtc hardware live (main)
+[  1315.1s] ready jtc fresh joint_states (main)
+[  1322.2s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1322.4s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1324.1s] ros stopped {"reason": "cycle_27_after_jtc"}
+[  1325.1s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1325.1s] board cycle027_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1325.1s] ===== cycle 27 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 1, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1340.1s] ===== cycle 28 start ===== {"remaining_s": 459.9}
+[  1341.6s] ros stopped {"reason": "cycle_28_start"}
+[  1341.7s] ALERT {"alerts": "motor_faulted", "where": "cycle028_pre"}
+[  1341.7s] board cycle028_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1341.7s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1341.7s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1341.7s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1343.2s] ready bridge action (main)
+[  1345.2s] ready bridge connected (main)
+[  1347.6s] ready bridge fresh joint_states (main)
+[  1353.0s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1354.3s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1354.5s] bridge sampler {"gap_max_ms": 91.44261499932327, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[  1356.2s] ros stopped {"reason": "cycle_28_after_bridge"}
+[  1357.3s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1359.9s] ready jtc action (main)
+[  1359.9s] ready jtc hardware live (main)
+[  1362.7s] ready jtc fresh joint_states (main)
+[  1369.9s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1370.1s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1371.7s] ros stopped {"reason": "cycle_28_after_jtc"}
+[  1372.8s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1372.8s] board cycle028_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1372.8s] ===== cycle 28 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1387.8s] ===== cycle 29 start ===== {"remaining_s": 412.2}
+[  1389.3s] ros stopped {"reason": "cycle_29_start"}
+[  1389.3s] ALERT {"alerts": "motor_faulted", "where": "cycle029_pre"}
+[  1389.3s] board cycle029_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1389.4s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1389.4s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1389.4s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1390.8s] ready bridge action (main)
+[  1392.8s] ready bridge connected (main)
+[  1395.2s] ready bridge fresh joint_states (main)
+[  1400.4s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1402.0s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1402.2s] bridge sampler {"gap_max_ms": 67.02301699988311, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[  1403.9s] ros stopped {"reason": "cycle_29_after_bridge"}
+[  1405.1s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1407.7s] ready jtc action (main)
+[  1407.7s] ready jtc hardware live (main)
+[  1410.1s] ready jtc fresh joint_states (main)
+[  1418.4s] jtc done {"jtc_reported_end_mm": [-0.094, -0.094], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1418.6s] jtc sampler {"jtc_reported_end_mm": [-0.094, -0.094], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1420.3s] ros stopped {"reason": "cycle_29_after_jtc"}
+[  1421.3s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1421.3s] board cycle029_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1421.3s] ===== cycle 29 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.094, -0.094], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1436.3s] ===== cycle 30 start ===== {"remaining_s": 363.7}
+[  1437.9s] ros stopped {"reason": "cycle_30_start"}
+[  1437.9s] ALERT {"alerts": "motor_faulted", "where": "cycle030_pre"}
+[  1437.9s] board cycle030_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1437.9s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1437.9s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1437.9s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1439.5s] ready bridge action (main)
+[  1441.5s] ready bridge connected (main)
+[  1444.0s] ready bridge fresh joint_states (main)
+[  1449.2s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1450.8s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1451.0s] bridge sampler {"gap_max_ms": 382.59327899959317, "gaps_over_150ms": 1, "peak_abs_yx_mm": 0.006251037120819092}
+[  1452.6s] ros stopped {"reason": "cycle_30_after_bridge"}
+[  1453.9s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1456.5s] ready jtc action (main)
+[  1456.5s] ready jtc hardware live (main)
+[  1458.9s] ready jtc fresh joint_states (main)
+[  1466.0s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1466.2s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1467.9s] ros stopped {"reason": "cycle_30_after_jtc"}
+[  1469.0s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1469.0s] board cycle030_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1469.0s] ===== cycle 30 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 2, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1484.0s] ===== cycle 31 start ===== {"remaining_s": 316.0}
+[  1485.5s] ros stopped {"reason": "cycle_31_start"}
+[  1485.5s] ALERT {"alerts": "motor_faulted", "where": "cycle031_pre"}
+[  1485.5s] board cycle031_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1485.5s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1485.5s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1485.6s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1486.9s] ready bridge action (main)
+[  1488.9s] ready bridge connected (main)
+[  1491.3s] ready bridge fresh joint_states (main)
+[  1496.5s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1498.2s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1498.3s] bridge sampler {"gap_max_ms": 56.61646499993367, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006250105798244476}
+[  1500.0s] ros stopped {"reason": "cycle_31_after_bridge"}
+[  1501.3s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1503.8s] ready jtc action (main)
+[  1503.8s] ready jtc hardware live (main)
+[  1506.2s] ready jtc fresh joint_states (main)
+[  1513.4s] jtc done {"jtc_reported_end_mm": [-0.063, -0.063], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1513.5s] jtc sampler {"jtc_reported_end_mm": [-0.063, -0.063], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1515.2s] ros stopped {"reason": "cycle_31_after_jtc"}
+[  1516.3s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1516.3s] board cycle031_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1516.3s] ===== cycle 31 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006250105798244476, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.063, -0.063], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1531.3s] ===== cycle 32 start ===== {"remaining_s": 268.7}
+[  1532.8s] ros stopped {"reason": "cycle_32_start"}
+[  1532.8s] ALERT {"alerts": "motor_faulted", "where": "cycle032_pre"}
+[  1532.8s] board cycle032_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1532.8s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1532.8s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1532.9s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1534.3s] ready bridge action (main)
+[  1536.3s] ready bridge connected (main)
+[  1538.8s] ready bridge fresh joint_states (main)
+[  1544.0s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1545.5s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1545.7s] bridge sampler {"gap_max_ms": 85.37617699948896, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[  1547.4s] ros stopped {"reason": "cycle_32_after_bridge"}
+[  1548.5s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1551.1s] ready jtc action (main)
+[  1551.1s] ready jtc hardware live (main)
+[  1553.4s] ready jtc fresh joint_states (main)
+[  1560.8s] jtc done {"jtc_reported_end_mm": [-0.075, -0.075], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1561.0s] jtc sampler {"jtc_reported_end_mm": [-0.075, -0.075], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1562.7s] ros stopped {"reason": "cycle_32_after_jtc"}
+[  1563.7s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1563.7s] board cycle032_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1563.7s] ===== cycle 32 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.075, -0.075], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1578.7s] ===== cycle 33 start ===== {"remaining_s": 221.3}
+[  1580.3s] ros stopped {"reason": "cycle_33_start"}
+[  1580.3s] ALERT {"alerts": "motor_faulted", "where": "cycle033_pre"}
+[  1580.3s] board cycle033_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1580.3s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1580.3s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1580.3s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1581.8s] ready bridge action (main)
+[  1583.8s] ready bridge connected (main)
+[  1586.2s] ready bridge fresh joint_states (main)
+[  1591.4s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1593.1s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1593.2s] bridge sampler {"gap_max_ms": 91.14046800004871, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[  1594.9s] ros stopped {"reason": "cycle_33_after_bridge"}
+[  1596.2s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1598.8s] ready jtc action (main)
+[  1598.8s] ready jtc hardware live (main)
+[  1601.2s] ready jtc fresh joint_states (main)
+[  1608.4s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1608.5s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1610.2s] ros stopped {"reason": "cycle_33_after_jtc"}
+[  1611.3s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1611.3s] board cycle033_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1611.3s] ===== cycle 33 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1626.3s] ===== cycle 34 start ===== {"remaining_s": 173.7}
+[  1627.8s] ros stopped {"reason": "cycle_34_start"}
+[  1627.8s] ALERT {"alerts": "motor_faulted", "where": "cycle034_pre"}
+[  1627.8s] board cycle034_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1627.8s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1627.8s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1627.9s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1629.3s] ready bridge action (main)
+[  1631.3s] ready bridge connected (main)
+[  1633.7s] ready bridge fresh joint_states (main)
+[  1638.9s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1640.5s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1640.7s] bridge sampler {"gap_max_ms": 63.56785700063483, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[  1642.4s] ros stopped {"reason": "cycle_34_after_bridge"}
+[  1643.6s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1646.2s] ready jtc action (main)
+[  1646.2s] ready jtc hardware live (main)
+[  1651.1s] ready jtc fresh joint_states (main)
+[  1658.2s] jtc done {"jtc_reported_end_mm": [-0.081, -0.081], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1658.4s] jtc sampler {"jtc_reported_end_mm": [-0.081, -0.081], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1660.1s] ros stopped {"reason": "cycle_34_after_jtc"}
+[  1661.1s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1661.1s] board cycle034_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1661.1s] ===== cycle 34 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.081, -0.081], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1676.1s] ===== cycle 35 start ===== {"remaining_s": 123.9}
+[  1677.7s] ros stopped {"reason": "cycle_35_start"}
+[  1677.7s] ALERT {"alerts": "motor_faulted", "where": "cycle035_pre"}
+[  1677.7s] board cycle035_pre {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1677.7s] ALERT {"alerts": "motor_faulted", "where": "origin_pre_pre_clear"}
+[  1677.7s] preserved alert transition before clear {"alerts": "motor_faulted", "enabled": false, "fault": true, "where": "origin_pre"}
+[  1677.7s] origin_pre ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1679.2s] ready bridge action (main)
+[  1681.2s] ready bridge connected (main)
+[  1683.5s] ready bridge fresh joint_states (main)
+[  1688.7s] bridge_fjt done {"ok": true, "rc": 0, "target_m": 0.02}
+[  1690.0s] bridge_cancel done {"ok": true, "rc": 0, "target_m": 0.018}
+[  1690.2s] bridge sampler {"gap_max_ms": 73.49533500018879, "gaps_over_150ms": 0, "peak_abs_yx_mm": 0.006251037120819092}
+[  1691.8s] ros stopped {"reason": "cycle_35_after_bridge"}
+[  1693.0s] origin_mid ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1694.6s] ready jtc action (main)
+[  1694.6s] ready jtc hardware live (main)
+[  1699.5s] ready jtc fresh joint_states (main)
+[  1706.9s] jtc done {"jtc_reported_end_mm": [-0.144, -0.144], "jtc_reported_peak_abs_yx_mm": 0.006, "note": "JTC reported endpoint is separate from later origin check", "ok": true, "rc": 0}
+[  1707.0s] jtc sampler {"jtc_reported_end_mm": [-0.144, -0.144], "note": "reported endpoint != later origin check", "peak_abs_yx_mm": 0.006251037120819092}
+[  1708.7s] ros stopped {"reason": "cycle_35_after_jtc"}
+[  1709.8s] origin_post ok {"note": "generated-step / PositionRefCommanded (not shaft encoder)", "return_err_mm": 0.0, "return_x_mm": 0.0, "return_y_mm": 0.0}
+[  1709.8s] board cycle035_post {"alerts": "none", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1709.8s] ===== cycle 35 end ===== {"alert_events": 2, "bridge_peak_abs_yx_mm": 0.006251037120819092, "gaps_over_150ms": 0, "jtc_reported_end_mm": [-0.144, -0.144], "ok": true, "origin_return_err_mm": 0.0, "reconnects": 0, "watchdog_events": 0}
+[  1724.8s] ALERT {"alerts": "motor_faulted", "where": "tail"}
+[  1724.8s] board tail {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1734.8s] ALERT {"alerts": "motor_faulted", "where": "tail"}
+[  1734.8s] board tail {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1744.8s] ALERT {"alerts": "motor_faulted", "where": "tail"}
+[  1744.8s] board tail {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1754.8s] ALERT {"alerts": "motor_faulted", "where": "tail"}
+[  1754.8s] board tail {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1764.8s] ALERT {"alerts": "motor_faulted", "where": "tail"}
+[  1764.8s] board tail {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1774.9s] ALERT {"alerts": "motor_faulted", "where": "tail"}
+[  1774.9s] board tail {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1784.9s] ALERT {"alerts": "motor_faulted", "where": "tail"}
+[  1784.9s] board tail {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1794.9s] ALERT {"alerts": "motor_faulted", "where": "tail"}
+[  1794.9s] board tail {"alerts": "motor_faulted", "enabled": false, "moving": false, "pos_m": [0.0, 0.0], "pos_mm": [0.0, 0.0], "test_mode": false, "watchdog": false}
+[  1800.0s] finalizing
+[  1801.5s] ros stopped {"reason": "finalize"}
+[  1801.5s] ALERT {"alerts": "motor_faulted", "where": "finalize"}
+[  1801.5s] BATTERY_DONE {"log_dir": "/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/logs/battery_20261004_202712", "ok": false}

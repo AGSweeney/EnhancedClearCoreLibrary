@@ -1,0 +1,55 @@
+{
+  "cycle": 2,
+  "t_start_s": 50.726,
+  "steps": {
+    "origin_pre": true,
+    "bridge_ready": true,
+    "bridge_fjt": true,
+    "bridge_cancel": true,
+    "origin_mid": true,
+    "jtc_ready": true,
+    "jtc": true,
+    "origin_post": true
+  },
+  "metrics": {
+    "bridge_peak_abs_yx_mm": 0.006251037120819092,
+    "jtc_peak_abs_yx_mm_from_sampler": 0.006251037120819092,
+    "jtc_reported_endpoint": {
+      "reported_end_x_mm": -0.119,
+      "reported_end_y_mm": -0.119,
+      "reported_peak_abs_yx_mm": 0.006,
+      "result_line": "[INFO] [1791158241.823675021] [send_trajectory_goal]: result status=SUCCEEDED error_code=0 (SUCCESSFUL) Goal successfully reached!",
+      "samples_line": "[INFO] [1791158241.837653128] [send_trajectory_goal]: samples=202 x_mm=[-0.14, 30.14] y_mm=[-0.14, 30.14] peak_|Y-X|_mm=0.006 end_mm=(-0.119, -0.119)",
+      "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+      "separate_from": "session_origin_check"
+    },
+    "origin_return": {
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "err_mm": 0.0,
+      "ok": true,
+      "measurement": "generated-step / PositionRefCommanded (not shaft encoder)",
+      "separate_from": "jtc_reported_endpoint"
+    },
+    "bridge_state_gaps": {
+      "sample_count": 120,
+      "gap_max_ms": 81.05401000000256,
+      "gap_mean_ms": 49.99859673949579,
+      "gaps_over_150ms": 0,
+      "gaps_over_150ms_values": []
+    },
+    "jtc_state_gaps": {
+      "sample_count": 305,
+      "gap_max_ms": 29.710582999996404,
+      "gap_mean_ms": 19.999912082237053,
+      "gaps_over_150ms": 0,
+      "gaps_over_150ms_values": []
+    }
+  },
+  "measurement_note": "Peak |Y-X|, JTC reported endpoint, and session origin checks are generated-step / PositionRefCommanded values, not shaft-encoder measurements. JTC reported endpoint is kept separate from the later origin check.",
+  "ok": true,
+  "t_end_s": 83.789,
+  "reconnects_this_cycle": 0,
+  "watchdog_events_this_cycle": 0,
+  "alert_events_this_cycle": 2
+}

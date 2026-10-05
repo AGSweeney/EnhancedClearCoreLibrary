@@ -1,0 +1,5 @@
+[     0.0s] start {"duration_s": 1800, "seed": 1791165603, "host": "172.16.82.114"}
+[     4.0s] jtc action ready
+[     6.0s] get_status failed {"error": "timed out"}
+[     6.0s] board not enabled after JTC start {"status": {}}
+[     8.0s] end-of-run status (before ROS teardown) {"enabled": null, "alerts": null}

@@ -1,0 +1,41 @@
+{
+  "label": "origin_mid",
+  "note": "Status immediately before clear_alerts",
+  "status": {
+    "enabled": true,
+    "moving": false,
+    "estop": false,
+    "fault": false,
+    "watchdog": false,
+    "test_mode": false,
+    "axis_mask": 3,
+    "alert_reg": 0,
+    "alerts": "none",
+    "travel_limit": "none",
+    "xrce": "off",
+    "xrce_time": "unsync",
+    "last_cmd_seq": 236,
+    "tcp_session_accepts": 2108,
+    "tcp_session_closes": 2107,
+    "tcp_stream_accepts": 497,
+    "tcp_stream_closes": 497,
+    "position": [
+      0.0056,
+      0.0056,
+      0.0,
+      0.0
+    ],
+    "velocity": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "effort": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}

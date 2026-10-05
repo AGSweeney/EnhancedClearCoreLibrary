@@ -1,0 +1,100 @@
+{
+  "status_end_before_teardown": {
+    "error": "timed out"
+  },
+  "final_after_disable": {
+    "enabled": false,
+    "moving": false,
+    "estop": false,
+    "fault": false,
+    "watchdog": false,
+    "test_mode": false,
+    "axis_mask": 3,
+    "alert_reg": 0,
+    "alerts": "none",
+    "travel_limit": "none",
+    "xrce": "off",
+    "xrce_time": "unsync",
+    "last_cmd_seq": 619,
+    "tcp_session_accepts": 1848,
+    "tcp_session_closes": 1847,
+    "tcp_stream_accepts": 72,
+    "tcp_stream_closes": 72,
+    "position": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "velocity": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "effort": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "axes": [
+      {
+        "axis": 0,
+        "name": "x",
+        "on": true,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": false,
+        "status_enabled": false,
+        "steps_active": false,
+        "hlfb": "deasserted",
+        "hlfb_duty": 0.0
+      },
+      {
+        "axis": 1,
+        "name": "y",
+        "on": true,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": false,
+        "status_enabled": false,
+        "steps_active": false,
+        "hlfb": "deasserted",
+        "hlfb_duty": 0.0
+      },
+      {
+        "axis": 2,
+        "name": "z",
+        "on": false,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": false,
+        "status_enabled": false,
+        "steps_active": false,
+        "hlfb": "deasserted",
+        "hlfb_duty": 0.0
+      },
+      {
+        "axis": 3,
+        "name": "a",
+        "on": false,
+        "alert_reg": 0,
+        "motor_in_fault": false,
+        "alerts_present": false,
+        "status_enabled": false,
+        "steps_active": false,
+        "hlfb": "deasserted",
+        "hlfb_duty": 0.0
+      }
+    ]
+  },
+  "status_known": true,
+  "checks": {
+    "status_known": true,
+    "enabled_false": true,
+    "test_mode_false": true,
+    "names_default": true,
+    "axis_mask_3": true
+  }
+}

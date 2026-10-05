@@ -1,0 +1,9 @@
+{
+  "out": "D:\\CCDev\\EnhancedClearCoreLibrary\\ClearCoreROS\\logs\\diag_disable_hlfb_20261004.jsonl",
+  "events": 14,
+  "final_alerts": "none",
+  "final_fault": false,
+  "final_enabled": false,
+  "cleared_after_capture": false,
+  "note": "Latch left intact; inspect axes[].alert_reg / hlfb / motor_in_fault vs phase."
+}

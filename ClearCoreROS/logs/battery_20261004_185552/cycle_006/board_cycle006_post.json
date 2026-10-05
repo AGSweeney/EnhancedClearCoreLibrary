@@ -1,0 +1,124 @@
+{
+  "label": "cycle006_post",
+  "status": {
+    "enabled": false,
+    "moving": false,
+    "estop": false,
+    "fault": false,
+    "watchdog": false,
+    "test_mode": false,
+    "axis_mask": 3,
+    "alert_reg": 0,
+    "alerts": "none",
+    "travel_limit": "none",
+    "xrce": "off",
+    "xrce_time": "unsync",
+    "last_cmd_seq": 599,
+    "tcp_session_accepts": 854,
+    "tcp_session_closes": 853,
+    "tcp_stream_accepts": 426,
+    "tcp_stream_closes": 426,
+    "position": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "velocity": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "effort": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "config": {
+    "nvm": true,
+    "nvm_valid": true,
+    "nvm_version": 3,
+    "axis_mask": 3,
+    "steps_per_rev": [
+      800,
+      800,
+      800,
+      800
+    ],
+    "pitch_mm": [
+      5.0,
+      5.0,
+      5.0,
+      5.0
+    ],
+    "vel_steps": 27000,
+    "accel_steps": 250000,
+    "decel_steps": 250000,
+    "watchdog_ms": 500,
+    "estop_di6": 1,
+    "test_mode": false,
+    "enabled": false,
+    "network_mode": "static",
+    "ip_address": "172.16.82.114",
+    "netmask": "255.255.255.0",
+    "gateway": "172.16.82.1",
+    "limit_flags": 0,
+    "limits_min": [
+      -0.02,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "limits_max": [
+      0.03,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "pos_lim_di": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "neg_lim_di": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "names": [
+      "joint_x",
+      "joint_y",
+      "joint_z",
+      "joint_a"
+    ],
+    "rotary": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "direction": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "gear": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "offset": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}
