@@ -495,6 +495,11 @@ public:
     **/
     void SetCoordinatedSteps(int32_t steps);
 
+    /** ClearHPGL: steps requested beyond the per-sample limit (carried, not lost), total. **/
+    uint32_t CoordinatedExcessSteps() const {
+        return m_coordExcessTotal;
+    }
+
     /**
         \brief True when CPM_MODE_QUAD_AB has no counts/edges left to emit.
 
@@ -1789,6 +1794,11 @@ protected:
 
     // Coordinated motion support
     bool m_coordinatedMode;
+    /* ClearHPGL: requests above m_stepsPerSampleMax used to be clipped and the excess
+     * discarded while the controller's position had already advanced, so the motor lost
+     * position for good. The excess is now carried into the following samples. */
+    int32_t m_coordCarry;
+    uint32_t m_coordExcessTotal;
     CoordinatedMotionController* m_coordinatedController;
     MotorDriver* m_coordinatedMotorX;  // X-axis motor in coordinated pair
     MotorDriver* m_coordinatedMotorY;   // Y-axis motor in coordinated pair

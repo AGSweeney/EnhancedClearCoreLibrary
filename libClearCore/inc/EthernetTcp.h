@@ -34,8 +34,11 @@ namespace ClearCore {
 
 /** The maximum number of allowable client connections at any given time. **/
 #define CLIENT_MAX 8
-/** The size of the buffer to hold incoming TCP data, in bytes. **/
-#define TCP_DATA_BUFFER_SIZE 600
+/** The size of the buffer to hold incoming TCP data, in bytes.
+    ClearHPGL: must hold a full receive window (TCP_WND = 4 * MSS = 5840). With the
+    original 600 bytes, any segment larger than the free space was refused with ERR_BUF
+    and a full-size (1460-byte) segment could never fit, so the connection stalled. **/
+#define TCP_DATA_BUFFER_SIZE 6144
 
 /**
     \brief A base class for an Ethernet TCP connection.

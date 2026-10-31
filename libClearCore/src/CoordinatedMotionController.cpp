@@ -25,6 +25,8 @@
 #include "SysTiming.h"
 #include "UnitConverter.h"
 #include <math.h>
+#include <sam.h>
+#include <string.h>
 
 namespace ClearCore {
 
@@ -106,6 +108,11 @@ CoordinatedMotionController::CoordinatedMotionController()
       m_junctionDeviationSteps(1.0),
       m_junctionDVmax(0),
       m_stopAtQueueEnd(false),
+      m_burstCount(0),
+      m_maxIrqOffCycles(0),
+      m_maxUpdateGapCycles(0),
+      m_lateUpdates(0),
+      m_lastUpdateCycles(0),
       m_deferQueueStart(false),
       m_activeTargetX(0),
       m_activeTargetY(0),
@@ -141,6 +148,10 @@ bool CoordinatedMotionController::Initialize(MotorDriver* motorX, MotorDriver* m
     if (motorX == nullptr || motorY == nullptr) {
         return false;
     }
+    /* ClearHPGL timing probe: enable the Cortex-M4 cycle counter. */
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
     
     m_motorX = motorX;
     m_motorY = motorY;
@@ -329,6 +340,20 @@ void CoordinatedMotionController::UpdateFast() {
     if (!m_initialized) {
         return;
     }
+    {
+        /* ClearHPGL timing probe: this runs once per TCC0 period (200 us = 24000 cycles). */
+        const uint32_t now = DWT->CYCCNT;
+        const uint32_t gap = now - m_lastUpdateCycles;
+        if (m_lastUpdateCycles != 0 && m_active) {
+            if (gap > m_maxUpdateGapCycles) {
+                m_maxUpdateGapCycles = gap;
+            }
+            if (gap > 24000u + 6000u) {  /* more than 50 us late */
+                m_lateUpdates++;
+            }
+        }
+        m_lastUpdateCycles = now;
+    }
     
     // If stop counter is active, continue sending zero steps to clear hardware buffer
     if (m_stopCounter > 0) {
@@ -429,6 +454,10 @@ void CoordinatedMotionController::UpdateFast() {
             }
         }
         
+        if (stepsX > BURST_THRESHOLD || stepsX < -BURST_THRESHOLD || stepsY > BURST_THRESHOLD ||
+            stepsY < -BURST_THRESHOLD) {
+            RecordBurst(stepsX, stepsY);
+        }
         // Apply steps to motors
         m_motorX->SetCoordinatedSteps(stepsX);
         m_motorY->SetCoordinatedSteps(stepsY);
@@ -486,6 +515,37 @@ void CoordinatedMotionController::UpdateFast() {
             m_stopCounter = m_stopAtQueueEnd ? 10 : 0;
         }
     }
+}
+
+void CoordinatedMotionController::RecordBurst(int32_t stepsX, int32_t stepsY) {
+    BurstEvent &e = m_burstLog[m_burstCount % BURST_LOG_SIZE];
+    e.ms = Milliseconds();
+    e.queued = m_motionQueueCount;
+    e.stepsX = stepsX;
+    e.stepsY = stepsY;
+    e.path = 0;
+    if (m_motionType == MOTION_TYPE_LINEAR) {
+        int32_t lx, ly;
+        m_linearInterpolator.DebugState(e.startX, e.startY, e.endX, e.endY, lx, ly, e.entry, e.exitSpeed,
+                                        e.nominal);
+        e.lastX = lx - stepsX;
+        e.lastY = ly - stepsY;
+        e.path = (m_linearInterpolator.StepsRemaining() == 0 && lx == e.endX && ly == e.endY) ? 1 : 0;
+    } else {
+        e.startX = e.startY = e.endX = e.endY = e.lastX = e.lastY = 0;
+        e.entry = e.exitSpeed = e.nominal = 0;
+        e.path = 2;
+    }
+    m_burstCount++;
+}
+
+uint8_t CoordinatedMotionController::BurstLog(BurstEvent *out, uint8_t max) const {
+    const uint32_t count = m_burstCount;
+    uint8_t n = 0;
+    for (uint32_t i = 0; i < BURST_LOG_SIZE && i < count && n < max; i++) {
+        out[n++] = m_burstLog[(count - 1 - i) % BURST_LOG_SIZE];
+    }
+    return n;
 }
 
 bool CoordinatedMotionController::ProcessNextArc() {
@@ -791,6 +851,7 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
 
     // Planner-enabled path
     __disable_irq();
+    const uint32_t irqOffStart = DWT->CYCCNT;  // ClearHPGL timing probe
     if (m_motionQueueCount >= ARC_QUEUE_SIZE) {
         __enable_irq();
         return false;
@@ -843,14 +904,23 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
     motion.valid = true;
     m_motionQueueTail = (tail + 1) % ARC_QUEUE_SIZE;
     m_motionQueueCount++;
-    if (kUseGrblPlanner) {
-        RecalculatePlanner();
-    }
-    if (!m_active && !m_deferQueueStart) {
-        bool started = ProcessNextMotion();
-        m_active = started;
+    {
+        const uint32_t off = DWT->CYCCNT - irqOffStart;  // ClearHPGL timing probe
+        if (off > m_maxIrqOffCycles) {
+            m_maxIrqOffCycles = off;
+        }
     }
     __enable_irq();
+    if (kUseGrblPlanner) {
+        PlanQueue();  // interrupts enabled; see PlanQueue()
+    }
+    if (!m_deferQueueStart) {
+        __disable_irq();
+        if (!m_active) {
+            m_active = ProcessNextMotion();
+        }
+        __enable_irq();
+    }
     return true;
 }
 
@@ -912,6 +982,7 @@ bool CoordinatedMotionController::QueueLinear(int32_t endX, int32_t endY) {
 
     // Planner-enabled path
     __disable_irq();
+    const uint32_t irqOffStart = DWT->CYCCNT;  // ClearHPGL timing probe
     if (m_motionQueueCount >= ARC_QUEUE_SIZE) {
         __enable_irq();
         return false;
@@ -952,14 +1023,23 @@ bool CoordinatedMotionController::QueueLinear(int32_t endX, int32_t endY) {
     motion.valid = true;
     m_motionQueueTail = (tail + 1) % ARC_QUEUE_SIZE;
     m_motionQueueCount++;
-    if (kUseGrblPlanner) {
-        RecalculatePlanner();
-    }
-    if (!m_active && !m_deferQueueStart) {
-        bool started = ProcessNextMotion();
-        m_active = started;
+    {
+        const uint32_t off = DWT->CYCCNT - irqOffStart;  // ClearHPGL timing probe
+        if (off > m_maxIrqOffCycles) {
+            m_maxIrqOffCycles = off;
+        }
     }
     __enable_irq();
+    if (kUseGrblPlanner) {
+        PlanQueue();  // interrupts enabled; see PlanQueue()
+    }
+    if (!m_deferQueueStart) {
+        __disable_irq();
+        if (!m_active) {
+            m_active = ProcessNextMotion();
+        }
+        __enable_irq();
+    }
     return true;
 }
 
@@ -968,14 +1048,14 @@ void CoordinatedMotionController::RecalculatePlanner() {
         return;  // Planner disabled, exit early
     }
     
-    if (m_motionQueueCount == 0) {
-        m_motionQueuePlanned = m_motionQueueHead;  // Reset planned pointer
+    if (m_planCount == 0) {
+        m_planPlanned = m_planHead;  // Reset planned pointer
         return;
     }
     
     uint8_t order[ARC_QUEUE_SIZE];
-    uint8_t count = m_motionQueueCount;
-    uint8_t idx = m_motionQueueHead;
+    uint8_t count = m_planCount;
+    uint8_t idx = m_planHead;
     for (uint8_t i = 0; i < count; i++) {
         order[i] = idx;
         idx = (idx + 1) % ARC_QUEUE_SIZE;
@@ -984,10 +1064,10 @@ void CoordinatedMotionController::RecalculatePlanner() {
     // Optimization: Start planning from planned pointer, not from head
     // Only recalculate blocks that could be affected by new additions
     uint8_t plannedIdx = 0;
-    if (kUseGrblPlanner && m_motionQueuePlanned != m_motionQueueHead) {
+    if (kUseGrblPlanner && m_planPlanned != m_planHead) {
         // Find where planned pointer is in the order array
         for (uint8_t i = 0; i < count; i++) {
-            if (order[i] == m_motionQueuePlanned) {
+            if (order[i] == m_planPlanned) {
                 plannedIdx = i;
                 break;
             }
@@ -1033,7 +1113,7 @@ void CoordinatedMotionController::RecalculatePlanner() {
     // Step 1: Calculate initial junction-limited entry speeds (in squared space for efficiency)
     // Work from planned pointer forward to optimize performance
     for (uint8_t i = plannedIdx; i < count; i++) {
-        QueuedMotion &cur = m_motionQueue[order[i]];
+        QueuedMotion &cur = m_planWork[order[i]];
         double nominalSqr = (double)cur.nominalSpeed * (double)cur.nominalSpeed;
         double maxEntrySqr = nominalSqr;
         
@@ -1043,7 +1123,7 @@ void CoordinatedMotionController::RecalculatePlanner() {
             // First queued segment: use active motion exit speed
             maxEntrySqr = activeExitSpeedSqr;
         } else if (i > 0) {
-            QueuedMotion &prev = m_motionQueue[order[i - 1]];
+            QueuedMotion &prev = m_planWork[order[i - 1]];
 
             // Direction-change vector at the junction (unit scale: each component in [-2, 2]).
             double dDirX = (double)cur.entryDirX - (double)prev.exitDirX;
@@ -1120,21 +1200,21 @@ void CoordinatedMotionController::RecalculatePlanner() {
         if (i + 1 < count) {
             // Look ahead: there IS a next move
             // Exit speed = next segment's entry speed (junction speed)
-            m_motionQueue[order[i]].exitSpeed = m_motionQueue[order[i + 1]].entrySpeed;
+            m_planWork[order[i]].exitSpeed = m_planWork[order[i + 1]].entrySpeed;
         } else {
             // Look ahead tail behavior:
             // - stop mode: force full stop
             // - continuous mode: keep rolling speed so a following queued block can blend in
-            m_motionQueue[order[i]].exitSpeed = m_stopAtQueueEnd
+            m_planWork[order[i]].exitSpeed = m_stopAtQueueEnd
                 ? 0
-                : m_motionQueue[order[i]].entrySpeed;
+                : m_planWork[order[i]].entrySpeed;
         }
     }
     
     // Step 3: Backward pass - verify deceleration is possible (work in squared space)
     // Work backwards from last block to planned pointer.
     if (count > 0) {
-        QueuedMotion &last = m_motionQueue[order[count - 1]];
+        QueuedMotion &last = m_planWork[order[count - 1]];
         // Last block: maximum entry speed that allows transition to its configured exit speed.
         if (last.lengthSteps > 0 && m_accelMax > 0) {
             double exitSqr = (double)last.exitSpeed * (double)last.exitSpeed;
@@ -1152,8 +1232,8 @@ void CoordinatedMotionController::RecalculatePlanner() {
     
     // Continue backward pass for remaining blocks
     for (int i = (int)count - 2; i >= (int)plannedIdx; i--) {
-        QueuedMotion &cur = m_motionQueue[order[i]];
-        QueuedMotion &next = m_motionQueue[order[i + 1]];
+        QueuedMotion &cur = m_planWork[order[i]];
+        QueuedMotion &next = m_planWork[order[i + 1]];
         
         // Work in squared space: entry_speed_sqr = next.entry_speed_sqr + 2 * accel * distance
         double nextEntrySqr = (double)next.entrySpeed * (double)next.entrySpeed;
@@ -1185,8 +1265,8 @@ void CoordinatedMotionController::RecalculatePlanner() {
     // Work forward from planned pointer, can increase speeds when possible
     uint8_t optimalPlanned = plannedIdx;  // Track optimal planned pointer
     for (uint8_t i = plannedIdx + 1; i < count; i++) {
-        QueuedMotion &prev = m_motionQueue[order[i - 1]];
-        QueuedMotion &cur = m_motionQueue[order[i]];
+        QueuedMotion &prev = m_planWork[order[i - 1]];
+        QueuedMotion &cur = m_planWork[order[i]];
         
         // Work in squared space
         double prevEntrySqr = (double)prev.entrySpeed * (double)prev.entrySpeed;
@@ -1222,15 +1302,15 @@ void CoordinatedMotionController::RecalculatePlanner() {
     
     // Update planned pointer to skip optimally planned blocks next time
     if (optimalPlanned < count) {
-        m_motionQueuePlanned = order[optimalPlanned];
+        m_planPlanned = order[optimalPlanned];
     } else {
-        m_motionQueuePlanned = m_motionQueueHead;
+        m_planPlanned = m_planHead;
     }
     
     // Step 5: Handle active motion transition (first segment)
     // If active motion exists, ensure first queued segment can transition smoothly
     if (m_active && count > 0) {
-        QueuedMotion &first = m_motionQueue[order[0]];
+        QueuedMotion &first = m_planWork[order[0]];
         
         // Work in squared space
         double firstEntrySqr = (double)first.entrySpeed * (double)first.entrySpeed;
@@ -1245,7 +1325,7 @@ void CoordinatedMotionController::RecalculatePlanner() {
     
     // Step 6: Final validation - ensure all speeds are within bounds
     for (uint8_t i = 0; i < count; i++) {
-        QueuedMotion &cur = m_motionQueue[order[i]];
+        QueuedMotion &cur = m_planWork[order[i]];
         
         // Ensure entry speed doesn't exceed nominal
         if (cur.entrySpeed > cur.nominalSpeed) {
@@ -1267,7 +1347,35 @@ void CoordinatedMotionController::RecalculatePlanner() {
         // Note: entrySpeed and exitSpeed are uint32_t (unsigned), so they cannot be negative
         // No need to check for negative values
     }
+}
 
+// ClearHPGL: the planner used to run inside QueueLinear/QueueArc with interrupts disabled.
+// It is double-precision software maths over the whole queue (measured: up to 204 us with
+// IRQs off), which held off the TCC0 period interrupt that writes the step counts. A late
+// CCBUF write straddling the period boundary made the step gate miss its compare and stay
+// open for a full period: ~100 extra step pulses (1/8 rev) the controller never commanded,
+// on small fast arcs where segments are queued fastest. Now: snapshot the queue with IRQs
+// off (a few us), plan the copy with IRQs on, and commit only the speeds with IRQs off,
+// skipping blocks the ISR has already taken.
+void CoordinatedMotionController::PlanQueue() {
+    __disable_irq();
+    memcpy(m_planWork, (const void *)m_motionQueue, sizeof(m_planWork));
+    m_planHead = m_motionQueueHead;
+    m_planCount = m_motionQueueCount;
+    m_planPlanned = m_motionQueuePlanned;
+    __enable_irq();
+
+    RecalculatePlanner();
+
+    __disable_irq();
+    for (uint8_t i = 0; i < m_planCount; i++) {
+        const uint8_t idx = (m_planHead + i) % ARC_QUEUE_SIZE;
+        if (m_motionQueue[idx].valid && m_planWork[idx].valid) {
+            m_motionQueue[idx].entrySpeed = m_planWork[idx].entrySpeed;
+            m_motionQueue[idx].exitSpeed = m_planWork[idx].exitSpeed;
+        }
+    }
+    m_motionQueuePlanned = m_motionQueue[m_planPlanned].valid ? m_planPlanned : m_motionQueueHead;
     // Active segment was started with exitSpeed=0; once a successor is queued, blend out at
     // junction speed instead of decelerating to a full stop at a batch boundary.
     if (m_active && m_motionQueueCount > 0) {
@@ -1281,6 +1389,7 @@ void CoordinatedMotionController::RecalculatePlanner() {
             }
         }
     }
+    __enable_irq();
 }
 
 bool CoordinatedMotionController::ProcessNextMotion() {
