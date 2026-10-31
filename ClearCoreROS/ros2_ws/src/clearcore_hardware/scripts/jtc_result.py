@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """JTC result predicate used by send_trajectory_goal.py.
 
 STATUS_SUCCEEDED is action_msgs/GoalStatus. RESULT_SUCCESSFUL is

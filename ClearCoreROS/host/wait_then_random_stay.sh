@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 # Wait for the bring-up battery to finish, then start stay-enabled random ROS moves.
 set -eo pipefail
 LOG=/mnt/d/CCDev/EnhancedClearCoreLibrary/ClearCoreROS/logs/battery_20261004_202712

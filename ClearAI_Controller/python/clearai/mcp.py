@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """python -m clearai.mcp — Cursor stdio MCP over Ethernet (UDP discover + TCP 9100)."""
 
 from __future__ import annotations

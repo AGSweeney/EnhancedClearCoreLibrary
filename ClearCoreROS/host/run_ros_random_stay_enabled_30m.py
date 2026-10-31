@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """30-minute ROS control endurance: random XY goals, stay connected and enabled.
 
 Launches joint_trajectory_controller once. Sends FollowJointTrajectory goals for

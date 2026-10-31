@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """
 Generate a ClearCNC G-code program: ~1 hour of random X moves between 0 and 7",
 random feed 10–500 ipm, X axis only (no Y/Z/A words).

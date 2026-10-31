@@ -1,3 +1,5 @@
+/* MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com> */
+
 // EXCERPT — source: ClearCNC_Controller/ClearCoreFirmware/ClearCNC_Firmware.cpp
 // EVIDENCE: E1 | symbol: StartMotionBlock coordinated batch | lines: 1663-1711
 

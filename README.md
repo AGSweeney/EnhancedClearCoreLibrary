@@ -92,4 +92,4 @@ Windows tools for flashing firmware via USB (see `Tools/README.md`):
 
 ## License
 
-The ClearCore library is provided under the MIT License. New coordinated motion and unit conversion features are also licensed under the MIT License with copyright attribution to Adam G. Sweeney <agsweeney@gmail.com>.
+The ClearCore library is provided under the MIT License (Copyright (c) 2020 Teknic, Inc.). The additions in this fork (coordinated motion, unit conversion and the fixes in `MODIFICATIONS.md`) and the controller projects are also MIT licensed, Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>. See [LICENSE](LICENSE). Microchip ASF, lwIP, jsmn and the bundled tools keep their own licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

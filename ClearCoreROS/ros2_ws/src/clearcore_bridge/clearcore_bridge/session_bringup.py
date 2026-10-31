@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Session bring-up shared by the bridge node and simulated-host tests.
 
 No ROS imports. Keepalive is not recovery; clear_alerts is.

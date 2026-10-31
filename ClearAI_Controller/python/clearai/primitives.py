@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Code as Policies primitive surface matching firmware method names."""
 
 from __future__ import annotations

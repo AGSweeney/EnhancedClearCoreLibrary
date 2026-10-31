@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Test motion/diagnostics enhancements: jog_velocity/jog_stop, alert decoding,
 motion log, uptime/counters/distance, batched moves, and move timing."""
 

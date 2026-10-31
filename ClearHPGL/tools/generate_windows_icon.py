@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Regenerate resources/icons/clearcnc_app_icon.ico from the SVG (run when art changes)."""
 from __future__ import annotations
 

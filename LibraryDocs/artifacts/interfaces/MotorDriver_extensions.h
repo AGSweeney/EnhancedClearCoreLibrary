@@ -1,3 +1,5 @@
+/* MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com> */
+
 // EXCERPT — source: libClearCore/inc/MotorDriver.h
 // EVIDENCE: E1 | symbol: CoordinatedMotionMode | lines: 457-522
 

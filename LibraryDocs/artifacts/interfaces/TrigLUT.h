@@ -1,3 +1,5 @@
+/* MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com> */
+
 // EXCERPT — source: libClearCore/inc/TrigLUT.h
 // EVIDENCE: E1 | symbol: SinQx | lines: 37-59
 

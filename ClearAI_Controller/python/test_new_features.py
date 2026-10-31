@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Test A-axis units, HLFB torque readback, and queue introspection/flush."""
 
 from __future__ import annotations

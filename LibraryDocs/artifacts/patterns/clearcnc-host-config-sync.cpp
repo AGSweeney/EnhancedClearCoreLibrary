@@ -1,3 +1,5 @@
+/* MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com> */
+
 // EXCERPT — source: ClearCNC_Controller/QtController/src/MainWindow.cpp
 // EVIDENCE: E1 | symbol: host CONFIG sync | lines: 1253-1281
 

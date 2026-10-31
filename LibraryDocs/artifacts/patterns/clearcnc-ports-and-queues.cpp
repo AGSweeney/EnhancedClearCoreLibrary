@@ -1,3 +1,5 @@
+/* MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com> */
+
 // EXCERPT — source: ClearCNC_Controller/ClearCoreFirmware/ClearCNC_Firmware.cpp
 // EVIDENCE: E1 | symbol: MOTION_QUEUE_SIZE / ETHERNET ports | lines: 64-96
 

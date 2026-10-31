@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Capture per-axis alert_reg / HLFB / MotorInFault around disable.
 
 Distinguishes a fault latched during motion from one appearing during or after

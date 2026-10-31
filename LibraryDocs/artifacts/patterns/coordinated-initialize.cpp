@@ -1,3 +1,5 @@
+/* MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com> */
+
 // EXCERPT — source: libClearCore/src/CoordinatedMotionController.cpp
 // EVIDENCE: E1 | symbol: CoordinatedMotionController::Initialize | lines: 140-163
 

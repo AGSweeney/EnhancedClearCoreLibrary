@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Quick verification of sub-step residual tracking: many relative moves whose
 mm->step conversion does NOT divide evenly, then return to 0. Without the
 residual fix the commanded pose drifts; with the fix it should return to ~0."""

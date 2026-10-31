@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """MCP stdio server over Ethernet: UDP discover, then TCP JSON-RPC on 9100."""
 
 from __future__ import annotations

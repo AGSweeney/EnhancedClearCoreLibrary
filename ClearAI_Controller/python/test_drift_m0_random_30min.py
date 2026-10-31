@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Extended random drift test for M0 (~30 minutes). Completely random large
 moves (random size 20-60mm, random direction, random feed, occasional dwells),
 then a single return move to bring the commanded net back to 0 at the end.

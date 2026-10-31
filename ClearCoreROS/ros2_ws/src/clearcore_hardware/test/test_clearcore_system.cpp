@@ -1,3 +1,5 @@
+/* MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com> */
+
 /* ClearCoreSystemHardware against localhost session and stream sockets. */
 
 #include "clearcore_hardware/clearcore_system.hpp"

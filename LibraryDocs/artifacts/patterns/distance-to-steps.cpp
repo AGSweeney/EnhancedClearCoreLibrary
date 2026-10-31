@@ -1,3 +1,5 @@
+/* MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com> */
+
 // EXCERPT — source: libClearCore/src/UnitConverter.cpp
 // EVIDENCE: E1 | symbol: UnitConverter::DistanceToSteps | lines: 35-60
 

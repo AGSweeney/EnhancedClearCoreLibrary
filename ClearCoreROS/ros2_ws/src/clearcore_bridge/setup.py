@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 from setuptools import setup
 
 package_name = "clearcore_bridge"

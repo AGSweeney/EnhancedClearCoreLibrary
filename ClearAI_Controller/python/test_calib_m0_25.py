@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """25-move calibration series for M0. All moves are whole-revolution multiples (5mm/rev).
 Net commanded displacement = +50mm = +10 rev = +8000 counts (at 800 counts/rev).
 User re-zeros the MSP count beforehand, then reports the final count."""

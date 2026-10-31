@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """
 Scale G-code geometry words by a factor.
 

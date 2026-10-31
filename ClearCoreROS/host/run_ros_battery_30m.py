@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """30-minute ClearCoreROS hardware battery with detailed logging.
 
 Captures completed cycles, failures, reconnects; peak |Y-X| and return-position

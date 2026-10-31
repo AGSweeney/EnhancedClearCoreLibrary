@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """XRCE JointState body checks without a board or UDP socket."""
 
 from __future__ import annotations

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Send the bench XY goal to joint_trajectory_controller and print the result.
 
 The trajectory is joint_x and joint_y: (0.03, 0.03) m at 2 s, then (0, 0) at 4 s.

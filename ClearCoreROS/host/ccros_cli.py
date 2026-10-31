@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Bench client for ClearCoreROS. Does not import ROS."""
 
 from __future__ import annotations

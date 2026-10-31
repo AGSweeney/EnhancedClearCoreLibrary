@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """ClearAI host: JSON-RPC Lines client for Code as Policies gantry primitives."""
 
 from .client import ClearAiClient, TelemetryReader, discover
