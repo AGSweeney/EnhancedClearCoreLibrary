@@ -31,6 +31,7 @@
 #define __SERIALUSB_H__
 
 #include <inttypes.h>
+#include <stddef.h>
 #include "Connector.h"
 #include "ISerial.h"
 
@@ -162,6 +163,9 @@ public:
         \copydoc ISerial::PortIsOpen()
     **/
     bool PortIsOpen() override;
+
+    /** One line of receive-path counters and state, for diagnosing stalled input. (ClearHPGL) */
+    void RxDebugLine(char *buf, size_t len);
 
     /**
         \brief Set UART transmission parity format.

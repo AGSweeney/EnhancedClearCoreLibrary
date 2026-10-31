@@ -181,6 +181,7 @@ private:
     // Cached normalized direction vector
     double m_dirX;
     double m_dirY;
+    double m_progress = 0.0;   // distance travelled along the path (same metric as m_totalSteps)
     
     // Last step counts (for delta calculation)
     int32_t m_lastXSteps;

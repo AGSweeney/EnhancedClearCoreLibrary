@@ -25,6 +25,7 @@
 **/
 #include "SerialUsb.h"
 #include "UsbManager.h"
+#include <stdio.h>
 
 namespace ClearCore {
 
@@ -43,6 +44,19 @@ void SerialUsb::Flush() {
 
 bool SerialUsb::PortIsOpen() {
     return static_cast<bool>(UsbMgr);
+}
+
+void SerialUsb::RxDebugLine(char *buf, size_t len) {
+    const UsbManager::RxDebugInfo d = UsbMgr.RxDebug();
+    snprintf(buf, len,
+             "usb rx: completions=%lu zlp=%lu arms=%lu arm_fails=%lu last_arm_err=%ld last_rc=%lu "
+             "pending=%lu ring=%ld dtr=%d open=%d ep_state=%u ep_count=%lu/%lu hw_status=0x%02x "
+             "hw_intflag=0x%02x hw_cfg=0x%02x",
+             (unsigned long)d.completions, (unsigned long)d.zeroLength, (unsigned long)d.arms,
+             (unsigned long)d.armFails, (long)d.lastArmError, (unsigned long)d.lastRc,
+             (unsigned long)d.readBufAvail, (long)d.ringAvail, d.dtr ? 1 : 0, d.portOpen ? 1 : 0,
+             (unsigned)d.epState, (unsigned long)d.epCount, (unsigned long)d.epSize, (unsigned)d.hwStatus,
+             (unsigned)d.hwIntFlag, (unsigned)d.hwCfg);
 }
 
 void SerialUsb::PortOpen() {

@@ -185,6 +185,27 @@ public:
     static UsbManager &Instance();
 #endif
 
+    /** Receive-path counters and state, for diagnosing stalled USB input. (ClearHPGL) */
+    struct RxDebugInfo {
+        uint32_t completions;   ///< read transfers completed
+        uint32_t zeroLength;    ///< ...of which with no data (zero-length packet / abort)
+        uint32_t arms;          ///< read transfers started
+        uint32_t armFails;      ///< ...that the USB stack refused
+        int32_t lastArmError;   ///< return value of the last refused start
+        uint32_t lastRc;        ///< transfer code of the last completion
+        uint32_t readBufAvail;  ///< bytes received but not yet in the ring buffer
+        int32_t ringAvail;      ///< bytes in the ring buffer
+        bool dtr;
+        bool portOpen;
+        uint8_t epState;        ///< ASF state of the bulk OUT endpoint (usb_ep_state)
+        uint32_t epCount;       ///< ...bytes received in the current transfer
+        uint32_t epSize;        ///< ...size requested
+        uint8_t hwStatus;       ///< EPSTATUS of the OUT endpoint (bit 6 BK0RDY, 4 STALLRQ0)
+        uint8_t hwIntFlag;      ///< EPINTFLAG of the OUT endpoint
+        uint8_t hwCfg;          ///< EPCFG of the OUT endpoint
+    };
+    RxDebugInfo RxDebug();
+
     /**
         \brief Change the baud rate for the port.
 
@@ -290,6 +311,14 @@ private:
     usb_cdc_control_signal_t m_lineState;
     uint8_t *m_readBufPtr;
     uint32_t m_readBufAvail;
+    // Rx diagnostics (ClearHPGL)
+    volatile uint32_t m_rxCompletions = 0;
+    volatile uint32_t m_rxZeroLength = 0;
+    volatile uint32_t m_rxArms = 0;
+    volatile uint32_t m_rxArmFails = 0;
+    volatile int32_t m_rxLastArmError = 0;
+    volatile uint32_t m_rxLastRc = 0;
+    void ArmRead();
 
     bool m_portOpen;
 

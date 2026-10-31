@@ -1656,6 +1656,15 @@ int32_t _usb_d_dev_ep_init(const uint8_t ep, const uint8_t attr, const uint16_t 
 	ept->cache    = (uint8_t *)(dir ? pcfg->i_cache : pcfg->cache);
 	ept->size     = max_pkt_siz;
 	ept->flags.u8 = (ep_type + 1);
+	/* ClearHPGL fix: record the direction now. flags.u8 cleared it, and it was only set by the
+	 * first transfer. An IN endpoint sharing its number with an OUT endpoint (CDC bulk 0x81 and
+	 * 0x01) then looked like OUT to _usb_d_dev_handle_eps, which runs both on that number's
+	 * interrupt: the idle IN instance acknowledged the OUT endpoint's TRCPT0 and dropped the
+	 * packet (trans_done ignores it when not busy), so the real OUT read never completed and USB
+	 * input stopped for good. It shows when the board has not transmitted since enumeration
+	 * (e.g. host writes with DTR low) and an OUT packet arrives while a stale TRFAIL0 is pending
+	 * (the OUT instance handles TRFAIL0 first), i.e. after back-pressure. */
+	ept->flags.bits.dir = dir;
 	ept->ep       = ep;
 
 	return USB_OK;
