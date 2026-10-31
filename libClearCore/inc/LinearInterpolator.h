@@ -138,6 +138,20 @@ public:
         return m_stepsRemaining;
     }
 
+    /** ClearHPGL diagnostics: segment endpoints, last emitted position and planned speeds. **/
+    void DebugState(int32_t &sx, int32_t &sy, int32_t &ex, int32_t &ey, int32_t &lx, int32_t &ly,
+                    uint32_t &entry, uint32_t &exitSpeed, uint32_t &nominal) const {
+        sx = m_startX;
+        sy = m_startY;
+        ex = m_endX;
+        ey = m_endY;
+        lx = m_lastXSteps;
+        ly = m_lastYSteps;
+        entry = m_entrySpeed;
+        exitSpeed = m_exitSpeed;
+        nominal = m_velocityMax;
+    }
+
 private:
     // Current move parameters
     int32_t m_startX;

@@ -166,6 +166,8 @@ MotorDriver::MotorDriver(ShiftRegister::Masks enableMask,
       m_quadDirForward(true),
       m_inFault(false),
       m_coordinatedMode(false),
+      m_coordCarry(0),
+      m_coordExcessTotal(0),
       m_coordinatedController(nullptr),
       m_coordinatedMotorX(nullptr),
       m_coordinatedMotorY(nullptr),
@@ -623,12 +625,16 @@ void MotorDriver::SetCoordinatedSteps(int32_t steps) {
         return;
     }
     
+    // ClearHPGL: add steps carried over from earlier samples that exceeded the limit.
+    steps += m_coordCarry;
+    m_coordCarry = 0;
+
     // Set direction
     bool negDir = steps < 0;
     if (negDir) {
         steps = -steps;
     }
-    
+
     // Update direction output if changed
     // Access protected member m_direction from StepGenerator base class
     bool currentDir = StepGenerator::m_direction;
@@ -636,10 +642,14 @@ void MotorDriver::SetCoordinatedSteps(int32_t steps) {
         StepGenerator::m_direction = negDir;
         OutputDirection();
     }
-    
+
     // Set step count (limited to max steps per sample)
     uint32_t maxSteps = StepGenerator::m_stepsPerSampleMax;
     if (steps > (int32_t)maxSteps) {
+        /* Carry the excess instead of discarding it (see m_coordCarry). */
+        const int32_t excess = steps - (int32_t)maxSteps;
+        m_coordCarry += negDir ? -excess : excess;
+        m_coordExcessTotal += (uint32_t)excess;
         steps = maxSteps;
     }
 
@@ -651,7 +661,7 @@ void MotorDriver::SetCoordinatedSteps(int32_t steps) {
         // Queue up the steps
         UpdateBDuty();
     }
-    
+
     // Update position tracking
     int32_t stepDelta = negDir ? -steps : steps;
     StepGenerator::m_posnAbsolute += stepDelta;

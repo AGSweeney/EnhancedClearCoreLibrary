@@ -183,8 +183,9 @@ err_t TcpReceive(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
             tcpClientData->data[tcpClientData->dataTail] = pbuf_get_at(p, i);
             tcpClientData->dataTail = nextIndex;
         }
-        // Acknowledge the data was received.
-        tcp_recved(tcpClientData->pcb, bytesReceived);
+        // ClearHPGL: the window is reopened in EthernetTcpClient::Read() as the
+        // application consumes data, so a sender can never outrun the buffer.
+        (void)bytesReceived;
         // Must free the pbuf
         pbuf_free(p);
         return ERR_OK;

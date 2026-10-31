@@ -304,6 +304,35 @@ public:
         return m_motionQueueCount;  // Read volatile variable
     }
 
+    /** ClearHPGL diagnostics: a sample that asked for an unusually large step count. **/
+    struct BurstEvent {
+        uint32_t ms;
+        uint8_t path;      // 0 normal step, 1 end-of-segment clamp
+        uint8_t queued;    // planner blocks waiting
+        int32_t stepsX;
+        int32_t stepsY;
+        int32_t startX, startY, endX, endY;
+        int32_t lastX, lastY;  // emitted position before this sample
+        uint32_t entry, exitSpeed, nominal;
+    };
+    static const uint8_t BURST_LOG_SIZE = 8;
+    static const int32_t BURST_THRESHOLD = 16;
+    /** Copies up to max newest-first events; returns how many. **/
+    uint8_t BurstLog(BurstEvent *out, uint8_t max) const;
+    uint32_t BurstCount() const {
+        return m_burstCount;
+    }
+    /** ClearHPGL timing probe (CPU cycles, 120 MHz): longest interrupts-off stretch in
+        QueueLinear, and longest gap between UpdateFast calls (nominal 24000 = 200 us). **/
+    uint32_t MaxIrqOffCycles() const { return m_maxIrqOffCycles; }
+    uint32_t MaxUpdateGapCycles() const { return m_maxUpdateGapCycles; }
+    uint32_t LateUpdates() const { return m_lateUpdates; }
+    void ResetTimingProbe() {
+        m_maxIrqOffCycles = 0;
+        m_maxUpdateGapCycles = 0;
+        m_lateUpdates = 0;
+    }
+
     // ========== Unit Conversion Support ==========
     
     /**
@@ -564,6 +593,11 @@ private:
     // NOTE: Queue variables marked volatile because they're accessed from both
     // ISR context (UpdateFast) and main thread context (QueueArc/QueueLinear)
     QueuedMotion m_motionQueue[ARC_QUEUE_SIZE];
+    // ClearHPGL: planner works on a snapshot with interrupts enabled (see PlanQueue()).
+    QueuedMotion m_planWork[ARC_QUEUE_SIZE];
+    uint8_t m_planHead;
+    uint8_t m_planCount;
+    uint8_t m_planPlanned;
     volatile uint8_t m_motionQueueHead;
     volatile uint8_t m_motionQueueTail;
     volatile uint8_t m_motionQueueCount;
@@ -602,11 +636,19 @@ private:
     double m_junctionDeviationSteps;
     uint32_t m_junctionDVmax;       // Per-axis max delta-V at junctions (steps/sec); 0 = use angle method
     volatile bool m_stopAtQueueEnd;
+    BurstEvent m_burstLog[BURST_LOG_SIZE];
+    volatile uint32_t m_burstCount;
+    volatile uint32_t m_maxIrqOffCycles;
+    volatile uint32_t m_maxUpdateGapCycles;
+    volatile uint32_t m_lateUpdates;
+    uint32_t m_lastUpdateCycles;
+    void RecordBurst(int32_t stepsX, int32_t stepsY);
     bool m_deferQueueStart;
     int32_t m_activeTargetX;
     int32_t m_activeTargetY;
 
     void RecalculatePlanner();
+    void PlanQueue();
     volatile uint8_t m_stopCounter;  // Counter to continue sending zero steps after completion
     volatile int32_t m_currentX;  // Position updated from ISR, read from main thread
     volatile int32_t m_currentY;  // Position updated from ISR, read from main thread

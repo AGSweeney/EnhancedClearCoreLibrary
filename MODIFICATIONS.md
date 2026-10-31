@@ -140,6 +140,18 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 - Edges are paced by a state machine: **one edge per sample** (~200 µs at 5 kHz), no ISR busy-wait — avoids burst/gap trains that trip ClearPath "Step input timing error"
 - Prefer `MotorManager::CLOCK_RATE_NORMAL`; practical max QUAD rate ≈ sample rate / 4 (~1250 counts/s). Wait on `QuadratureOutputIdle()` after `StepsComplete()`.
 
+### 5. Coordinated step output and TCP receive fixes (from ClearHPGL, 2026-10-30)
+
+**Files**:
+- `libClearCore/inc/MotorDriver.h` / `libClearCore/src/MotorDriver.cpp` — `SetCoordinatedSteps()` carries steps above the per-sample limit into following samples (`m_coordCarry`) instead of discarding them; `CoordinatedExcessSteps()` reports the total.
+- `libClearCore/inc/EthernetTcp.h` — `TCP_DATA_BUFFER_SIZE` 600 → 6144 (holds a full `TCP_WND`).
+- `libClearCore/src/EthernetTcp.cpp` / `libClearCore/src/EthernetTcpClient.cpp` — `tcp_recved()` moved from the receive callback to `EthernetTcpClient::Read()`.
+- New-file changes (see NEW_FILES.md): `CoordinatedMotionController` (`PlanQueue()`, burst log, timing probe) and `LinearInterpolator` (`DebugState()`).
+
+**Why**:
+- **Extra step bursts on small arcs.** `QueueLinear()` / `QueueArc()` ran the double-precision planner with interrupts disabled (measured up to 204 µs, longer than one 200 µs TCC0 period). The TCC0 period interrupt that writes each motor's step count (CCBUF) was held off, the write straddled the period boundary, the compare was missed and the step gate stayed open for a full period: ~100 pulses (1/8 rev) in 0.2 ms that the controller neither commanded nor counted. `PlanQueue()` now plans a snapshot with interrupts enabled and commits only the speeds with interrupts off (measured after: 40 µs max IRQ-off, 207 µs max update gap, no extra pulses; a 12-circle job returned to within 8 encoder counts, same as squares).
+- **TCP connections stalling.** Each connection buffered 600 bytes and refused any segment that did not fit; a full 1460-byte segment never fits, so bulk transfers stalled permanently. The buffer now holds a full receive window and the window reopens only as the application reads, so TCP flow control applies.
+
 ## Summary
 
 **Total Modified Files**: 3 (+ QUAD_AB additions across Connector/MotorDriver/MotorManager/docs/example)

@@ -128,6 +128,10 @@ int16_t EthernetTcpClient::Read(uint8_t *dataPtr, uint32_t length) {
         dataPtr[bytesRead++] = m_tcpData->data[m_tcpData->dataHead];
         m_tcpData->dataHead = nextIndex;
     }
+    // ClearHPGL: reopen the receive window only for data the application has taken.
+    if (bytesRead > 0 && m_tcpData->pcb != nullptr) {
+        tcp_recved(m_tcpData->pcb, bytesRead);
+    }
     return bytesRead;
 }
 
