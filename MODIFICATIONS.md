@@ -152,6 +152,20 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 - **Extra step bursts on small arcs.** `QueueLinear()` / `QueueArc()` ran the double-precision planner with interrupts disabled (measured up to 204 µs, longer than one 200 µs TCC0 period). The TCC0 period interrupt that writes each motor's step count (CCBUF) was held off, the write straddled the period boundary, the compare was missed and the step gate stayed open for a full period: ~100 pulses (1/8 rev) in 0.2 ms that the controller neither commanded nor counted. `PlanQueue()` now plans a snapshot with interrupts enabled and commits only the speeds with interrupts off (measured after: 40 µs max IRQ-off, 207 µs max update gap, no extra pulses; a 12-circle job returned to within 8 encoder counts, same as squares).
 - **TCP connections stalling.** Each connection buffered 600 bytes and refused any segment that did not fit; a full 1460-byte segment never fits, so bulk transfers stalled permanently. The buffer now holds a full receive window and the window reopens only as the application reads, so TCP flow control applies.
 
+### 6. USB serial receive and linear interpolation fixes (from ClearHPGL, 2026-10-31)
+
+**Files**:
+- `libClearCore/hpl/usb/hpl_usb.c` — `_usb_d_dev_ep_init()` records the endpoint direction (`flags.bits.dir`).
+- `libClearCore/src/UsbManager.cpp` / `libClearCore/inc/UsbManager.h` — receive stays armed when DTR drops; a zero-length completion re-arms the read; all reads go through `ArmRead()`; receive counters and endpoint state in `RxDebug()`.
+- `libClearCore/src/SerialUsb.cpp` / `libClearCore/inc/SerialUsb.h` — `RxDebugLine()` formats `RxDebug()` for a console.
+- New-file change (see NEW_FILES.md): `LinearInterpolator` tracks progress along the segment exactly.
+
+**Why**:
+- **USB input stopping part-way through a transfer.** The CDC bulk IN (0x81) and bulk OUT (0x01) endpoints share endpoint number 1. Endpoint init cleared the direction bit, which only the first transfer set, so until the board transmitted, the IN endpoint looked like an OUT endpoint. The interrupt handler runs every endpoint instance on that number: when an OUT packet arrived with a stale TRFAIL0 pending (after NAKs during back-pressure), the real OUT endpoint handled TRFAIL0 only and the idle IN instance took the packet's TRCPT0, acknowledged it and dropped the data (not busy). The read never completed and every later packet was NAKed. Hosts that receive replies (DTR high) never hit it; `copy /b file COMn` (DTR low, nothing sent back) stalled at a different point each run. Found with a driver-level event trace.
+- **No USB input at all with DTR low.** Receive was stopped whenever DTR dropped and restarted only on DTR high, so after any client closed the port, or for a host that writes without DTR (Windows `copy`), input stopped for good. Transmit still requires DTR; the 1200-baud bootloader touch is unchanged.
+- **Zero-length packets.** The read buffer is one 64-byte packet; a host ends a transfer that is a multiple of 64 bytes with a zero-length packet, which completed the read with nothing to copy and never re-armed it.
+- **Motor fault on slow, nearly axis-aligned moves.** Each axis advanced by a per-sample increment rounded to Q15 and a segment ended only when both axes passed their end. On the minor axis of a nearly axis-aligned move at low speed the increment is a few Q15 units (2 instead of 2.4 for a 2-step X over an 8800-step Y at 20 mm/s), so it lagged, the major axis overran its end (1685 steps), and the end clamp moved it back in one 200 µs sample — a step burst the ClearPath faulted on. Progress along the path is now accumulated in double precision and both axes are computed from the start point every sample; the segment ends exactly when the progress reaches its length. Checked with the failing segment and 20,000 random segments at 5–300 mm/s (old: 1685-step overshoot, 207 segments not ending on target; new: no overshoot, never above the commanded speed, all on target).
+
 ## Summary
 
 **Total Modified Files**: 3 (+ QUAD_AB additions across Connector/MotorDriver/MotorManager/docs/example)
