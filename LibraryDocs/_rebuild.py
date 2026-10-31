@@ -292,7 +292,7 @@ last_updated: 2026-07-26
 | L06 | MotorDriver enhancements | library | libraries/motor-driver | libClearCore/inc/MotorDriver.h, libClearCore/src/MotorDriver.cpp | medium | MotorManager sample ISR | step/dir pins | A-L06-if, A-L06-pat | verified | E1 |
 | P01 | ClearCNC Firmware | project | project/subsystems/clearcnc-firmware | ClearCNC_Controller/ClearCoreFirmware/ClearCNC_Firmware.cpp | app-only | main loop | USB CDC, TCP 8888/8889, UDP 10040 | A-P01-pat, A-P01-main, A-P01-batch, A-P01-data | verified | E1 |
 | P02 | ClearCNC Qt Host | project | project/subsystems/clearcnc-host | ClearCNC_Controller/QtController/src/MainWindow.cpp, ClearCNC_Controller/QtController/src/main.cpp | app-only | Qt GUI thread | serial/TCP; QSettings | A-P02-pat | verified | E1 |
-| P03 | ClearHPGL | project | project/subsystems/clearhpgl | ClearHPGL/src/MainWindow.cpp, ClearHPGL/src/DxfImport.h | app-only | Qt GUI thread | serial/TCP; DXF files | — | verified | E1 |
+| P03 | ClearHPGL | project | project/subsystems/clearhpgl | moved: https://github.com/AGSweeney/ClearCore_HPGL | — | — | — | — | moved | — |
 | P04 | NewGControl | project | project/subsystems/newgcontrol | NewGControl/src/MainWindow.cpp, NewGControl/src/GrblProtocol.h | app-only | Qt GUI thread | serial/TCP; JSON snapshots | — | verified | E1 |
 | PL01 | Microchip Studio build | platform | platform/build | libClearCore/ClearCore.cppproj, libClearCore/ClearCore.atsln | n/a | — | flash image | A-PL01-bld | verified | E1 |
 | PL02 | ClearCore runtime | platform | platform/clearcore-runtime | libClearCore/inc/SysTiming.h, libClearCore/inc/ClearCore.h | n/a | SysManager UpdateFast | connectors M0–M3, I/O | A-PL02-if | verified | E1 |

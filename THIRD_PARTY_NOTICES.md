@@ -13,13 +13,12 @@ licences, and changes made to them here stay under the licence of the file they 
 | Microchip Advanced Software Framework (ASF) | `libClearCore/hal/`, `hpl/`, `hri/`, `usb/` | Microchip Technology Inc. and its subsidiaries | Microchip ASF licence, in each file's header (use with Microchip products) |
 | Microchip device startup and linker scripts | `*/Device_Startup/` | Microchip Technology Inc. | Apache-2.0 (`SPDX-License-Identifier` in each file) |
 | lwIP TCP/IP stack | `LwIP/` | Swedish Institute of Computer Science and contributors | BSD-style, in each file's header |
-| jsmn JSON tokenizer | `ClearAI_Controller/ClearCoreFirmware/third_party/jsmn/`, `ClearCoreROS/firmware/third_party/jsmn/` | Serge Zaitsev | MIT, in `jsmn.h` |
+| jsmn JSON tokenizer | `ClearAI_Controller/ClearCoreFirmware/third_party/jsmn/` | Serge Zaitsev | MIT, in `jsmn.h` |
 | ClearCore flash scripts | `Tools/flash_clearcore.cmd`, `Tools/flash_clearcore_loop.cmd` | Teknic, Inc. (authors Zachary Lebold, Nick Dawson) | Distributed with Teknic's ClearCore library (MIT) |
 | BOSSA flash utility | `Tools/bossac/bossac.exe` | BOSSA authors, <https://github.com/shumatech/BOSSA> | Upstream licence applies |
 | UF2 conversion tool | `Tools/uf2-builder/` | Distributed with Teknic's ClearCore library; UF2 format by Microsoft, <https://github.com/microsoft/uf2> | Upstream licence applies |
 
-The controller projects (`ClearCNC_Controller/`, `ClearAI_Controller/`, `ClearCoreROS/`,
-`ClearHPGL/`, `NewGControl/`), `LibraryDocs/`, `docs/` and the build scripts are by Adam G. Sweeney
+The controller projects (`ClearCNC_Controller/`, `ClearAI_Controller/`, `NewGControl/`), `LibraryDocs/`, `docs/` and the build scripts are by Adam G. Sweeney
 (MIT), apart from the third-party parts listed above.
 
 Changes made here to third-party files are documented in `MODIFICATIONS.md`. They include changes to

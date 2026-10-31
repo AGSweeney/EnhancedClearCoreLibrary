@@ -54,7 +54,7 @@ Ethernet support uses the LwIP stack. Use the ethernet API from libClearCore for
 | **GRBLCompatibleExample** | GRBL-style firmware: G0/G1/G2/G03, $ commands, jogging ($J=), homing ($H), gSender-friendly. Serial only. See `GRBLCompatibleExample/README.md`. |
 | **ProjectTemplate** | Minimal Microchip Studio template. Put your code in `main.cpp`. |
 | **ClearAI_Controller** | JSON-RPC Lines firmware so an LLM can command an XY gantry (Code as Policies primitives), plus ClearAI/LocoRix MCP servers. See `ClearAI_Controller/README.md` and `ClearAI_Controller/docs/`. |
-| **ClearCoreROS** | ClearCore firmware for M0–M3 as ROS 2 joints. JSON-RPC session, binary joint stream, NVM mechanics and static IP, per-axis joint name, direction, gear, and offset, soft limits and limit switches, coordinated XY lines and arcs, homing and probing, and an XRCE-DDS `JointState` publisher. Hardware runs have shown two-axis `FollowJointTrajectory` and `/joint_states` through a micro-ROS agent. See `ClearCoreROS/README.md`. |
+| **ClearCoreROS** | Moved to its own repository: [ClearCore_ROS](https://github.com/AGSweeney/ClearCore_ROS). |
 
 Open the matching `.atsln`, set the project as **Startup Project**, then **Start Without Debugging (Ctrl+Alt+F5)** to build, flash, and run.
 
@@ -89,6 +89,14 @@ Windows tools for flashing firmware via USB (see `Tools/README.md`):
 - **Motion streaming**: `MotionStreamingExample/README.md`, `MotionStreamingExample/STREAMING_GUIDE.md`
 - **GRBL-compatible example**: `GRBLCompatibleExample/README.md`
 - **New/modified files**: `NEW_FILES.md`, `MODIFICATIONS.md`
+
+## Moved projects
+
+These projects started here and now have their own repositories (their history up to the split
+remains in this one):
+
+- **ClearCoreROS**: [ClearCore_ROS](https://github.com/AGSweeney/ClearCore_ROS), ROS 2 joints on ClearCore.
+- **ClearHPGL**: [ClearCore_HPGL](https://github.com/AGSweeney/ClearCore_HPGL), HP-GL plotter firmware and desktop app.
 
 ## License
 

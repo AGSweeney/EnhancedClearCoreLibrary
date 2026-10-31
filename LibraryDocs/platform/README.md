@@ -22,7 +22,7 @@ Stack-inferred platform docs for this repository (create-librarydocs 2.1.0). Not
 | Target | Built | Bench/CI verified | Notable features | Notes |
 |--------|-------|-------------------|------------------|-------|
 | ClearCore SAME53 | Y | E4 (no bench artifact) | Coordinated XY, Ethernet | Primary MCU |
-| Windows x64 Qt host | Y | — | ClearCNC / ClearHPGL / NewGControl | Desktop |
+| Windows x64 Qt host | Y | — | ClearCNC / NewGControl | Desktop |
 
 ## Platform modules
 

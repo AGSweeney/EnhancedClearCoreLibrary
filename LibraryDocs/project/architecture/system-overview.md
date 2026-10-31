@@ -26,7 +26,7 @@ Enhanced ClearCore Library: Teknic `libClearCore` (SAME53) plus coordinated XY /
 | L01–L06 | Motion/unit libraries in `libClearCore` |
 | P01 | ClearCNC firmware |
 | P02 | ClearCNC Qt host |
-| P03 | ClearHPGL (ClearCNC + DXF/HPGL) |
+| P03 | ClearHPGL: moved to [ClearCore_HPGL](https://github.com/AGSweeney/ClearCore_HPGL) |
 | P04 | NewGControl (GRBL-family; separate protocol) |
 | PL01–PL03 | Microchip build, ClearCore runtime, Qt host build |
 

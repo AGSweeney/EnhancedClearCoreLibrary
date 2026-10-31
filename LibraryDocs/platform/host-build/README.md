@@ -16,7 +16,7 @@ status: verified
 
 # Host Qt build
 
-Windows desktop builds for ClearCNC (default); same CMake patterns for ClearHPGL / NewGControl.
+Windows desktop builds for ClearCNC (default); same CMake patterns for NewGControl.
 
 ## build.ps1 defaults
 
