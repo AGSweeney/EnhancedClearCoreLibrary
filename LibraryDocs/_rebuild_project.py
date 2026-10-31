@@ -16,7 +16,7 @@ write(
     "project/README.md",
     """# Project docs
 
-ClearCNC / ClearHPGL / NewGControl application knowledge.
+ClearCNC / NewGControl application knowledge (ClearHPGL moved to its own repository).
 
 | Area | Path |
 |------|------|
@@ -183,41 +183,16 @@ topics:
   - ClearHPGL
   - DXF
   - HPGL
-  - ClearCNC
-  - path-repair
 source_paths:
-  - ClearHPGL/src/MainWindow.cpp
-  - ClearHPGL/src/DxfImport.h
-  - ClearHPGL/CMakeLists.txt
-status: verified
+  - https://github.com/AGSweeney/ClearCore_HPGL
+status: moved
 ---
 
 # ClearHPGL
 
-Qt 6 ClearCNC-oriented host with DXF import, DXF→HPGL preview/export, and path-gap / issue repair.
-
-**App-only** — not linked to `libClearCore`; speaks ClearCNC line protocol.
-
-## Key modules
-
-| Module | Role |
-|--------|------|
-| `MainWindow` | Transport, machine, program, DXF UI |
-| `DxfImport` | ASCII DXF load |
-| `PathGapBridge` / `PathVizIssues` | Repair / markers |
-| Preview kinematics / 3D view | Visualization only |
-
-## Related
-
-[clearcnc-firmware](../clearcnc-firmware/README.md), [clearcnc-host](../clearcnc-host/README.md).
-
-## Source evidence
-
-| Claim | Evidence | Level |
-|-------|----------|-------|
-| Standalone Qt CMake target | `ClearHPGL/CMakeLists.txt` | E1 |
-| DXF import | `ClearHPGL/src/DxfImport.h` | E1 |
-| Host controls | `ClearHPGL/src/MainWindow.cpp` | E1 |
+Moved to its own repository: [ClearCore_HPGL](https://github.com/AGSweeney/ClearCore_HPGL). It is now HP-GL plotter firmware for
+ClearCore plus a Qt desktop app (DXF and HP-GL preview, plotting, monitoring); see that
+repository's README. The earlier app code that was here is in this repository's history.
 """,
 )
 

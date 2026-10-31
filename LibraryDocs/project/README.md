@@ -1,6 +1,6 @@
 # Project docs
 
-ClearCNC / ClearHPGL / NewGControl application knowledge.
+ClearCNC / NewGControl application knowledge (ClearHPGL moved to its own repository).
 
 | Area | Path |
 |------|------|
