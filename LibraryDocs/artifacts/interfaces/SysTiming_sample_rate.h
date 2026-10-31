@@ -1,3 +1,5 @@
+/* MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com> */
+
 // EXCERPT — source: libClearCore/inc/SysTiming.h
 // EVIDENCE: E1 | symbol: _CLEARCORE_SAMPLE_RATE_HZ | lines: 42-57
 

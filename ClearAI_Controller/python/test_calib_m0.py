@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Calibration move series for M0. Each move is a whole number of revolutions
 (5mm/rev, 800 counts/rev). User zeros the MSP position count beforehand, then
 reports the final count to compare against the commanded pose."""

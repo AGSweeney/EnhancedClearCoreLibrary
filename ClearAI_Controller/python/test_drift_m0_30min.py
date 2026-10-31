@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Extended drift test for M0 (~30 minutes). Runs a net-neutral cycle of varied
 move sizes repeatedly. Commanded final position should equal the start, so the
 expected MSP count (zeroed at start) is ~0. Any non-zero MSP reading at the end

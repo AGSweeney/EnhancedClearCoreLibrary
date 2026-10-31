@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Minimal XRCE-DDS agent checker.
 
 Accepts the ClearCore client, answers CREATE_CLIENT and CREATE, and prints

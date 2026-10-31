@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Walk IO-0..IO-5 outputs and verify read_inputs readback."""
 
 from __future__ import annotations

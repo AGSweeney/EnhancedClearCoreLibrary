@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """No-motion TCP reconnect stress for the Transport TcpData Close fix.
 
 Repeatedly opens session (and optionally stream), calls get_status/disable,

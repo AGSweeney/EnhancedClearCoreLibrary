@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Host-side checks for the motion bugs found in review."""
 
 from __future__ import annotations

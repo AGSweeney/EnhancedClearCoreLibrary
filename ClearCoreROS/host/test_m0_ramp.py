@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Local streaming diagnostic for M0.
 
 Compare generated position with the received reference advanced to the sample's

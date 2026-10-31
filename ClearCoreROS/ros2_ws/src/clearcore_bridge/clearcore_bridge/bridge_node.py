@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """ROS 2 node: JointState, Trigger services, and FollowJointTrajectory.
 
 The action samples the trajectory on time_from_start. Point velocities are

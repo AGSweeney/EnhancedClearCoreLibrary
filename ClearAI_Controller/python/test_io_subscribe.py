@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Test input-change notifications: subscribe_inputs -> input_changed on telemetry 9101."""
 
 from __future__ import annotations

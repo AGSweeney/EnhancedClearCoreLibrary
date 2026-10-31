@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Rebuild LibraryDocs for create-librarydocs 2.1.0."""
 from pathlib import Path
 

@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Test static persisted IP: configure_network, get_config reporting, validation,
 and restart (with reconnect). DHCP is restored at the end so the board returns to
 DHCP on its next boot."""

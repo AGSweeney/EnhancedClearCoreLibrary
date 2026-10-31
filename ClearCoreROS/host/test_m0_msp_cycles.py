@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Net-zero returns on M0, with an MSP screenshot at each enabled settle and after disable.
 
 Firmware position is generated steps. MSP Position (cnts) is read from the

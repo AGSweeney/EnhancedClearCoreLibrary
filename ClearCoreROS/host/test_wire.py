@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Compare the Python frame codec with firmware/RosProtocol.h."""
 
 from __future__ import annotations

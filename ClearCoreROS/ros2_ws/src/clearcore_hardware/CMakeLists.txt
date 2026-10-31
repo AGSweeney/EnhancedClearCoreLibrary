@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 cmake_minimum_required(VERSION 3.16)
 project(clearcore_hardware)
 

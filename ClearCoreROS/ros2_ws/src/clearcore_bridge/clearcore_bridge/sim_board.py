@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Localhost JSON-RPC + binary stream stand-in for ClearCoreROS firmware."""
 
 from __future__ import annotations

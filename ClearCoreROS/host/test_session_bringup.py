@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """SessionClient + bring_up_session against a simulated JSON-RPC board."""
 
 from __future__ import annotations

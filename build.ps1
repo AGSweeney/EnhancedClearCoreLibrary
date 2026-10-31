@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 param(
     [ValidateSet("Debug", "Release", "RelWithDebInfo", "MinSizeRel")]
     [string]$Config = "Release",

@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Longer M0 bench: repeated travels, dwells, then back to zero."""
 
 import sys

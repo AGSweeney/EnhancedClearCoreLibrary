@@ -1,3 +1,5 @@
+/* MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com> */
+
 // EXCERPT — source: libClearCore/inc/LinearInterpolator.h
 // EVIDENCE: E1 | symbol: LinearInterpolator | lines: 45-94
 

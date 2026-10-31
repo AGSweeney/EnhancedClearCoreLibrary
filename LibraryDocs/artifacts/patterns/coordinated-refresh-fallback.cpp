@@ -1,3 +1,5 @@
+/* MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com> */
+
 // EXCERPT — source: libClearCore/src/MotorDriver.cpp
 // EVIDENCE: E1 | symbol: MotorDriver::Refresh coordDriving | lines: 482-510
 

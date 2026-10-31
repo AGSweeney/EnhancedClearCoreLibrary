@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Repeat the first-motor 10 mm move on M0, then restore the saved setup.
 
 The address comes from the command line or from CCROS_HOST. The move is 10 mm

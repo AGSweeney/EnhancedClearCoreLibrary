@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Run ClearCoreROS host tests and print a CI result table.
 
 This is simulated-host coverage. It does not home motors, trip a physical

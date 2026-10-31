@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """CLI: python -m clearai --port COM5 enable"""
 
 from __future__ import annotations

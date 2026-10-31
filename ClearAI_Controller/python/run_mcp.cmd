@@ -1,3 +1,4 @@
+:: MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 @echo off
 set PYTHONUNBUFFERED=1
 if not defined CLEARAI_TCP_PORT set CLEARAI_TCP_PORT=9100

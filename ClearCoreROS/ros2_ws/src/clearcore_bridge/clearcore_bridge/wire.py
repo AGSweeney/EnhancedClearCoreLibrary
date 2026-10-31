@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Little-endian ClearCoreROS stream frames. No ROS dependency.
 
 Byte layout is firmware/RosProtocol.h and PROTOCOL.md.

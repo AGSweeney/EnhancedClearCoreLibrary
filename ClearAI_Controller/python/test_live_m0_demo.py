@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Live M0 demo: longer, faster moves with dwells, a sustained jog, and a batch.
 Bare motor on M0 (X axis, 160 steps/mm, 5mm/rev). 100mm == 20 revs."""
 

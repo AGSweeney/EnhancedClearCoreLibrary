@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Test I/O enhancements: read_analog, write_analog, write_pwm, and conflict guards."""
 
 from __future__ import annotations

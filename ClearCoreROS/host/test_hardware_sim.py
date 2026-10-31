@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Import the production JTC success predicate. Plugin behavior is the C++ gtest."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Live bench test on M0 (X axis, bare motor, no mechanics). Small relative moves,
 jog-velocity, batched moves; observe est_ms/elapsed_ms, counters, distance, log, alerts."""
 

@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Test Safety / limits features: per-axis dynamics, machine-coord soft limits,
 limit-triggered fault latch, and host watchdog / keepalive."""
 

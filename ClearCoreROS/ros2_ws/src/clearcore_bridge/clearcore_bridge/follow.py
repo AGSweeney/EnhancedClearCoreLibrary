@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """Trajectory sampling, goal ownership, and motion-success checks.
 
 No ROS imports. The bridge uses these so a cached or faulted sample cannot be

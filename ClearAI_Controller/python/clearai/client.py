@@ -1,3 +1,4 @@
+# MIT License. Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>
 """JSON-RPC Lines client for ClearAI firmware (USB serial or TCP)."""
 
 from __future__ import annotations
