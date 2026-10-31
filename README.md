@@ -1,103 +1,110 @@
 # Enhanced ClearCore Library
 
-This repository contains the ClearCore Motion and I/O Library, enhanced with coordinated motion (arcs, linear) and unit conversion support. It provides a foundation to build ClearCore applications. Also included are Microchip Studio example programs—including G-code streaming and GRBL-compatible firmware—and a Microchip Studio template project for building your own application.
+**Teknic's ClearCore library with coordinated multi-axis motion, physical units, and the controllers built on it.**
 
-## Enhanced Features
+The [Teknic ClearCore](https://teknic.com/products/io-motion-controller/) is an industrial I/O and motion controller for ClearPath servos and step-and-direction drives. Its stock library moves each motor on its own. This fork adds what a machine needs: two motors moving together along straight lines and arcs at a constant path speed, a queue with lookahead so moves flow into each other, and programming in millimetres, inches or degrees instead of step counts.
 
-This library includes enhanced motion control capabilities:
+It also holds the applications built on top of it: a CNC controller, an LLM-driven gantry controller and a GRBL desktop app. Two larger projects that started here now have their own repositories (see [Projects](#projects)).
 
-### Coordinated Motion
-- **Coordinated Arc Moves**: Generate smooth circular arc paths with two motors moving synchronously
-- **Coordinated Linear Moves**: Straight-line coordinated motion with constant velocity along the path
-- **Continuous Motion Chaining**: Seamlessly chain multiple arcs or linear moves without stopping
-- **Constant Path Velocity**: Maintains constant velocity along the programmed path (arc circumference or linear distance)
+> [!WARNING]
+> The additions and the controller projects are **experimental**. They are not certified for production or safety-critical use. Always keep a physical E-stop in the motor power circuit.
 
-### Unit Conversion Support
-- **Physical Units**: Program moves in inches, millimeters, centimeters, meters, revolutions, or degrees instead of raw step counts
-- **Feed Rate Units**: Set velocities in inches/minute, mm/minute, mm/second, RPM, or steps/second
-- **Mechanical Configuration**: Configure motors with steps per revolution, lead screw pitch, and gear ratios
-- **Automatic Conversion**: Library automatically converts between physical units and step counts based on your mechanical setup
+## What this fork adds to libClearCore
 
-### Key Benefits
-- **Intuitive Programming**: Work with familiar units (inches, mm) instead of calculating step counts manually
-- **Reduced Errors**: Eliminate manual conversion calculations that can introduce mistakes
-- **G-Code Compatible**: Natural fit for CNC applications and G-code interpreters
-- **Backward Compatible**: All existing step-based APIs continue to work unchanged
+| Feature | What it does |
+|---------|--------------|
+| **Coordinated motion** | `CoordinatedMotionController` drives two motors as one machine: linear and circular-arc moves at a constant velocity along the path, with acceleration limits. |
+| **Motion queue with lookahead** | Moves are queued and chained without stopping; the planner works out how fast the machine can pass through each corner. |
+| **Physical units** | Configure steps per revolution, lead-screw pitch and gear ratio, then command positions and feed rates in mm, inches, revolutions or degrees (`UnitConverter`, unit methods on `MotorDriver` and the controller). |
+| **Quadrature output mode** | `CPM_MODE_QUAD_AB`: drive ClearPath motors with A/B quadrature instead of step and direction. |
+| **Reliability fixes** | Fixes found while building the controllers: step bursts on small arcs, a motor fault on slow nearly-straight moves, stalled TCP transfers, and USB serial input stopping mid-transfer. |
 
-See `NEW_FILES.md` for a complete list of new files added for these features.
+Everything Teknic's library already did keeps working; the additions are new classes and new methods. [NEW_FILES.md](NEW_FILES.md) lists the new files and [MODIFICATIONS.md](MODIFICATIONS.md) every change to Teknic's files, with the reasons.
 
-#### Microchip Studio requirements
+### A taste of the API
 
-The included Microchip Studio projects require Microchip Studio 7.0.1645 or later (latest recommended).
+```cpp
+#include "ClearCore.h"
 
-From **Tools → Device Pack Manager**, ensure these packs are installed:
-* **SAME53_DFP** 1.1.118
-* **CMSIS** 4.5.0
+CoordinatedMotionController motion;
 
-**Installers and resources**: https://www.teknic.com/downloads/
+int main() {
+    MotorMgr.MotorModeSet(MotorManager::MOTOR_ALL, Connector::CPM_MODE_STEP_AND_DIR);
+    ConnectorM0.EnableRequest(true);
+    ConnectorM1.EnableRequest(true);
 
-### libClearCore
+    motion.Initialize(&ConnectorM0, &ConnectorM1);
+    motion.SetMechanicalParamsX(800, 5.0, UNIT_MM);  // 800 steps/rev, 5 mm per rev
+    motion.SetMechanicalParamsY(800, 5.0, UNIT_MM);
+    motion.FeedRateMMPerMin(1200);
 
-libClearCore provides a C++ object-oriented API for the ClearCore hardware. Each connector has an associated object. API reference: https://teknic-inc.github.io/ClearCore-library/.
+    // Queued moves run back to back without stopping at the joins.
+    motion.MoveLinearMM(50, 0);
+    motion.MoveArcMM(50, 25, 25, -M_PI / 2, M_PI / 2, false);  // half circle around (50, 25)
+    motion.MoveLinearMM(0, 50);
 
-A Microchip Studio project (*.cppproj) is included to build the library.
+    while (true) {
+    }
+}
+```
 
-### LwIP
+The [coordinated motion guide](docs/CoordinatedArcMotion/README.md) covers the theory, the full API and more examples.
 
-Ethernet support uses the LwIP stack. Use the ethernet API from libClearCore for Ethernet apps. LwIP source is included. A Microchip Studio project (*.cppproj) is provided to build LwIP.
+## Projects
 
-### Root-level examples
+Applications built on the library, in this repository:
 
-| Example | Description |
-|--------|-------------|
-| **MotionStreamingExample** | Stream G-code over serial (USB CDC) or Ethernet TCP. Supports G01, G02/G03 (I,J or R), G20/G21, G90/G91, G92, G4, M200–M203, M114, M115, M500, M501. See `MotionStreamingExample/README.md` and `MotionStreamingExample/STREAMING_GUIDE.md`. |
-| **GRBLCompatibleExample** | GRBL-style firmware: G0/G1/G2/G03, $ commands, jogging ($J=), homing ($H), gSender-friendly. Serial only. See `GRBLCompatibleExample/README.md`. |
-| **ProjectTemplate** | Minimal Microchip Studio template. Put your code in `main.cpp`. |
-| **ClearAI_Controller** | JSON-RPC Lines firmware so an LLM can command an XY gantry (Code as Policies primitives), plus ClearAI/LocoRix MCP servers. See `ClearAI_Controller/README.md` and `ClearAI_Controller/docs/`. |
-| **ClearCoreROS** | Moved to its own repository: [ClearCore_ROS](https://github.com/AGSweeney/ClearCore_ROS). |
+| Project | What it is |
+|---------|------------|
+| [ClearCNC Controller](ClearCNC_Controller/README.md) | Qt desktop app and ClearCore firmware for a small CNC or bench motion setup: G-code streaming over USB or Ethernet, jogging, and a 3D tool-position view. |
+| [ClearAI Controller](ClearAI_Controller/README.md) | Firmware and Python hosts that let an LLM command ClearPath servos through JSON-RPC primitives ("Code as Policies"), with MCP servers. |
+| [NewGControl](NewGControl/README.md) | Standalone Qt desktop controller for GRBL-family firmware, aimed at gSender-style workflows. |
 
-Open the matching `.atsln`, set the project as **Startup Project**, then **Start Without Debugging (Ctrl+Alt+F5)** to build, flash, and run.
+Moved to their own repositories (their history up to the split is still here):
 
-### Microchip_Examples
+| Project | Repository |
+|---------|------------|
+| ClearCoreROS: ClearCore firmware and ROS 2 packages that expose M0–M3 as ROS 2 joints | [ClearCore_ROS](https://github.com/AGSweeney/ClearCore_ROS) |
+| ClearHPGL: firmware that makes ClearCore an HP-GL pen plotter, plus a desktop app | [ClearCore_HPGL](https://github.com/AGSweeney/ClearCore_HPGL) |
 
-Official-style examples for ClearCore features (Analog I/O, CCIO, Serial, Ethernet, Step & Direction, etc.). Each subfolder has a solution (*.atsln). Load it, set the desired project as Startup Project, then build and run.
+## Examples and templates
 
-#### Coordinated motion (Microchip_Examples)
+| Path | Contents |
+|------|----------|
+| `Microchip_Examples/` | Teknic's ClearCore examples (analog and digital I/O, CCIO-8, serial, Ethernet, ClearPath modes, step and direction), plus `MoveQuadrature` for the quadrature mode. |
+| `ProjectTemplate/` | Minimal Microchip Studio project to start your own application: put your code in `main.cpp`. |
+| `Depreciated/` | Older examples kept for reference: G-code motion streaming, a GRBL-compatible firmware, and the first coordinated arc and units examples. |
 
-- **CoordinatedArcMoves** and **CoordinatedMovesWithUnits** live under `Microchip_Examples/ClearPathModeExamples/ClearPath-SD_Series/`. They demonstrate arc chaining, unit conversion, and feed rate in physical units.
+## Getting started
 
-See `docs/CoordinatedArcMotion/README.md` for coordinated motion theory and API details.
+1. **Install Microchip Studio** 7.0.1645 or later, and from **Tools → Device Pack Manager** install **SAME53_DFP 1.1.118** and **CMSIS 4.5.0**. Teknic's installers and resources are at <https://www.teknic.com/downloads/>.
+2. **Open a solution**: an example under `Microchip_Examples/`, `ProjectTemplate/ProjectTemplate.atsln`, or a project's firmware. The solutions include the `libClearCore` and `LwIP` projects, so the library builds with your application.
+3. **Build and flash**: set your project as the startup project and choose **Start Without Debugging** (Ctrl+Alt+F5). From the command line, `Tools/flash_clearcore.cmd <file.bin>` finds the ClearCore's USB port and flashes it.
 
-### ProjectTemplate
-
-Minimal starter for new apps. Open `ProjectTemplate/ProjectTemplate.atsln`, add your code to `main.cpp`, then build and flash.
-
-### Tools
-
-Windows tools for flashing firmware via USB (see `Tools/README.md`):
-
-- **bossac** — Command-line flasher
-- **flash_clearcore.cmd** — Finds ClearCore USB port and flashes with bossac
-- **uf2-builder** — Converts firmware to UF2 for drag-and-drop flashing via bootloader
+The ClearCNC desktop app builds with `build.ps1` (Visual Studio 2022, CMake and Qt 6); see its README.
 
 ## Documentation
 
-- **API reference**: https://teknic-inc.github.io/ClearCore-library/
-- **ClearCNC Controller** (Qt host + ClearCore firmware): `ClearCNC_Controller/README.md` — protocol, spindle, estop, dwell
-- **ClearAI Controller** (LLM gantry primitives + MCP): `ClearAI_Controller/README.md`, `ClearAI_Controller/docs/`, `ClearAI_Controller/PROTOCOL.md`
-- **Coordinated motion**: `docs/CoordinatedArcMotion/README.md` — theory, usage, API
-- **Motion streaming**: `MotionStreamingExample/README.md`, `MotionStreamingExample/STREAMING_GUIDE.md`
-- **GRBL-compatible example**: `GRBLCompatibleExample/README.md`
-- **New/modified files**: `NEW_FILES.md`, `MODIFICATIONS.md`
+| Document | Contents |
+|----------|----------|
+| [Teknic API reference](https://teknic-inc.github.io/ClearCore-library/) | The stock ClearCore library |
+| [docs/CoordinatedArcMotion](docs/CoordinatedArcMotion/README.md) | Coordinated motion: theory, usage, API, examples |
+| [NEW_FILES.md](NEW_FILES.md), [MODIFICATIONS.md](MODIFICATIONS.md) | What this fork adds and changes, and why |
+| [LibraryDocs](LibraryDocs/README.md) | Knowledge base for the coordinated motion code and the controller apps |
+| Project READMEs | [ClearCNC](ClearCNC_Controller/README.md), [ClearAI](ClearAI_Controller/README.md) (also its `PROTOCOL.md` and `docs/`), [NewGControl](NewGControl/README.md) |
 
-## Moved projects
+## Repository layout
 
-These projects started here and now have their own repositories (their history up to the split
-remains in this one):
-
-- **ClearCoreROS**: [ClearCore_ROS](https://github.com/AGSweeney/ClearCore_ROS), ROS 2 joints on ClearCore.
-- **ClearHPGL**: [ClearCore_HPGL](https://github.com/AGSweeney/ClearCore_HPGL), HP-GL plotter firmware and desktop app.
+| Path | Contents |
+|------|----------|
+| `libClearCore/` | The ClearCore library with this fork's additions (Microchip Studio project included) |
+| `LwIP/` | lwIP TCP/IP stack used by the library's Ethernet support |
+| `ClearCNC_Controller/`, `ClearAI_Controller/`, `NewGControl/` | Projects built on the library |
+| `Microchip_Examples/`, `ProjectTemplate/`, `Depreciated/` | Examples and the starter template |
+| `docs/`, `LibraryDocs/` | Documentation |
+| `Tools/` | `bossac`, `flash_clearcore.cmd` and `uf2-builder` for flashing over USB |
+| `ClearCoreROS/`, `ClearHPGL/` | Pointers to the moved projects |
 
 ## License
 
-The ClearCore library is provided under the MIT License (Copyright (c) 2020 Teknic, Inc.). The additions in this fork (coordinated motion, unit conversion and the fixes in `MODIFICATIONS.md`) and the controller projects are also MIT licensed, Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>. See [LICENSE](LICENSE). Microchip ASF, lwIP, jsmn and the bundled tools keep their own licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The ClearCore library is provided under the MIT License (Copyright (c) 2020 Teknic, Inc.). The additions in this fork and the controller projects are also MIT licensed, Copyright (c) 2026 Adam G. Sweeney <agsweeney@gmail.com>. See [LICENSE](LICENSE). Microchip ASF, lwIP, jsmn and the bundled tools keep their own licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
