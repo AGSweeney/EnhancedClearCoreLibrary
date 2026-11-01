@@ -190,6 +190,14 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 - The callback runs before the connectors refresh so the steps it sets go out in the same sample. `EncoderIn` is updated after the connectors, so the callback sees the previous sample's encoder position (one sample, 200 µs, of master lag).
 - Behaviour without the new calls is unchanged: no callback is set and external mode is off by default; coordinated mode runs the same code as before.
 
+### 9. Direction output in coordinated / external step modes (ECam, 2026-11-01)
+
+**Files**: `libClearCore/src/MotorDriver.cpp`, `libClearCore/inc/MotorDriver.h` — `ApplySampleSteps()`, new `ReversalWaits()`.
+
+**Why**:
+- **Position drift every cam cycle** (ClearPath on a ballscrew following a poly 3-4-5 profile). The step count for a sample is double-buffered into the step timer, so the pulses written in one sample go out at the start of the next, while the sample interrupt is already running. `ApplySampleSteps()` set the direction output from the sign of every sample's count, and a sample with no steps counted as positive. On a slow negative move (pattern -1, 0, 0, -1, …) the output therefore flipped to positive at every pause and back at the next step, each time a few tens of µs after the previous sample's pulse had gone out. On the failing profile that is 300 direction changes per revolution, 150 of them right behind a pulse; a drive that takes the direction slightly after the step edge counts those pulses the wrong way.
+- Now a sample with no steps leaves the direction alone, and a reversal directly after a sample that sent steps waits one sample (nothing is sent, the steps are carried and go out next sample after the direction change). The direction then only changes with nothing in flight, as the stock StepGenerator does (it changes direction from standstill only). Same net steps; `PositionRefCommanded()` unchanged; `ReversalWaits()` counts the held reversals.
+
 ## Summary
 
 **Total Modified Files**: 3 (+ QUAD_AB additions across Connector/MotorDriver/MotorManager/docs/example)

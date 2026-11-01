@@ -539,6 +539,14 @@ public:
     }
 
     /**
+        \brief Reversals held back one sample because the previous sample's
+        steps were still going out (coordinated and external step modes).
+    **/
+    uint32_t ReversalWaits() const {
+        return m_reversalWaits;
+    }
+
+    /**
         \brief True when CPM_MODE_QUAD_AB has no counts/edges left to emit.
 
         StepsComplete() can return true while the last ABAB/BABA cycle is still
@@ -1841,6 +1849,10 @@ protected:
     // External step mode: steps handed in by the application for the next sample.
     bool m_externalMode;
     volatile int32_t m_externalPending;
+    // Steps output in the last sample (still going out at the start of this one), and the
+    // reversals that had to wait for them.
+    int32_t m_lastSampleSteps;
+    uint32_t m_reversalWaits;
     // Direction, per-sample limit with carry, step output and position tracking
     // shared by coordinated and external step modes.
     void ApplySampleSteps(int32_t steps);
