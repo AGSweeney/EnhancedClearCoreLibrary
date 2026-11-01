@@ -28,6 +28,25 @@
 
 namespace ClearCore {
 
+/* ClearHPGL: this runs in the 5 kHz step interrupt, and double precision is software on the M4F
+ * (single precision has a hardware FPU). Double cos/sin/sqrt/fmod made starting an arc take up to
+ * 185 us of the 200 us period; one overrun misses the step compare and the drive gets a burst of
+ * pulses nobody counted (a motor jump). The angle still accumulates in double; the circle point is
+ * taken in single precision: at r = 100000 steps that is within 0.05 step, and the last sample
+ * lands on the exact end point anyway. */
+static inline double WrapTwoPi(double a) {
+    const double twoPi = 2.0 * M_PI;
+    while (a < 0.0) a += twoPi;
+    while (a >= twoPi) a -= twoPi;
+    return a;
+}
+
+static inline void CirclePoint(double cx, double cy, double r, double angle, double *x, double *y) {
+    const float a = (float)WrapTwoPi(angle);
+    *x = cx + r * (double)cosf(a);
+    *y = cy + r * (double)sinf(a);
+}
+
 ArcInterpolator::ArcInterpolator()
     : m_currentAngleQx(0),
       m_currentXQx(0),
@@ -111,10 +130,8 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
     // Exact sweep in double radians; the Q15 span above is kept for the
     // fields that still report it. Equal start and end angles mean a full turn.
     const double twoPi = 2.0 * M_PI;
-    double a0 = fmod(startAngle, twoPi);
-    double a1 = fmod(endAngle, twoPi);
-    if (a0 < 0.0) a0 += twoPi;
-    if (a1 < 0.0) a1 += twoPi;
+    double a0 = WrapTwoPi(startAngle);
+    double a1 = WrapTwoPi(endAngle);
     double spanRad = clockwise ? (a0 - a1) : (a1 - a0);
     if (spanRad <= 1e-12) {
         spanRad += twoPi;
@@ -169,8 +186,7 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
                    (((int64_t)m_currentArc.radiusQx * sinVal) >> 15);
     
     double cx = (double)centerX, cy = (double)centerY, r = (double)radius;
-    m_lastXExact = cx + r * cos(startAngle);
-    m_lastYExact = cy + r * sin(startAngle);
+    CirclePoint(cx, cy, r, a0, &m_lastXExact, &m_lastYExact);
     m_lastXSteps = (int32_t)llround(m_lastXExact);
     m_lastYSteps = (int32_t)llround(m_lastYExact);
     m_startAngleRad = a0;
@@ -178,8 +194,10 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
     m_sweptRad = 0.0;
     m_done = false;
     m_haveExactEnd = false;
-    m_endXSteps = (int32_t)llround(cx + r * cos(endAngle));
-    m_endYSteps = (int32_t)llround(cy + r * sin(endAngle));
+    double ex, ey;
+    CirclePoint(cx, cy, r, a1, &ex, &ey);
+    m_endXSteps = (int32_t)llround(ex);
+    m_endYSteps = (int32_t)llround(ey);
     
     return true;
 }
@@ -212,10 +230,10 @@ bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
     const double remainingDist = r * remainingRad;
     double targetSpeed = (double)m_velocityMax;
     if (m_accelMax > 0) {
-        const double fromStart = sqrt((double)m_entrySpeed * (double)m_entrySpeed +
-                                      2.0 * (double)m_accelMax * distFromStart);
-        const double fromEnd = sqrt((double)m_exitSpeed * (double)m_exitSpeed +
-                                    2.0 * (double)m_accelMax * remainingDist);
+        const double fromStart = (double)sqrtf((float)((double)m_entrySpeed * (double)m_entrySpeed +
+                                                       2.0 * (double)m_accelMax * distFromStart));
+        const double fromEnd = (double)sqrtf((float)((double)m_exitSpeed * (double)m_exitSpeed +
+                                                     2.0 * (double)m_accelMax * remainingDist));
         if (fromStart < targetSpeed) {
             targetSpeed = fromStart;
         }
@@ -243,8 +261,8 @@ bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
 
     const double cx = (double)(m_currentArc.centerXQx >> FRACT_BITS);
     const double cy = (double)(m_currentArc.centerYQx >> FRACT_BITS);
-    const double xExact = cx + r * cos(angle);
-    const double yExact = cy + r * sin(angle);
+    double xExact, yExact;
+    CirclePoint(cx, cy, r, angle, &xExact, &yExact);
     m_remainX += xExact - m_lastXExact;
     m_remainY += yExact - m_lastYExact;
     m_lastXExact = xExact;
@@ -278,10 +296,7 @@ bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
 
     // Keep the Q15 mirrors current for code that still reads them.
     const double twoPi = 2.0 * M_PI;
-    double norm = fmod(angle, twoPi);
-    if (norm < 0.0) {
-        norm += twoPi;
-    }
+    const double norm = WrapTwoPi(angle);
     m_currentAngleRad = norm;
     m_currentAngleQx = NormalizeAngleQx((int32_t)(norm * (32768.0 / twoPi)));
     m_currentXQx = ((int64_t)m_lastXSteps) << FRACT_BITS;

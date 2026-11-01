@@ -494,9 +494,13 @@ MotorDriver::Refresh()  // For each motor
 ```
 
 **Timing Budget**:
-- Total ISR time: 200 µs
-- Arc calculation: ~40-70 µs
-- Well within budget
+- Period: 200 µs. `UpdateFast()` must finish well inside it: an overrun misses the step compare
+  and the drive gets a burst of pulses that is neither commanded nor counted (a motor jump).
+- Double precision is software on the Cortex-M4F, so the per-sample arc maths uses `cosf`/`sinf`/
+  `sqrtf` (hardware FPU). With double `cos`/`sin`/`sqrt`/`fmod`, starting an arc took up to 185 µs.
+- Measured (ClearPath plotter, 545-arc job): longest `UpdateFast()` 93 µs, at an arc start.
+- `MaxUpdateCycles()`, `MaxUpdateKind()` and `SlowUpdates()` (runs over 150 µs) report it on a
+  running machine; `ResetTimingProbe()` clears them.
 
 ### Fixed-Point Calculations
 

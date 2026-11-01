@@ -344,20 +344,35 @@ void CoordinatedMotionController::UpdateFast() {
     if (!m_initialized) {
         return;
     }
-    {
-        /* ClearHPGL timing probe: this runs once per TCC0 period (200 us = 24000 cycles). */
-        const uint32_t now = DWT->CYCCNT;
+    /* ClearHPGL timing probe. This runs once per TCC0 period (200 us = 24000 cycles) and must
+     * finish well inside it: an overrun misses the step compare and the drive gets a burst of
+     * pulses nobody counted (a motor jump). Gaps count only while motion runs on from the previous
+     * call: XY is not updated at all while stopped for a pen change. */
+    const uint32_t now = DWT->CYCCNT;
+    if (m_prevUpdateDriving) {
         const uint32_t gap = now - m_lastUpdateCycles;
-        if (m_lastUpdateCycles != 0 && m_active) {
-            if (gap > m_maxUpdateGapCycles) {
-                m_maxUpdateGapCycles = gap;
-            }
-            if (gap > 24000u + 6000u) {  /* more than 50 us late */
-                m_lateUpdates++;
-            }
+        if (gap > m_maxUpdateGapCycles) {
+            m_maxUpdateGapCycles = gap;
         }
-        m_lastUpdateCycles = now;
+        if (gap > 24000u + 6000u) {  /* more than 50 us late */
+            m_lateUpdates++;
+        }
     }
+    m_lastUpdateCycles = now;
+    m_updateStartedMotion = false;
+    UpdateFastBody();
+    const uint32_t took = DWT->CYCCNT - now;
+    if (took > m_maxUpdateCycles) {
+        m_maxUpdateCycles = took;
+        m_maxUpdateKind = (uint8_t)((m_updateStartedMotion ? 2 : 0) + (m_motionType == MOTION_TYPE_ARC ? 1 : 0));
+    }
+    if (took > 18000u) {  /* over 150 us of the 200 us period */
+        m_slowUpdates++;
+    }
+    m_prevUpdateDriving = m_active;
+}
+
+void CoordinatedMotionController::UpdateFastBody() {
     
     // If stop counter is active, continue sending zero steps to clear hardware buffer
     if (m_stopCounter > 0) {
@@ -377,6 +392,7 @@ void CoordinatedMotionController::UpdateFast() {
     
     bool motionComplete = false;
     auto StartNextMotion = [this](bool arcWasActive) -> bool {
+        m_updateStartedMotion = true;  // ClearHPGL timing probe
         if (ProcessNextMotion()) {
             return true;
         }
@@ -808,6 +824,51 @@ bool CoordinatedMotionController::ValidateLinear(int32_t /*endX*/, int32_t /*end
     return true;
 }
 
+// ClearHPGL: only the main thread adds to the motion queue; the step interrupt only takes from its
+// head. So the start point of a new block (the previous block's end, or where the running move
+// ends) cannot change between this snapshot and CommitQueuedMotion(), and the free slot at the tail
+// is not read by the interrupt until the count says it is there. The block is built with
+// interrupts enabled; they are off only for the snapshot and the commit (QueueArc used to compute
+// sin/cos in software doubles with them off: up to 190 us, close to the 200 us step period).
+bool CoordinatedMotionController::QueueStartPoint(int32_t *startX, int32_t *startY) {
+    __disable_irq();
+    const uint32_t irqOffStart = DWT->CYCCNT;  // ClearHPGL timing probe
+    if (m_motionQueueCount >= ARC_QUEUE_SIZE) {
+        __enable_irq();
+        return false;
+    }
+    *startX = m_currentX;
+    *startY = m_currentY;
+    if (m_motionQueueCount > 0) {
+        uint8_t prevIdx = (m_motionQueueTail + ARC_QUEUE_SIZE - 1) % ARC_QUEUE_SIZE;
+        *startX = m_motionQueue[prevIdx].endX;
+        *startY = m_motionQueue[prevIdx].endY;
+    } else if (m_active) {
+        *startX = m_activeTargetX;
+        *startY = m_activeTargetY;
+    }
+    NoteIrqOff(irqOffStart);
+    __enable_irq();
+    return true;
+}
+
+void CoordinatedMotionController::CommitQueuedMotion() {
+    m_motionQueue[m_motionQueueTail].valid = true;
+    __disable_irq();
+    const uint32_t irqOffStart = DWT->CYCCNT;  // ClearHPGL timing probe
+    m_motionQueueTail = (m_motionQueueTail + 1) % ARC_QUEUE_SIZE;
+    m_motionQueueCount++;
+    NoteIrqOff(irqOffStart);
+    __enable_irq();
+}
+
+void CoordinatedMotionController::NoteIrqOff(uint32_t irqOffStart) {
+    const uint32_t off = DWT->CYCCNT - irqOffStart;
+    if (off > m_maxIrqOffCycles) {
+        m_maxIrqOffCycles = off;
+    }
+}
+
 bool CoordinatedMotionController::QueueArcTo(int32_t centerX, int32_t centerY,
                                             int32_t endX, int32_t endY,
                                             bool clockwise) {
@@ -890,22 +951,11 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
         return true;
     }
 
-    // Planner-enabled path
-    __disable_irq();
-    const uint32_t irqOffStart = DWT->CYCCNT;  // ClearHPGL timing probe
-    if (m_motionQueueCount >= ARC_QUEUE_SIZE) {
-        __enable_irq();
+    // Planner-enabled path. ClearHPGL: the double-precision maths (software doubles on the M4F)
+    // runs with interrupts enabled; see QueueStartPoint() and CommitQueuedMotion().
+    int32_t startX, startY;
+    if (!QueueStartPoint(&startX, &startY)) {
         return false;
-    }
-    int32_t startX = m_currentX;
-    int32_t startY = m_currentY;
-    if (m_motionQueueCount > 0) {
-        uint8_t prevIdx = (m_motionQueueTail + ARC_QUEUE_SIZE - 1) % ARC_QUEUE_SIZE;
-        startX = m_motionQueue[prevIdx].endX;
-        startY = m_motionQueue[prevIdx].endY;
-    } else if (m_active) {
-        startX = m_activeTargetX;
-        startY = m_activeTargetY;
     }
     double sn = startAngle;
     double en = endAngle;
@@ -946,16 +996,7 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
     motion.arc.startAngle = sn;
     motion.arc.endAngle = en;
     motion.arc.clockwise = clockwise;
-    motion.valid = true;
-    m_motionQueueTail = (tail + 1) % ARC_QUEUE_SIZE;
-    m_motionQueueCount++;
-    {
-        const uint32_t off = DWT->CYCCNT - irqOffStart;  // ClearHPGL timing probe
-        if (off > m_maxIrqOffCycles) {
-            m_maxIrqOffCycles = off;
-        }
-    }
-    __enable_irq();
+    CommitQueuedMotion();
     if (kUseGrblPlanner) {
         PlanQueue();  // interrupts enabled; see PlanQueue()
     }
@@ -1025,22 +1066,10 @@ bool CoordinatedMotionController::QueueLinear(int32_t endX, int32_t endY) {
         return true;
     }
 
-    // Planner-enabled path
-    __disable_irq();
-    const uint32_t irqOffStart = DWT->CYCCNT;  // ClearHPGL timing probe
-    if (m_motionQueueCount >= ARC_QUEUE_SIZE) {
-        __enable_irq();
+    // Planner-enabled path (maths with interrupts enabled, as in QueueArc)
+    int32_t startX, startY;
+    if (!QueueStartPoint(&startX, &startY)) {
         return false;
-    }
-    int32_t startX = m_currentX;
-    int32_t startY = m_currentY;
-    if (m_motionQueueCount > 0) {
-        uint8_t prevIdx = (m_motionQueueTail + ARC_QUEUE_SIZE - 1) % ARC_QUEUE_SIZE;
-        startX = m_motionQueue[prevIdx].endX;
-        startY = m_motionQueue[prevIdx].endY;
-    } else if (m_active) {
-        startX = m_activeTargetX;
-        startY = m_activeTargetY;
     }
     int32_t dx = endX - startX;
     int32_t dy = endY - startY;
@@ -1065,16 +1094,7 @@ bool CoordinatedMotionController::QueueLinear(int32_t endX, int32_t endY) {
     motion.endY = endY;
     motion.linear.endX = endX;
     motion.linear.endY = endY;
-    motion.valid = true;
-    m_motionQueueTail = (tail + 1) % ARC_QUEUE_SIZE;
-    m_motionQueueCount++;
-    {
-        const uint32_t off = DWT->CYCCNT - irqOffStart;  // ClearHPGL timing probe
-        if (off > m_maxIrqOffCycles) {
-            m_maxIrqOffCycles = off;
-        }
-    }
-    __enable_irq();
+    CommitQueuedMotion();
     if (kUseGrblPlanner) {
         PlanQueue();  // interrupts enabled; see PlanQueue()
     }
