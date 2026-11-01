@@ -121,8 +121,10 @@ EthernetTcpClient EthernetTcpServer::Accept() {
 
         client = EthernetTcpClient(clientData);
 
-        // Clean out stale/old/'disconnected' references.
-        if (!client.Connected()) {
+        // Clean out stale/old/'disconnected' references. ClearHPGL: a client that has
+        // already closed but left data unread is kept: a host that connects, sends a whole
+        // job and closes before the next Accept() would otherwise lose the job.
+        if (!client.Connected() && client.BytesAvailable() <= 0) {
             free(clientData);
             m_tcpDataClient[iClient] = nullptr;
             continue;

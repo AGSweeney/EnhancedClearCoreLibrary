@@ -166,6 +166,18 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 - **Zero-length packets.** The read buffer is one 64-byte packet; a host ends a transfer that is a multiple of 64 bytes with a zero-length packet, which completed the read with nothing to copy and never re-armed it.
 - **Motor fault on slow, nearly axis-aligned moves.** Each axis advanced by a per-sample increment rounded to Q15 and a segment ended only when both axes passed their end. On the minor axis of a nearly axis-aligned move at low speed the increment is a few Q15 units (2 instead of 2.4 for a 2-step X over an 8800-step Y at 20 mm/s), so it lagged, the major axis overran its end (1685 steps), and the end clamp moved it back in one 200 µs sample — a step burst the ClearPath faulted on. Progress along the path is now accumulated in double precision and both axes are computed from the start point every sample; the segment ends exactly when the progress reaches its length. Checked with the failing segment and 20,000 random segments at 5–300 mm/s (old: 1685-step overshoot, 207 segments not ending on target; new: no overshoot, never above the commanded speed, all on target).
 
+### 7. Arc timing in the step interrupt, queueing with interrupts enabled, TCP accept (from ClearHPGL, 2026-11-01)
+
+**Files**:
+- `libClearCore/src/EthernetTcpServer.cpp` — `Accept()` keeps a client that has closed but still holds unread data.
+- New-file changes (see NEW_FILES.md): `ArcInterpolator` takes circle points and ramp speeds in single precision; `CoordinatedMotionController` builds queue blocks with interrupts enabled (`QueueStartPoint()` / `CommitQueuedMotion()`) and its timing probe measures each `UpdateFast()` (`MaxUpdateCycles()`, `MaxUpdateKind()`, `SlowUpdates()`).
+
+**Why**:
+- **Motor jumps on arcs.** `UpdateFast()` runs in the 5 kHz TCC0 interrupt (200 µs period). Starting an arc there took up to 185 µs: `ArcInterpolator` used double-precision `cos`/`sin`/`sqrt`/`fmod`, which are software on the Cortex-M4F. An overrun misses the step compare and the drive gets a burst of pulses that is neither commanded nor counted (the same mechanism as section 5). The circle point and the accel/decel limits now use `cosf`/`sinf`/`sqrtf` (hardware FPU); the sweep still accumulates in double and the last sample lands on the exact end point. Measured on a ClearPath plotter running a 545-arc job: longest `UpdateFast()` 93 µs (was 185 µs), none over 150 µs, position equal to pulses sent, no jumps. Host arc test unchanged (end error 0, worst radial error 1.69 steps, no bursts).
+- **Interrupts off while queueing arcs.** `QueueArc()` computed its angles and tangents in double precision with interrupts disabled: up to 190 µs. Only the main thread adds to the motion queue and the step interrupt only takes from its head, so the block is now built with interrupts enabled; they are off only to read the start point and to publish the block (measured under 1 µs).
+- **TCP jobs lost.** `Accept()` freed any client that was no longer connected, so a host that connected, sent a whole job and closed before the next `Accept()` (the application busy, e.g. writing NVM) lost the data. A closed client with unread data is now returned and can be read out.
+- **Timing probe.** The gap probe counted pauses where the controller was not updated at all (e.g. stopped between moves); gaps now count only while motion runs on from the previous call. `UpdateFast()` records its longest run, whether it was an arc and whether it started the next move, and how many runs exceeded 150 µs.
+
 ## Summary
 
 **Total Modified Files**: 3 (+ QUAD_AB additions across Connector/MotorDriver/MotorManager/docs/example)

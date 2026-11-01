@@ -343,14 +343,23 @@ public:
         return m_burstCount;
     }
     /** ClearHPGL timing probe (CPU cycles, 120 MHz): longest interrupts-off stretch in
-        QueueLinear, and longest gap between UpdateFast calls (nominal 24000 = 200 us). **/
+        QueueLinear/QueueArc; longest gap between UpdateFast calls while moving (nominal 24000 =
+        200 us) and how many were over 250 us; longest single UpdateFast and what it did
+        (MaxUpdateKind: bit 0 = arc, bit 1 = started the next move), and how many took over
+        150 us. An UpdateFast near 200 us misses the step compare: a motor jump. **/
     uint32_t MaxIrqOffCycles() const { return m_maxIrqOffCycles; }
     uint32_t MaxUpdateGapCycles() const { return m_maxUpdateGapCycles; }
     uint32_t LateUpdates() const { return m_lateUpdates; }
+    uint32_t MaxUpdateCycles() const { return m_maxUpdateCycles; }
+    uint8_t MaxUpdateKind() const { return m_maxUpdateKind; }
+    uint32_t SlowUpdates() const { return m_slowUpdates; }
     void ResetTimingProbe() {
         m_maxIrqOffCycles = 0;
         m_maxUpdateGapCycles = 0;
         m_lateUpdates = 0;
+        m_maxUpdateCycles = 0;
+        m_maxUpdateKind = 0;
+        m_slowUpdates = 0;
     }
 
     // ========== Unit Conversion Support ==========
@@ -608,6 +617,10 @@ private:
     
     ArcInterpolator m_arcInterpolator;
     LinearInterpolator m_linearInterpolator;
+    // ClearHPGL: build queue blocks with interrupts enabled (see QueueStartPoint in the .cpp).
+    bool QueueStartPoint(int32_t *startX, int32_t *startY);
+    void CommitQueuedMotion();
+    void NoteIrqOff(uint32_t irqOffStart);
     // QueueArcTo hands its exact end point to QueueArc through these.
     bool m_exactEndPending = false;
     int32_t m_exactEndX = 0;
@@ -666,6 +679,12 @@ private:
     volatile uint32_t m_maxUpdateGapCycles;
     volatile uint32_t m_lateUpdates;
     uint32_t m_lastUpdateCycles;
+    volatile uint32_t m_maxUpdateCycles = 0;
+    volatile uint8_t m_maxUpdateKind = 0;
+    volatile uint32_t m_slowUpdates = 0;
+    bool m_prevUpdateDriving = false;
+    bool m_updateStartedMotion = false;
+    void UpdateFastBody();
     void RecordBurst(int32_t stepsX, int32_t stepsY);
     bool m_deferQueueStart;
     int32_t m_activeTargetX;
