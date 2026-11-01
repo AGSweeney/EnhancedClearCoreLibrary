@@ -169,6 +169,8 @@ MotorDriver::MotorDriver(ShiftRegister::Masks enableMask,
       m_coordCarry(0),
       m_coordExcessTotal(0),
       m_coordinatedController(nullptr),
+      m_externalMode(false),
+      m_externalPending(0),
       m_coordinatedMotorX(nullptr),
       m_coordinatedMotorY(nullptr),
       m_unitsConfigured(false),
@@ -504,6 +506,11 @@ void MotorDriver::Refresh() {
             if (this == m_coordinatedMotorX) {
                 m_coordinatedController->UpdateFast();
             }
+        } else if (m_externalMode) {
+            // The application set this sample's steps (0 if it did not).
+            const int32_t steps = m_externalPending;
+            m_externalPending = 0;
+            ApplySampleSteps(steps);
         } else {
             // Independent motion (or coordinated planner idle on both motors)
             // Calculate the number of steps to send in the next sample time
@@ -559,6 +566,10 @@ bool MotorDriver::ValidateMove(bool negDirection) {
 bool MotorDriver::Move(int32_t dist, MoveTarget moveTarget) {
     bool negDir;
 
+    if (m_externalMode) {
+        return false;  // the application owns the step output
+    }
+
     if (moveTarget == MOVE_TARGET_ABSOLUTE) {
         negDir = dist - m_posnAbsolute < 0;
     }
@@ -578,6 +589,9 @@ bool MotorDriver::Move(int32_t dist, MoveTarget moveTarget) {
 }
 
 bool MotorDriver::MoveVelocity(int32_t velocity) {
+    if (m_externalMode) {
+        return false;  // the application owns the step output
+    }
     if (!ValidateMove(velocity < 0)) {
         if (m_statusRegMotor.bit.StepsActive ) {
             MoveStopDecel();
@@ -618,10 +632,41 @@ bool MotorDriver::CoordinatedMotionMode(bool enable, CoordinatedMotionController
     return true;
 }
 
+bool MotorDriver::ExternalStepMode(bool enable) {
+    if (enable) {
+        if (m_coordinatedMode) {
+            return false;
+        }
+        if (m_statusRegMotor.bit.StepsActive) {
+            MoveStopAbrupt();
+        }
+        m_externalPending = 0;
+        m_coordCarry = 0;
+        m_externalMode = true;
+    } else {
+        m_externalMode = false;
+        m_externalPending = 0;
+        m_coordCarry = 0;
+    }
+    return true;
+}
+
+void MotorDriver::SetExternalSteps(int32_t steps) {
+    if (m_externalMode) {
+        m_externalPending = steps;
+    }
+}
+
 void MotorDriver::SetCoordinatedSteps(int32_t steps) {
-    if (!m_coordinatedMode ||
-            (Connector::m_mode != Connector::CPM_MODE_STEP_AND_DIR &&
-             Connector::m_mode != Connector::CPM_MODE_QUAD_AB)) {
+    if (!m_coordinatedMode) {
+        return;
+    }
+    ApplySampleSteps(steps);
+}
+
+void MotorDriver::ApplySampleSteps(int32_t steps) {
+    if (Connector::m_mode != Connector::CPM_MODE_STEP_AND_DIR &&
+            Connector::m_mode != Connector::CPM_MODE_QUAD_AB) {
         return;
     }
     

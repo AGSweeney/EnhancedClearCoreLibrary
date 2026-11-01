@@ -124,6 +124,19 @@ public:
     **/
     void ResetBoard(ResetModes mode = RESET_NORMAL);
 
+    /**
+        \brief A function called in the sample interrupt (#SampleRateHz), just
+        before the connectors refresh, so step counts it sets with
+        MotorDriver::SetExternalSteps() go out in the same sample.
+
+        It runs at interrupt priority: keep it short, use no heap and no
+        blocking calls, and prefer single-precision or integer maths.
+        EncoderIn holds the position read in the previous sample.
+
+        \param[in] callback The function, or nullptr to remove it.
+    **/
+    void SampleCallbackSet(void (*callback)());
+
 #ifndef HIDE_FROM_DOXYGEN
     // Ideally these would be private, but they need to be called from C
     // interrupt handler functions that can't be friends without putting them
@@ -135,6 +148,9 @@ public:
 private:
     /// Flag to defer operations until initialized.
     bool m_readyForOperations;
+
+    /// Application hook run every sample before the connectors refresh.
+    void (*volatile m_sampleCallback)();
 
     /**
         Initialize the clock rates and interrupts.

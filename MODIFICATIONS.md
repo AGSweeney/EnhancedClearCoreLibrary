@@ -178,6 +178,18 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 - **TCP jobs lost.** `Accept()` freed any client that was no longer connected, so a host that connected, sent a whole job and closed before the next `Accept()` (the application busy, e.g. writing NVM) lost the data. A closed client with unread data is now returned and can be read out.
 - **Timing probe.** The gap probe counted pauses where the controller was not updated at all (e.g. stopped between moves); gaps now count only while motion runs on from the previous call. `UpdateFast()` records its longest run, whether it was an arc and whether it started the next move, and how many runs exceeded 150 µs.
 
+### 8. Sample callback and external step mode (for electronic camming, 2026-11-01)
+
+**Files**:
+- `libClearCore/inc/SysManager.h`, `libClearCore/src/SysManager.cpp` — `SampleCallbackSet(void (*)())`: an application function run in the sample interrupt (5 kHz) just before the connectors refresh.
+- `libClearCore/inc/MotorDriver.h`, `libClearCore/src/MotorDriver.cpp` — `ExternalStepMode(bool)`, `ExternalStepMode()`, `SetExternalSteps(int32_t)`, `ExternalStepsCarry()`. The step output code of `SetCoordinatedSteps()` (direction, per-sample limit with carry, step output, `PositionRefCommanded()` tracking) moved into a private `ApplySampleSteps()` shared by both modes.
+
+**Why**:
+- An electronic cam follower has to set every motor's steps each sample from a master position (encoder, a crank motor it drives, or a clock). Until now the only way to inject per-sample steps was `CoordinatedMotionController`, which is tied to an X/Y pair and only drives while its planner has motion queued.
+- In external step mode the StepGenerator is bypassed and `Move()` / `MoveVelocity()` return false, so nothing else can write that motor's step output. A sample in which the application sets no steps outputs none (the pending count is consumed every sample), so a stalled application stops the motor rather than repeating the last count.
+- The callback runs before the connectors refresh so the steps it sets go out in the same sample. `EncoderIn` is updated after the connectors, so the callback sees the previous sample's encoder position (one sample, 200 µs, of master lag).
+- Behaviour without the new calls is unchanged: no callback is set and external mode is off by default; coordinated mode runs the same code as before.
+
 ## Summary
 
 **Total Modified Files**: 3 (+ QUAD_AB additions across Connector/MotorDriver/MotorManager/docs/example)
