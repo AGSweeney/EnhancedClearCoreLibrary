@@ -45,7 +45,14 @@ ArcInterpolator::ArcInterpolator()
       m_lastXExact(0.0),
       m_lastYExact(0.0),
       m_remainX(0.0),
-      m_remainY(0.0) {
+      m_remainY(0.0),
+      m_startAngleRad(0.0),
+      m_spanRad(0.0),
+      m_sweptRad(0.0),
+      m_done(true),
+      m_haveExactEnd(false),
+      m_endXSteps(0),
+      m_endYSteps(0) {
     Reset();
 }
 
@@ -96,12 +103,23 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
         }
     }
     
-    // Calculate arc length and total steps
-    // Arc length = radius * angle (in radians)
-    // angleSpanQx is in Q15, convert to radians: angleSpanQx / 32768 * 2π
-    // But we want steps, so: steps = radius * angleSpanQx / 32768
-    int64_t arcLengthQx = ((int64_t)radius * angleSpanQx) >> 15;
-    uint32_t totalSteps = (uint32_t)arcLengthQx;
+    // Arc length (steps) = radius * span in radians. Q15 angles are fractions
+    // of a full turn (TWO_PI_QX = 32768 = 2*pi), so span_rad = spanQx * 2*pi / 32768.
+    // (Fix 2026-10-31: the 2*pi factor was missing, so the accel/decel ramps
+    // below saw arcs 2*pi times shorter than they are and capped the speed at
+    // sqrt(a*r/2) on a half circle.)
+    // Exact sweep in double radians; the Q15 span above is kept for the
+    // fields that still report it. Equal start and end angles mean a full turn.
+    const double twoPi = 2.0 * M_PI;
+    double a0 = fmod(startAngle, twoPi);
+    double a1 = fmod(endAngle, twoPi);
+    if (a0 < 0.0) a0 += twoPi;
+    if (a1 < 0.0) a1 += twoPi;
+    double spanRad = clockwise ? (a0 - a1) : (a1 - a0);
+    if (spanRad <= 1e-12) {
+        spanRad += twoPi;
+    }
+    uint32_t totalSteps = (uint32_t)((double)radius * spanRad + 0.5);
     
     if (totalSteps == 0) {
         return false;
@@ -150,78 +168,62 @@ bool ArcInterpolator::InitializeArc(int32_t centerX, int32_t centerY,
     m_currentYQx = m_currentArc.centerYQx + 
                    (((int64_t)m_currentArc.radiusQx * sinVal) >> 15);
     
-    m_lastXSteps = (int32_t)(m_currentXQx >> FRACT_BITS);
-    m_lastYSteps = (int32_t)(m_currentYQx >> FRACT_BITS);
     double cx = (double)centerX, cy = (double)centerY, r = (double)radius;
     m_lastXExact = cx + r * cos(startAngle);
     m_lastYExact = cy + r * sin(startAngle);
+    m_lastXSteps = (int32_t)llround(m_lastXExact);
+    m_lastYSteps = (int32_t)llround(m_lastYExact);
+    m_startAngleRad = a0;
+    m_spanRad = spanRad;
+    m_sweptRad = 0.0;
+    m_done = false;
+    m_haveExactEnd = false;
+    m_endXSteps = (int32_t)llround(cx + r * cos(endAngle));
+    m_endYSteps = (int32_t)llround(cy + r * sin(endAngle));
     
     return true;
 }
 
 bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
-    // Compute remaining angle in the direction of travel.
-    // BUG GUARD: if the continuous-angle tracker has stepped PAST endAngle, the formula
-    // below would wrap to ~2π (full circle).  Clamp using spanQx: any remaining > span
-    // means we have overshot, so treat as complete (remaining = 0).
-    int32_t angleRemainingQx;
-    if (m_currentArc.clockwise) {
-        if (m_currentArc.endAngleQx < m_currentAngleQx) {
-            angleRemainingQx = m_currentAngleQx - m_currentArc.endAngleQx;
-        } else {
-            angleRemainingQx = TWO_PI_QX - (m_currentArc.endAngleQx - m_currentAngleQx);
-        }
-    } else {
-        if (m_currentArc.endAngleQx > m_currentAngleQx) {
-            angleRemainingQx = m_currentArc.endAngleQx - m_currentAngleQx;
-        } else {
-            angleRemainingQx = TWO_PI_QX - (m_currentAngleQx - m_currentArc.endAngleQx);
-        }
-    }
-    if (angleRemainingQx > m_currentArc.spanQx) {
-        angleRemainingQx = 0;
-    }
-
-    int64_t radiusSteps = m_currentArc.radiusQx >> FRACT_BITS;
-    if (radiusSteps == 0) {
-        radiusSteps = 1;
-    }
-    m_currentArc.stepsRemaining =
-        (uint32_t)(((int64_t)radiusSteps * angleRemainingQx) >> 15);
-
-    if (angleRemainingQx <= 0) {
-        stepsX = 0;
-        stepsY = 0;
+    // 2026-10-31 rewrite: the sweep is tracked in double radians from the
+    // exact start angle, so the arc length, the accel/decel ramps and the end
+    // point no longer depend on the Q15 angle resolution (one Q15 unit is
+    // ~4.6 steps of arc at r = 24000 steps). The last sample lands on the end
+    // point exactly (m_endXSteps/m_endYSteps).
+    stepsX = 0;
+    stepsY = 0;
+    if (m_done) {
         return false;
     }
 
-    // CRITICAL: Maintain TANGENTIAL velocity along the arc path
-    // The speed along the arc circumference must be constant (velocityMax steps/sec)
-    // Individual motor speeds will adapt automatically based on their position on the arc
-    
-    // Calculate angular velocity from tangential velocity:
-    // Tangential velocity: v = r * ω  (steps/sec)
-    // Angular velocity: ω = v / r    (rad/sec)
-    // Angle increment per sample: dθ = ω * dt = (v / r) * (1 / sampleRateHz)
-    
-    // Calculate accel/decel-limited tangential speed
-    uint32_t distFromStart = (m_currentArc.totalSteps > m_currentArc.stepsRemaining) ?
-                              (m_currentArc.totalSteps - m_currentArc.stepsRemaining) : 0;
-    uint32_t remainingDist = m_currentArc.stepsRemaining;
+    double r = (double)(m_currentArc.radiusQx >> FRACT_BITS);
+    if (r < 1.0) {
+        r = 1.0;
+    }
+    const double remainingRad = m_spanRad - m_sweptRad;
+    if (remainingRad <= 0.0) {
+        m_done = true;
+        m_currentArc.stepsRemaining = 0;
+        return false;
+    }
+
+    // Accel/decel-limited tangential speed (steps/s).
+    const double distFromStart = r * m_sweptRad;
+    const double remainingDist = r * remainingRad;
     double targetSpeed = (double)m_velocityMax;
     if (m_accelMax > 0) {
-        double maxSpeedFromStart = sqrt((double)m_entrySpeed * (double)m_entrySpeed +
-                                        2.0 * (double)m_accelMax * (double)distFromStart);
-        double maxSpeedFromEnd = sqrt((double)m_exitSpeed * (double)m_exitSpeed +
-                                      2.0 * (double)m_accelMax * (double)remainingDist);
-        if (maxSpeedFromStart < targetSpeed) {
-            targetSpeed = maxSpeedFromStart;
+        const double fromStart = sqrt((double)m_entrySpeed * (double)m_entrySpeed +
+                                      2.0 * (double)m_accelMax * distFromStart);
+        const double fromEnd = sqrt((double)m_exitSpeed * (double)m_exitSpeed +
+                                    2.0 * (double)m_accelMax * remainingDist);
+        if (fromStart < targetSpeed) {
+            targetSpeed = fromStart;
         }
-        if (maxSpeedFromEnd < targetSpeed) {
-            targetSpeed = maxSpeedFromEnd;
+        if (fromEnd < targetSpeed) {
+            targetSpeed = fromEnd;
         }
     }
-    // Avoid long start delay: use a fraction of feed when accel-limited to very low speed.
+    // Avoid a long crawl at the very start/end: never below 1/20 of feed.
     double minTargetSpeed = (m_velocityMax > 0) ? (double)(m_velocityMax / 20) : 1.0;
     if (minTargetSpeed < 1.0) {
         minTargetSpeed = 1.0;
@@ -230,105 +232,61 @@ bool ArcInterpolator::GenerateNextSteps(int32_t &stepsX, int32_t &stepsY) {
         targetSpeed = minTargetSpeed;
     }
 
-    // Angle increment per sample: dθ (rad) = targetSpeed / (radius * sampleRate).
-    double angleIncRad = (double)targetSpeed / ((double)radiusSteps * (double)m_sampleRateHz);
-    double angleRemainingRad = (double)angleRemainingQx * (2.0 * M_PI / 32768.0);
-    if (angleIncRad > angleRemainingRad) {
-        angleIncRad = angleRemainingRad;
+    double angleInc = targetSpeed / (r * (double)m_sampleRateHz);
+    const bool last = (angleInc >= remainingRad);
+    if (last) {
+        m_sweptRad = m_spanRad;
+    } else {
+        m_sweptRad += angleInc;
     }
-    if (m_currentArc.clockwise) {
-        angleIncRad = -angleIncRad;
-    }
+    const double angle = m_startAngleRad + (m_currentArc.clockwise ? -m_sweptRad : m_sweptRad);
 
-    // Advance angle every sample (no "wait for 1 Q15" — eliminates start delay).
-    m_currentAngleRad += angleIncRad;
-    const double twoPi = 2.0 * M_PI;
-    while (m_currentAngleRad < 0.0) {
-        m_currentAngleRad += twoPi;
-    }
-    while (m_currentAngleRad >= twoPi) {
-        m_currentAngleRad -= twoPi;
-    }
-
-    m_currentAngleQx = (int32_t)(m_currentAngleRad * (32768.0 / twoPi));
-    m_currentAngleQx = NormalizeAngleQx(m_currentAngleQx);
-
-    // Exact position (steps) from continuous angle for fractional step accumulation.
-    double cx = (double)(m_currentArc.centerXQx >> FRACT_BITS);
-    double cy = (double)(m_currentArc.centerYQx >> FRACT_BITS);
-    double r = (double)(m_currentArc.radiusQx >> FRACT_BITS);
-    double xExact = cx + r * cos(m_currentAngleRad);
-    double yExact = cy + r * sin(m_currentAngleRad);
-    double deltaX = xExact - m_lastXExact;
-    double deltaY = yExact - m_lastYExact;
+    const double cx = (double)(m_currentArc.centerXQx >> FRACT_BITS);
+    const double cy = (double)(m_currentArc.centerYQx >> FRACT_BITS);
+    const double xExact = cx + r * cos(angle);
+    const double yExact = cy + r * sin(angle);
+    m_remainX += xExact - m_lastXExact;
+    m_remainY += yExact - m_lastYExact;
     m_lastXExact = xExact;
     m_lastYExact = yExact;
-    m_remainX += deltaX;
-    m_remainY += deltaY;
     int32_t outX = (int32_t)(m_remainX >= 0.0 ? m_remainX + 0.5 : m_remainX - 0.5);
     int32_t outY = (int32_t)(m_remainY >= 0.0 ? m_remainY + 0.5 : m_remainY - 0.5);
     m_remainX -= (double)outX;
     m_remainY -= (double)outY;
 
-    // Update Q15 position for remaining/clamp logic
-    int64_t newXQx = m_currentArc.centerXQx +
-                     (((int64_t)m_currentArc.radiusQx * CosQx(m_currentAngleQx)) >> 15);
-    int64_t newYQx = m_currentArc.centerYQx +
-                     (((int64_t)m_currentArc.radiusQx * SinQx(m_currentAngleQx)) >> 15);
-    m_currentXQx = newXQx;
-    m_currentYQx = newYQx;
-
-    int32_t angleRemainingQxPost;
-    if (m_currentArc.clockwise) {
-        if (m_currentArc.endAngleQx < m_currentAngleQx) {
-            angleRemainingQxPost = m_currentAngleQx - m_currentArc.endAngleQx;
-        } else {
-            angleRemainingQxPost = TWO_PI_QX - (m_currentArc.endAngleQx - m_currentAngleQx);
+    if (last) {
+        // Land on the end point. Normally this changes the last sample by a
+        // step or two; the cap keeps a wrong end point from becoming a burst.
+        const int32_t kMaxEndFix = 4;
+        const int32_t fixX = m_endXSteps - m_lastXSteps;
+        const int32_t fixY = m_endYSteps - m_lastYSteps;
+        if (fixX - outX <= kMaxEndFix && outX - fixX <= kMaxEndFix) {
+            outX = fixX;
         }
-    } else {
-        if (m_currentArc.endAngleQx > m_currentAngleQx) {
-            angleRemainingQxPost = m_currentArc.endAngleQx - m_currentAngleQx;
-        } else {
-            angleRemainingQxPost = TWO_PI_QX - (m_currentAngleQx - m_currentArc.endAngleQx);
+        if (fixY - outY <= kMaxEndFix && outY - fixY <= kMaxEndFix) {
+            outY = fixY;
         }
-    }
-    // Same overshoot guard as the pre-advance check.
-    if (angleRemainingQxPost > m_currentArc.spanQx) {
-        angleRemainingQxPost = 0;
-    }
-    m_currentArc.stepsRemaining = (uint32_t)(((int64_t)radiusSteps * angleRemainingQxPost) >> 15);
-
-    const int32_t ANGLE_DONE_QX = 2;
-    if (angleRemainingQxPost <= ANGLE_DONE_QX) {
-        int32_t cosEnd = CosQx(m_currentArc.endAngleQx);
-        int32_t sinEnd = SinQx(m_currentArc.endAngleQx);
-        int64_t endXQx = m_currentArc.centerXQx + (((int64_t)m_currentArc.radiusQx * cosEnd) >> 15);
-        int64_t endYQx = m_currentArc.centerYQx + (((int64_t)m_currentArc.radiusQx * sinEnd) >> 15);
-        int32_t endXSteps = (int32_t)(endXQx >> FRACT_BITS);
-        int32_t endYSteps = (int32_t)(endYQx >> FRACT_BITS);
-        stepsX = endXSteps - m_lastXSteps;
-        stepsY = endYSteps - m_lastYSteps;
-        m_lastXSteps = endXSteps;
-        m_lastYSteps = endYSteps;
-        m_currentXQx = endXQx;
-        m_currentYQx = endYQx;
-        m_currentAngleQx = m_currentArc.endAngleQx;
-        m_currentAngleRad = (double)m_currentArc.endAngleQx * (twoPi / 32768.0);
-        m_lastXExact = (double)endXSteps;
-        m_lastYExact = (double)endYSteps;
         m_remainX = 0.0;
         m_remainY = 0.0;
-        m_currentArc.stepsRemaining = 0;
-        if (stepsX == 0 && stepsY == 0) {
-            return false;
-        }
-        return true;
+        m_done = true;
     }
 
-    stepsX = outX;
-    stepsY = outY;
     m_lastXSteps += outX;
     m_lastYSteps += outY;
+    stepsX = outX;
+    stepsY = outY;
+
+    // Keep the Q15 mirrors current for code that still reads them.
+    const double twoPi = 2.0 * M_PI;
+    double norm = fmod(angle, twoPi);
+    if (norm < 0.0) {
+        norm += twoPi;
+    }
+    m_currentAngleRad = norm;
+    m_currentAngleQx = NormalizeAngleQx((int32_t)(norm * (32768.0 / twoPi)));
+    m_currentXQx = ((int64_t)m_lastXSteps) << FRACT_BITS;
+    m_currentYQx = ((int64_t)m_lastYSteps) << FRACT_BITS;
+    m_currentArc.stepsRemaining = last ? 0u : (uint32_t)(r * (m_spanRad - m_sweptRad));
     return true;
 }
 
@@ -356,6 +314,13 @@ void ArcInterpolator::Reset() {
     m_lastYExact = 0.0;
     m_remainX = 0.0;
     m_remainY = 0.0;
+    m_startAngleRad = 0.0;
+    m_spanRad = 0.0;
+    m_sweptRad = 0.0;
+    m_done = true;
+    m_haveExactEnd = false;
+    m_endXSteps = 0;
+    m_endYSteps = 0;
 }
 
 int32_t ArcInterpolator::AngleToQx(double angleRad) {

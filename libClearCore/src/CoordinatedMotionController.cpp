@@ -198,7 +198,11 @@ bool CoordinatedMotionController::MoveArc(int32_t centerX, int32_t centerY,
                                          0, 0)) {
         return false;
     }
-    
+    m_arcInterpolator.SetExactEndpoints(
+        m_currentX, m_currentY,
+        (int32_t)llround((double)centerX + (double)radius * cos(endAngle)),
+        (int32_t)llround((double)centerY + (double)radius * sin(endAngle)));
+
     // Update current position
     int32_t tempX, tempY;
     m_arcInterpolator.GetCurrentPosition(tempX, tempY);
@@ -577,7 +581,11 @@ bool CoordinatedMotionController::ProcessNextArc() {
         m_arcQueueCount--;
         return false;
     }
-    
+    m_arcInterpolator.SetExactEndpoints(
+        m_currentX, m_currentY,
+        (int32_t)llround((double)arc.centerX + (double)arc.radius * cos(arc.endAngle)),
+        (int32_t)llround((double)arc.centerY + (double)arc.radius * sin(arc.endAngle)));
+
     m_motionType = MOTION_TYPE_ARC;
     
     // Update current angle
@@ -800,6 +808,39 @@ bool CoordinatedMotionController::ValidateLinear(int32_t /*endX*/, int32_t /*end
     return true;
 }
 
+bool CoordinatedMotionController::QueueArcTo(int32_t centerX, int32_t centerY,
+                                            int32_t endX, int32_t endY,
+                                            bool clockwise) {
+    if (!m_initialized) {
+        return false;
+    }
+    // Start = where the queue will be when this arc runs.
+    int32_t startX, startY;
+    __disable_irq();
+    startX = m_currentX;
+    startY = m_currentY;
+    if (m_motionQueueCount > 0) {
+        uint8_t prevIdx = (m_motionQueueTail + ARC_QUEUE_SIZE - 1) % ARC_QUEUE_SIZE;
+        startX = m_motionQueue[prevIdx].endX;
+        startY = m_motionQueue[prevIdx].endY;
+    } else if (m_active) {
+        startX = m_activeTargetX;
+        startY = m_activeTargetY;
+    }
+    __enable_irq();
+    const double sx = (double)startX - (double)centerX;
+    const double sy = (double)startY - (double)centerY;
+    const double radius = sqrt(sx * sx + sy * sy);
+    const double startAngle = atan2(sy, sx);
+    const double endAngle = atan2((double)endY - (double)centerY, (double)endX - (double)centerX);
+    m_exactEndPending = true;
+    m_exactEndX = endX;
+    m_exactEndY = endY;
+    const bool ok = QueueArc(centerX, centerY, (int32_t)llround(radius), startAngle, endAngle, clockwise);
+    m_exactEndPending = false;
+    return ok;
+}
+
 bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
                                           int32_t radius,
                                           double startAngle,
@@ -874,6 +915,10 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
     double endYf = (double)centerY + (double)radius * sin(endAngle);
     int32_t endX = (int32_t)llround(endXf);
     int32_t endY = (int32_t)llround(endYf);
+    if (m_exactEndPending) {   // QueueArcTo: the caller's end point, not the rounded-radius one
+        endX = m_exactEndX;
+        endY = m_exactEndY;
+    }
     double entryDirX = 0.0, entryDirY = 0.0;
     double exitDirX = 0.0, exitDirY = 0.0;
     TangentDir(sn, clockwise, entryDirX, entryDirY);
@@ -1422,6 +1467,8 @@ bool CoordinatedMotionController::ProcessNextMotion() {
                                             motion.arc.clockwise,
                                             nominal, m_accelMax, SampleRateHz,
                                             entry, exit)) {
+            // Count from the queued start and land on the queued end exactly.
+            m_arcInterpolator.SetExactEndpoints(motion.startX, motion.startY, motion.endX, motion.endY);
             m_motionType = MOTION_TYPE_ARC;
             m_currentAngle = motion.arc.endAngle;
             m_activeTargetX = motion.endX;

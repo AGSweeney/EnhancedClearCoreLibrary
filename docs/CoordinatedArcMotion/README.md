@@ -1083,6 +1083,23 @@ bool QueueArc(int32_t centerX, int32_t centerY,
 
 **Description**: Queues an arc move that can chain from any motion type (arc or linear). The arc will start smoothly from the current position when the previous motion completes. The start angle is automatically calculated using `CalculateStartAngle()` to ensure tangent continuity from the current position.
 
+#### QueueArcTo
+
+```cpp
+bool QueueArcTo(int32_t centerX, int32_t centerY,
+                int32_t endX, int32_t endY,
+                bool clockwise);
+```
+
+**Parameters**:
+- `centerX`, `centerY`: Arc center (steps)
+- `endX`, `endY`: Exact end point (steps)
+- `clockwise`: `true` for clockwise, `false` for counterclockwise
+
+**Returns**: `true` if arc queued successfully
+
+**Description**: Like `QueueArc`, but takes the end point instead of a radius and angles. The arc starts wherever the queue will be when it runs (the previous move's end, or the current position) and lands on `endX`/`endY` exactly, even when the radius is not a whole number of steps. `QueueArc` rebuilds its end point from a rounded radius, which can miss by a step on a diagonal arc. The end point must lie on the circle through the start around the centre to within a few steps; the last sample's correction is capped, so a wrong end point never causes a step burst.
+
 #### QueueLinear
 
 ```cpp
