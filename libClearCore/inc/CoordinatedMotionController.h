@@ -123,6 +123,26 @@ public:
                  bool clockwise);
 
     /**
+        \brief Queue an arc to an exact end point.
+
+        Like QueueArc, but the caller gives the end point instead of a radius
+        and angles. The start is wherever the queue will be when the arc runs
+        (the previous move's end, or the current position). The arc lands on
+        endX/endY exactly, even when the radius is not a whole number of steps
+        (QueueArc rebuilds the end point from a rounded radius, which can miss
+        by a step on a diagonal arc). endX/endY must lie on the circle through
+        the start around the centre to within a few steps.
+
+        \param[in] centerX Arc center X position in steps
+        \param[in] centerY Arc center Y position in steps
+        \param[in] endX Ending X position in steps
+        \param[in] endY Ending Y position in steps
+        \param[in] clockwise Direction (true = clockwise)
+        \return true if arc command accepted
+    **/
+    bool QueueArcTo(int32_t centerX, int32_t centerY, int32_t endX, int32_t endY, bool clockwise);
+
+    /**
         \brief Maximum number of segments the planner queue can hold.
         Use this to cap the batch size in the host firmware so it never tries to submit
         more segments than fit, which would cause QueueArc/QueueLinear to fail.
@@ -588,6 +608,10 @@ private:
     
     ArcInterpolator m_arcInterpolator;
     LinearInterpolator m_linearInterpolator;
+    // QueueArcTo hands its exact end point to QueueArc through these.
+    bool m_exactEndPending = false;
+    int32_t m_exactEndX = 0;
+    int32_t m_exactEndY = 0;
     
     // Unified motion queue (can hold both arcs and linear moves)
     // NOTE: Queue variables marked volatile because they're accessed from both

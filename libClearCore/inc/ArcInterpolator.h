@@ -125,27 +125,28 @@ public:
         \return true if arc is complete
     **/
     bool IsArcComplete() const {
-        int32_t angleRemainingQx;
-        if (m_currentArc.clockwise) {
-            if (m_currentArc.endAngleQx < m_currentAngleQx) {
-                angleRemainingQx = m_currentAngleQx - m_currentArc.endAngleQx;
-            } else {
-                angleRemainingQx = TWO_PI_QX - (m_currentArc.endAngleQx - m_currentAngleQx);
-            }
-        } else {
-            if (m_currentArc.endAngleQx > m_currentAngleQx) {
-                angleRemainingQx = m_currentArc.endAngleQx - m_currentAngleQx;
-            } else {
-                angleRemainingQx = TWO_PI_QX - (m_currentAngleQx - m_currentArc.endAngleQx);
-            }
-        }
-        // Clamp: if remaining > span we've overshot the endpoint (angle stepped past it).
-        // Without this, the wrap formula gives ~2π remaining and draws a full extra circle.
-        if (angleRemainingQx > m_currentArc.spanQx) {
-            angleRemainingQx = 0;
-        }
-        const int32_t ANGLE_THRESHOLD_QX = (TWO_PI_QX / 3600); // ~0.1 degree
-        return angleRemainingQx <= ANGLE_THRESHOLD_QX;
+        // Set by GenerateNextSteps when it emits the sample that reaches the
+        // end angle (exactly: the sweep is tracked in double radians), and by
+        // Reset. (2026-10-31: replaces the Q15 remaining-angle threshold,
+        // which ended arcs up to 0.1 degree early.)
+        return m_done;
+    }
+
+    /**
+        rief Give the arc's exact integer start and end positions (steps).
+
+        Call right after InitializeArc. The interpolator then counts its
+        position from startX/startY and its last sample lands exactly on
+        endX/endY (the final correction is capped at a few steps, so a
+        mismatched end point can never cause a step burst). Without it the
+        end point is the circle point at endAngle, rounded.
+    **/
+    void SetExactEndpoints(int32_t startX, int32_t startY, int32_t endX, int32_t endY) {
+        m_lastXSteps = startX;
+        m_lastYSteps = startY;
+        m_endXSteps = endX;
+        m_endYSteps = endY;
+        m_haveExactEnd = true;
     }
 
     /**
@@ -193,6 +194,14 @@ private:
     double m_lastYExact;         // Last Y position (steps, double) for delta
     double m_remainX;            // Fractional step remainder X
     double m_remainY;            // Fractional step remainder Y
+    // Sweep tracked in double radians (2026-10-31): exact span and end point.
+    double m_startAngleRad;      // Start angle, normalised to [0, 2*pi)
+    double m_spanRad;            // Total sweep (> 0, <= 2*pi)
+    double m_sweptRad;           // Sweep done so far
+    bool m_done;                 // Final sample emitted (or no arc)
+    bool m_haveExactEnd;         // SetExactEndpoints was called
+    int32_t m_endXSteps;         // End point the last sample lands on
+    int32_t m_endYSteps;
 
     // Constants
     static const int32_t TWO_PI_QX = 32768; // 2π in Q15 format

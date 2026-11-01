@@ -98,6 +98,7 @@ The ClearCNC desktop app builds with `build.ps1` (Visual Studio 2022, CMake and 
 | Path | Contents |
 |------|----------|
 | `libClearCore/` | The ClearCore library with this fork's additions (Microchip Studio project included) |
+| `libClearCore/tests/host/` | PC-side tests for hardware-independent code (`make` with g++); see its README |
 | `LwIP/` | lwIP TCP/IP stack used by the library's Ethernet support |
 | `ClearCNC_Controller/`, `ClearAI_Controller/`, `NewGControl/` | Projects built on the library |
 | `Microchip_Examples/`, `ProjectTemplate/`, `Depreciated/` | Examples and the starter template |
