@@ -127,7 +127,8 @@ public:
     /**
         \brief A function called in the sample interrupt (#SampleRateHz), just
         before the connectors refresh, so step counts it sets with
-        MotorDriver::SetExternalSteps() go out in the same sample.
+        MotorDriver::SetExternalSteps() are loaded by this sample's refresh
+        (the pulses go out over the following sample period).
 
         It runs at interrupt priority: keep it short, use no heap and no
         blocking calls, and prefer single-precision or integer maths.

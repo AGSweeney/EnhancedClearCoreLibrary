@@ -187,7 +187,7 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 **Why**:
 - An electronic cam follower has to set every motor's steps each sample from a master position (encoder, a crank motor it drives, or a clock). Until now the only way to inject per-sample steps was `CoordinatedMotionController`, which is tied to an X/Y pair and only drives while its planner has motion queued.
 - In external step mode the StepGenerator is bypassed and `Move()` / `MoveVelocity()` return false, so nothing else can write that motor's step output. A sample in which the application sets no steps outputs none (the pending count is consumed every sample), so a stalled application stops the motor rather than repeating the last count.
-- The callback runs before the connectors refresh so the steps it sets go out in the same sample. `EncoderIn` is updated after the connectors, so the callback sees the previous sample's encoder position (one sample, 200 µs, of master lag).
+- The callback runs before the connectors refresh, so the steps it sets are loaded into the step timer by this sample's refresh (no extra sample of delay); the pulses themselves go out over the following 200 µs period (see section 9). `EncoderIn` is updated after the connectors, so the callback sees the previous sample's encoder position (one sample, 200 µs, of master lag).
 - Behaviour without the new calls is unchanged: no callback is set and external mode is off by default; coordinated mode runs the same code as before.
 
 ### 9. Direction output in coordinated / external step modes (ECam, 2026-11-01)
@@ -200,19 +200,18 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 
 ## Summary
 
-**Total Modified Files**: 3 (+ QUAD_AB additions across Connector/MotorDriver/MotorManager/docs/example)
-
-**Modification Types**:
-1. **Coordinated Motion Integration**: Added support for coordinated motion between two motors
-2. **Unit Conversion Support**: Added physical unit conversion (inches, mm, degrees, etc.)
-3. **Header Includes**: Added includes for new feature headers
-4. **Quadrature AB Motion Mode**: Added `CPM_MODE_QUAD_AB` StepGenerator output mode
+**Modification Types** (sections above):
+1. **Coordinated motion integration** (1–3): coordinated motion between two motors, physical unit conversion, includes for the new feature headers.
+2. **Quadrature AB motion mode** (4): `CPM_MODE_QUAD_AB` StepGenerator output mode (Connector, MotorDriver, MotorManager, docs, example).
+3. **Fixes from ClearHPGL** (5–7): coordinated step output, TCP receive and accept, USB serial receive, linear interpolation, arc timing in the step interrupt.
+4. **Electronic camming** (8–9): `SysManager` sample callback, `MotorDriver` external step mode, and the step-direction rule shared with coordinated mode.
 
 **All Modifications Preserve**:
 - Original Teknic copyright and license
 - Original file structure and organization
-- Backward compatibility with existing code
-- Original functionality (additions only, no removals)
+- The existing API: everything added is opt-in (no callback, external mode off, coordinated mode off by default)
+
+**Behaviour changes** (bug fixes, sections 5–7 and 9): coordinated / external step output, TCP and USB receive, and the step direction in coordinated mode behave differently from the original where the original lost or mis-sent data or steps; each section says what changed and why.
 
 ## License
 
