@@ -161,7 +161,7 @@ Connector *const Connectors[CLEARCORE_PIN_MAX] = {
 /**
     Constructor
 **/
-SysManager::SysManager() : m_readyForOperations(false) {
+SysManager::SysManager() : m_readyForOperations(false), m_sampleCallback(nullptr) {
     XBee = XBeeDriver(&XBee_CTS_IN, &XBee_RTS_OUT, &XBee_Rx_IN, &XBee_Tx_OUT,
                       PER_SERCOM_ALT);
     SdCard = SdCardDriver(&MicroSD_MISO, &MicroSD_SS, &MicroSD_SCK,
@@ -328,6 +328,10 @@ void SysManager::Initialize() {
 /**
     Update systems at the sample rate
 **/
+void SysManager::SampleCallbackSet(void (*callback)()) {
+    m_sampleCallback = callback;
+}
+
 void SysManager::UpdateFastImpl() {
     CcioMgr.Refresh();
     AdcMgr.Update();
@@ -336,6 +340,11 @@ void SysManager::UpdateFastImpl() {
     InputMgr.UpdateBegin();
 
     if (SysMgr.Ready()) {
+        // Application hook (e.g. an electronic-cam follower) before the step outputs refresh.
+        void (*const callback)() = m_sampleCallback;
+        if (callback) {
+            callback();
+        }
         for (uint8_t i = 0; i < CLEARCORE_PIN_MAX; i++) {
             Connectors[i]->Refresh();
         }

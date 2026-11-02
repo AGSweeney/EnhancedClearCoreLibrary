@@ -17,7 +17,8 @@ It also holds the applications built on top of it: a CNC controller, an LLM-driv
 | **Motion queue with lookahead** | Moves are queued and chained without stopping; the planner works out how fast the machine can pass through each corner. |
 | **Physical units** | Configure steps per revolution, lead-screw pitch and gear ratio, then command positions and feed rates in mm, inches, revolutions or degrees (`UnitConverter`, unit methods on `MotorDriver` and the controller). |
 | **Quadrature output mode** | `CPM_MODE_QUAD_AB`: drive ClearPath motors with A/B quadrature instead of step and direction. |
-| **Reliability fixes** | Fixes found while building the controllers: step bursts on small arcs, a motor fault on slow nearly-straight moves, stalled TCP transfers, and USB serial input stopping mid-transfer. |
+| **Sample callback and external step mode** | `SysMgr.SampleCallbackSet()` runs your function in the 5 kHz sample interrupt; `MotorDriver::ExternalStepMode()` / `SetExternalSteps()` let it set each motor's steps every sample, e.g. an electronic cam following an encoder or a crank motor. Used by the Electronic CAM Workbench (ECamUI, its own repository). |
+| **Reliability fixes** | Fixes found while building the controllers: step bursts on small arcs, a motor fault on slow nearly-straight moves, stalled TCP transfers, USB serial input stopping mid-transfer, and per-sample step output flipping the direction between pulses (position drift on some drives). |
 
 Everything Teknic's library already did keeps working; the additions are new classes and new methods. [NEW_FILES.md](NEW_FILES.md) lists the new files and [MODIFICATIONS.md](MODIFICATIONS.md) every change to Teknic's files, with the reasons.
 

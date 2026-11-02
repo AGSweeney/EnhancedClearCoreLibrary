@@ -178,21 +178,40 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 - **TCP jobs lost.** `Accept()` freed any client that was no longer connected, so a host that connected, sent a whole job and closed before the next `Accept()` (the application busy, e.g. writing NVM) lost the data. A closed client with unread data is now returned and can be read out.
 - **Timing probe.** The gap probe counted pauses where the controller was not updated at all (e.g. stopped between moves); gaps now count only while motion runs on from the previous call. `UpdateFast()` records its longest run, whether it was an arc and whether it started the next move, and how many runs exceeded 150 µs.
 
+### 8. Sample callback and external step mode (for electronic camming, 2026-11-01)
+
+**Files**:
+- `libClearCore/inc/SysManager.h`, `libClearCore/src/SysManager.cpp` — `SampleCallbackSet(void (*)())`: an application function run in the sample interrupt (5 kHz) just before the connectors refresh.
+- `libClearCore/inc/MotorDriver.h`, `libClearCore/src/MotorDriver.cpp` — `ExternalStepMode(bool)`, `ExternalStepMode()`, `SetExternalSteps(int32_t)`, `ExternalStepsCarry()`. The step output code of `SetCoordinatedSteps()` (direction, per-sample limit with carry, step output, `PositionRefCommanded()` tracking) moved into a private `ApplySampleSteps()` shared by both modes.
+
+**Why**:
+- An electronic cam follower has to set every motor's steps each sample from a master position (encoder, a crank motor it drives, or a clock). Until now the only way to inject per-sample steps was `CoordinatedMotionController`, which is tied to an X/Y pair and only drives while its planner has motion queued.
+- In external step mode the StepGenerator is bypassed and `Move()` / `MoveVelocity()` return false, so nothing else can write that motor's step output. A sample in which the application sets no steps outputs none (the pending count is consumed every sample), so a stalled application stops the motor rather than repeating the last count.
+- The callback runs before the connectors refresh, so the steps it sets are loaded into the step timer by this sample's refresh (no extra sample of delay); the pulses themselves go out over the following 200 µs period (see section 9). `EncoderIn` is updated after the connectors, so the callback sees the previous sample's encoder position (one sample, 200 µs, of master lag).
+- Behaviour without the new calls is unchanged: no callback is set and external mode is off by default; coordinated mode runs the same code as before.
+
+### 9. Direction output in coordinated / external step modes (ECam, 2026-11-01)
+
+**Files**: `libClearCore/src/MotorDriver.cpp`, `libClearCore/inc/MotorDriver.h` — `ApplySampleSteps()`, new `ReversalWaits()`.
+
+**Why**:
+- **Position drift every cam cycle** (ClearPath on a ballscrew following a poly 3-4-5 profile). The step count for a sample is double-buffered into the step timer, so the pulses written in one sample go out at the start of the next, while the sample interrupt is already running. `ApplySampleSteps()` set the direction output from the sign of every sample's count, and a sample with no steps counted as positive. On a slow negative move (pattern -1, 0, 0, -1, …) the output therefore flipped to positive at every pause and back at the next step, each time a few tens of µs after the previous sample's pulse had gone out. On the failing profile that is 300 direction changes per revolution, 150 of them right behind a pulse; a drive that takes the direction slightly after the step edge counts those pulses the wrong way.
+- Now a sample with no steps leaves the direction alone, and a reversal directly after a sample that sent steps waits one sample (nothing is sent, the steps are carried and go out next sample after the direction change). The direction then only changes with nothing in flight, as the stock StepGenerator does (it changes direction from standstill only). Same net steps; `PositionRefCommanded()` unchanged; `ReversalWaits()` counts the held reversals.
+
 ## Summary
 
-**Total Modified Files**: 3 (+ QUAD_AB additions across Connector/MotorDriver/MotorManager/docs/example)
-
-**Modification Types**:
-1. **Coordinated Motion Integration**: Added support for coordinated motion between two motors
-2. **Unit Conversion Support**: Added physical unit conversion (inches, mm, degrees, etc.)
-3. **Header Includes**: Added includes for new feature headers
-4. **Quadrature AB Motion Mode**: Added `CPM_MODE_QUAD_AB` StepGenerator output mode
+**Modification Types** (sections above):
+1. **Coordinated motion integration** (1–3): coordinated motion between two motors, physical unit conversion, includes for the new feature headers.
+2. **Quadrature AB motion mode** (4): `CPM_MODE_QUAD_AB` StepGenerator output mode (Connector, MotorDriver, MotorManager, docs, example).
+3. **Fixes from ClearHPGL** (5–7): coordinated step output, TCP receive and accept, USB serial receive, linear interpolation, arc timing in the step interrupt.
+4. **Electronic camming** (8–9): `SysManager` sample callback, `MotorDriver` external step mode, and the step-direction rule shared with coordinated mode.
 
 **All Modifications Preserve**:
 - Original Teknic copyright and license
 - Original file structure and organization
-- Backward compatibility with existing code
-- Original functionality (additions only, no removals)
+- The existing API: everything added is opt-in (no callback, external mode off, coordinated mode off by default)
+
+**Behaviour changes** (bug fixes, sections 5–7 and 9): coordinated / external step output, TCP and USB receive, and the step direction in coordinated mode behave differently from the original where the original lost or mis-sent data or steps; each section says what changed and why.
 
 ## License
 
