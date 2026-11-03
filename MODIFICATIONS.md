@@ -210,6 +210,12 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 
 **Why**: an enable starts a countdown (`CPM_ENABLE_DELAY` samples) that `Refresh()` finishes by setting `m_isEnabled`. A disable inside that window cleared only `m_isEnabled`, so the countdown went on and marked the motor enabled while its enable output was off. From then on `StatusReg` read ReadyState `MOTOR_FAULTED` with `MotorInFault` set (HLFB is deasserted on a disabled motor) and `EnableRequest(true)` skipped the enable delay, until a reset. Found on the ECam bench: an application that disables on `MotorInFault` (the bit is sticky across a disable) re-faulted every enable this way.
 
+### 12. lwIP heap and pool statistics (`LwIP/LwIP/port/include/lwipopts.h`, ECam, 2026-11-03)
+
+**What**: `LWIP_STATS 1` and `MEMP_STATS 1`; `MEM_STATS` follows (lwIP's default with its own heap). The per-protocol counters (link, ARP, IP, ICMP, IGMP, UDP, TCP, system) stay off.
+
+**Why**: an application can then read `lwip_stats.mem` and `lwip_stats.memp[]` (use, high water, allocation failures) to see that the 4 KB heap and the pools are not running out under load, as the ECam firmware's `diag` does in a 30-minute EtherNet/IP + telemetry test. It costs a few hundred bytes of RAM and a counter update per allocation; nothing changes in how the stack behaves.
+
 ## Summary
 
 **Modification Types** (sections above):
@@ -219,6 +225,7 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 4. **Electronic camming** (8–9): `SysManager` sample callback, `MotorDriver` external step mode, and the step-direction rule shared with coordinated mode.
 5. **lwIP configuration** (10): room for an EtherNet/IP adapter's UDP sockets.
 6. **Motor enable fix** (11): a disable during the enable delay no longer leaves the motor marked enabled.
+7. **lwIP statistics** (12): heap and pool counters compiled in.
 
 **All Modifications Preserve**:
 - Original Teknic copyright and license

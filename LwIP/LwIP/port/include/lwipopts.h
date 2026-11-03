@@ -400,7 +400,7 @@
 // <q> Enables statistics collection in lwip_stats
 // <id> lwip_stats
 #ifndef LWIP_STATS
-#define LWIP_STATS 0
+#define LWIP_STATS 1 /* for the heap and pool counters below (MEM_STATS follows from it); the per-protocol counters stay off */
 #endif
 
 // <q> Compile in the statistics output functions
@@ -460,7 +460,7 @@
 // <q> Enable memp.c stats
 // <id> lwip_memp_stats
 #ifndef MEMP_STATS
-#define MEMP_STATS 0
+#define MEMP_STATS 1 /* pool use, high water and allocation failures, readable in lwip_stats.memp[] */
 #endif
 
 // <q> Enable system stats
