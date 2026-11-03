@@ -883,6 +883,10 @@ void MotorDriver::EnableRequest(bool value) {
     }
     else if (!value) {
         m_isEnabled = false;
+        // A disable during the enable delay ends it too: otherwise the countdown finishes in Refresh()
+        // and marks a motor whose enable output is off as enabled (ReadyState faulted, MotorInFault
+        // set, until the next enable).
+        m_isEnabling = false;
     }
     __enable_irq();
 

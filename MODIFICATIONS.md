@@ -204,6 +204,12 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 
 **Why**: an EtherNet/IP adapter (QuickEIP) holds two UDP sockets (44818 and 2222). With DHCP (one while it runs) and one application UDP port, as the ECam firmware's discovery on 9502, that is exactly lwIP's default of 4, and any further UDP use would fail to bind without an obvious error. DNS holds no socket: with lwIP's default `LWIP_DNS_SECURE` it opens one only during a lookup. The two extra blocks cost about 64 bytes of RAM.
 
+### 11. Disable during the enable delay (`libClearCore/src/MotorDriver.cpp`, ECam, 2026-11-03)
+
+**What**: `MotorDriver::EnableRequest(false)` now also clears `m_isEnabling`.
+
+**Why**: an enable starts a countdown (`CPM_ENABLE_DELAY` samples) that `Refresh()` finishes by setting `m_isEnabled`. A disable inside that window cleared only `m_isEnabled`, so the countdown went on and marked the motor enabled while its enable output was off. From then on `StatusReg` read ReadyState `MOTOR_FAULTED` with `MotorInFault` set (HLFB is deasserted on a disabled motor) and `EnableRequest(true)` skipped the enable delay, until a reset. Found on the ECam bench: an application that disables on `MotorInFault` (the bit is sticky across a disable) re-faulted every enable this way.
+
 ## Summary
 
 **Modification Types** (sections above):
@@ -212,13 +218,14 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 3. **Fixes from ClearHPGL** (5–7): coordinated step output, TCP receive and accept, USB serial receive, linear interpolation, arc timing in the step interrupt.
 4. **Electronic camming** (8–9): `SysManager` sample callback, `MotorDriver` external step mode, and the step-direction rule shared with coordinated mode.
 5. **lwIP configuration** (10): room for an EtherNet/IP adapter's UDP sockets.
+6. **Motor enable fix** (11): a disable during the enable delay no longer leaves the motor marked enabled.
 
 **All Modifications Preserve**:
 - Original Teknic copyright and license
 - Original file structure and organization
 - The existing API: everything added is opt-in (no callback, external mode off, coordinated mode off by default)
 
-**Behaviour changes** (bug fixes, sections 5–7 and 9): coordinated / external step output, TCP and USB receive, and the step direction in coordinated mode behave differently from the original where the original lost or mis-sent data or steps; each section says what changed and why.
+**Behaviour changes** (bug fixes, sections 5–7, 9 and 11): coordinated / external step output, TCP and USB receive, and the step direction in coordinated mode behave differently from the original where the original lost or mis-sent data or steps; each section says what changed and why.
 
 ## License
 
