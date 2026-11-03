@@ -198,6 +198,12 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 - **Position drift every cam cycle** (ClearPath on a ballscrew following a poly 3-4-5 profile). The step count for a sample is double-buffered into the step timer, so the pulses written in one sample go out at the start of the next, while the sample interrupt is already running. `ApplySampleSteps()` set the direction output from the sign of every sample's count, and a sample with no steps counted as positive. On a slow negative move (pattern -1, 0, 0, -1, …) the output therefore flipped to positive at every pause and back at the next step, each time a few tens of µs after the previous sample's pulse had gone out. On the failing profile that is 300 direction changes per revolution, 150 of them right behind a pulse; a drive that takes the direction slightly after the step edge counts those pulses the wrong way.
 - Now a sample with no steps leaves the direction alone, and a reversal directly after a sample that sent steps waits one sample (nothing is sent, the steps are carried and go out next sample after the direction change). The direction then only changes with nothing in flight, as the stock StepGenerator does (it changes direction from standstill only). Same net steps; `PositionRefCommanded()` unchanged; `ReversalWaits()` counts the held reversals.
 
+### 10. lwIP UDP sockets (for an EtherNet/IP adapter, 2026-11-02)
+
+**File**: `LwIP/LwIP/port/include/lwipopts.h` — new `MEMP_NUM_UDP_PCB` (6; lwIP's default is 4), guarded with `#ifndef` like the other pool sizes.
+
+**Why**: an EtherNet/IP adapter (QuickEIP) holds two UDP sockets (44818 and 2222). With DHCP (one while it runs) and one application UDP port, as the ECam firmware's discovery on 9502, that is exactly lwIP's default of 4, and any further UDP use would fail to bind without an obvious error. DNS holds no socket: with lwIP's default `LWIP_DNS_SECURE` it opens one only during a lookup. The two extra blocks cost about 64 bytes of RAM.
+
 ## Summary
 
 **Modification Types** (sections above):
@@ -205,6 +211,7 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 2. **Quadrature AB motion mode** (4): `CPM_MODE_QUAD_AB` StepGenerator output mode (Connector, MotorDriver, MotorManager, docs, example).
 3. **Fixes from ClearHPGL** (5–7): coordinated step output, TCP receive and accept, USB serial receive, linear interpolation, arc timing in the step interrupt.
 4. **Electronic camming** (8–9): `SysManager` sample callback, `MotorDriver` external step mode, and the step-direction rule shared with coordinated mode.
+5. **lwIP configuration** (10): room for an EtherNet/IP adapter's UDP sockets.
 
 **All Modifications Preserve**:
 - Original Teknic copyright and license
