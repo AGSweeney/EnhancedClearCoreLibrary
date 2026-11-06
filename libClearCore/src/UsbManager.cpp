@@ -315,6 +315,11 @@ bool UsbManager::CBLineStateChanged(usb_cdc_control_signal_t state) {
         cdcdf_acm_register_callback(CDCDF_ACM_CB_WRITE, (FUNC_PTR)NULL);
         // Stop Rx/Tx
         cdcdf_acm_stop_xfer();
+        // The write callback is gone, so an aborted transfer never reports back: without this, m_sendActive stayed set
+        // and transmit was dead until a reset once a host closed the port with a transfer waiting. What was waiting
+        // was for that host. (ECam change.)
+        UsbMgr.m_outHead = UsbMgr.m_outTail;
+        atomic_clear_seqcst(&UsbMgr.m_sendActive);
         if (cdcdf_acm_get_line_coding()->dwDTERate == 1200) {
             SysMgr.ResetBoard(SysManager::RESET_TO_BOOTLOADER);
         }
