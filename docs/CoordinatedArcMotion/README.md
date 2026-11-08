@@ -627,6 +627,86 @@ motionController.FeedRateInchesPerMin(100.0);
 motionController.FeedRateMMPerMin(2540.0);
 ```
 
+### CoreXY Machines
+
+On a CoreXY (or H-bot) machine neither motor drives an axis on its own. Motor A
+moves the head along one diagonal and motor B along the other:
+
+```
+A = X + Y          X = (A + B) / 2
+B = X - Y          Y = (A - B) / 2
+```
+
+The controller still plans and interpolates in X/Y. `SetKinematics()` changes
+only the steps sent to the motors each sample, so every move, arc, position,
+feed rate and unit method works in Cartesian X/Y as before.
+
+```cpp
+motionController.Initialize(&ConnectorM0, &ConnectorM1);   // M0 = A, M1 = B
+motionController.SetKinematics(KINEMATICS_COREXY);
+
+// GT2 belt on a 20-tooth pulley: 40 mm per motor rev. Use the same values
+// for X and Y: a CoreXY step has to be the same distance on both, and
+// SetKinematics() refuses CoreXY if they differ.
+motionController.SetMechanicalParamsX(800, 40.0, UNIT_MM);
+motionController.SetMechanicalParamsY(800, 40.0, UNIT_MM);
+
+motionController.FeedRateMMPerSec(200.0);      // path speed
+motionController.MotorVelMax(6000);            // each motor, steps/s (see below)
+motionController.JunctionDVmax(1500);          // per motor in CoreXY
+
+motionController.QueueLinear(8000, 4000);      // X/Y steps, as on a Cartesian machine
+```
+
+**Motor speed.** A move along X or Y turns both motors at the path speed. A
+45-degree move turns one motor at 1.41 times the path speed and leaves the
+other still. `MotorVelMax()` sets a limit per motor: each queued line or arc
+gets the fastest path speed that keeps both motors within it, so diagonals
+run slower than axis moves. It defaults to 0 (no limit). Acceleration follows
+the same rule: a motor accelerates up to 1.41 times `ArcAccelMax()`, so set
+the path acceleration to your motor limit divided by 1.41 if that matters.
+
+**Corners.** `JunctionDVmax()` limits each motor's speed change at a corner,
+not each axis's. In CoreXY that is the sum of the X and Y changes.
+
+**Direction and wiring.** Check the motors one at a time with the controller
+idle. Turning A forward alone should move the head toward +X and +Y; turning
+B forward alone should move it toward +X and -Y. If one motor runs the wrong
+way, invert it at the drive (or with the connector's polarity setting). If
+the head moves along the wrong diagonal, A and B are swapped: pass the motors
+to `Initialize()` the other way round.
+
+**Homing and jogging.** When the controller is idle, each motor runs its own
+`Move()`/`MoveVelocity()` (see [ISR Integration](#isr-integration)), and the
+controller does not follow those moves. To move only X, move A and B by the
+same amount in the same direction; to move only Y, move them by the same
+amount in opposite directions. When homing is done, set the motor positions
+(`PositionRefSet()`) and call `SyncPositionFromMotors()`, which sets X and Y
+from them, or call `SetPosition()` directly.
+
+```cpp
+// Home toward -X: both motors backward together, until the X switch closes.
+ConnectorM0.MoveVelocity(-2000);
+ConnectorM1.MoveVelocity(-2000);
+while (!xHomeSwitch.State()) { }
+ConnectorM0.MoveStopAbrupt();
+ConnectorM1.MoveStopAbrupt();
+// ... same for Y with the motors in opposite directions ...
+ConnectorM0.PositionRefSet(0);
+ConnectorM1.PositionRefSet(0);
+motionController.SyncPositionFromMotors();     // X = 0, Y = 0
+```
+
+`SyncPositionFromMotors()` returns false if A + B is odd. A single motor step
+moves the head half a step in X and in Y, so the motors can sit between
+Cartesian steps. X is then rounded down. Coordinated moves are relative, so
+motor B stays one step off X − Y until you move one motor a single step on
+its own (one motor step is half a step of head travel).
+
+The CoreXY equations live in `CoordinatedKinematics.h`, which has no hardware
+dependencies; `libClearCore/tests/host/corexy_kinematics_test.cpp` tests them
+on a PC.
+
 ### Single Arc Move
 
 #### Basic Arc

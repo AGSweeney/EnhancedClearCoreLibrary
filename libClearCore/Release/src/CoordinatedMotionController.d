@@ -1,10 +1,10 @@
 src/CoordinatedMotionController.d src/CoordinatedMotionController.o: \
  ../src/CoordinatedMotionController.cpp \
  ../inc/CoordinatedMotionController.h ../inc/ArcInterpolator.h \
- ../inc/StepGenerator.h ../inc/LinearInterpolator.h \
- ../inc/UnitConverter.h ../inc/MotorDriver.h ../inc/Connector.h \
- ../inc/SysConnectors.h ../inc/DigitalIn.h ../inc/InputManager.h \
- ../inc/PeripheralRoute.h \
+ ../inc/StepGenerator.h ../inc/CoordinatedKinematics.h \
+ ../inc/LinearInterpolator.h ../inc/UnitConverter.h ../inc/MotorDriver.h \
+ ../inc/Connector.h ../inc/SysConnectors.h ../inc/DigitalIn.h \
+ ../inc/InputManager.h ../inc/PeripheralRoute.h \
  C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/sam.h \
  C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include/same53n19a.h \
  C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\arm\CMSIS\4.5.0\CMSIS\Include/core_cm4.h \
@@ -118,6 +118,8 @@ src/CoordinatedMotionController.d src/CoordinatedMotionController.o: \
 ../inc/ArcInterpolator.h:
 
 ../inc/StepGenerator.h:
+
+../inc/CoordinatedKinematics.h:
 
 ../inc/LinearInterpolator.h:
 

@@ -41,6 +41,19 @@ High-reuse two-motor coordinated planner for chained linear/arc moves with const
 | `JunctionDVmax` / `JunctionDeviationSteps` | Cornering |
 | `UpdateFast` | ISR step generator |
 | `PlannerQueueCapacity` | Returns `ARC_QUEUE_SIZE` (16) |
+| `SetKinematics` / `Kinematics` | `KINEMATICS_CARTESIAN` (default) or `KINEMATICS_COREXY` (motor 1 = A = X+Y, motor 2 = B = X−Y; also H-bot) |
+| `MotorVelMax` | Per-motor speed cap (steps/s, 0 = none); lowers each segment's path speed |
+| `SyncPositionFromMotors` | Set X/Y from the motors' commanded positions (after homing/jogging) |
+
+## Kinematics (CoreXY)
+
+Planning, interpolation, positions and units stay Cartesian. `OutputSteps()` maps each sample's X/Y steps through `Kinematics::ToMotor` (`CoordinatedKinematics.h`, no hardware dependencies) before `SetCoordinatedSteps`. Consequences in CoreXY:
+
+- A motor runs up to √2 × path speed (45° moves). `MotorVelMax` caps each queued segment: linear factor `|ux|+|uy|`; arcs use the largest factor over the sweep (`ArcMotorSpeedFactor`). The interrupt-side legacy arc queue (`ProcessNextArc`) uses the worst case √2.
+- `JunctionDVmax` is per motor: divisor `|ΔdirX|+|ΔdirY|` (`JunctionMotorDelta`).
+- Motor acceleration reaches √2 × `ArcAccelMax`; not capped separately.
+- Both axes need the same steps per unit; `SetKinematics(KINEMATICS_COREXY)` returns false if both mechanical configs are set and differ, or if motion is active/queued.
+- Per-sample motor steps can be up to 2 × the larger axis step; excess over the per-sample limit is carried by `ApplySampleSteps` (`m_coordCarry`).
 
 Artifact: [A-L01-if](../../artifacts/interfaces/CoordinatedMotionController.h).
 
@@ -116,7 +129,7 @@ ClearCore SAME53 / Teknic `libClearCore` build. Fixed-point and sample-ISR assum
 
 ## Testing and verification
 
-Exercised via Microchip examples and ClearCNC firmware motion paths. No in-repo unit-test harness for these classes.
+Exercised via Microchip examples and ClearCNC firmware motion paths. The controller itself has no host test; its CoreXY maths does: `libClearCore/tests/host/corexy_kinematics_test.cpp` (transform round trip, speed factors, interpolated lines and arcs through the CoreXY output under a motor speed cap).
 
 ## Related components
 
