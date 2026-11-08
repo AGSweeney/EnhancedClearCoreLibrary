@@ -25,7 +25,9 @@
     ClearCore Coordinated Motion Controller
 
     This class manages coordinated motion between two motors, enabling
-    continuous arc moves with smooth transitions.
+    continuous arc moves with smooth transitions. The path is always planned
+    in Cartesian X/Y; SetKinematics() chooses how it maps onto the motors
+    (plain X/Y, or CoreXY / H-bot).
 **/
 
 #ifndef __COORDINATEDMOTIONCONTROLLER_H__
@@ -33,6 +35,7 @@
 
 #include <stdint.h>
 #include "ArcInterpolator.h"
+#include "CoordinatedKinematics.h"
 #include "LinearInterpolator.h"
 #include "UnitConverter.h"
 
@@ -64,6 +67,75 @@ public:
         \return true if initialization successful
     **/
     bool Initialize(MotorDriver* motorX, MotorDriver* motorY);
+
+    /**
+        \brief Choose how the X/Y path maps onto the two motors.
+
+        KINEMATICS_CARTESIAN (the default): the first motor given to
+        Initialize() is X, the second Y.
+
+        KINEMATICS_COREXY: the first motor is A and the second B, with
+        A = X + Y and B = X - Y in steps (H-bot uses the same equations).
+        Every move, position and speed in this class stays Cartesian; only
+        the steps sent to the motors change. Both motors must have the same
+        steps per unit, so if SetMechanicalParamsX/Y were both given they
+        must match. The fastest motor runs up to sqrt(2) times the path speed
+        (on a 45-degree move), and accelerates up to sqrt(2) times the path
+        acceleration; use MotorVelMax() to keep each motor within its limit.
+
+        Change it only while stopped with nothing queued. It does not touch
+        the position: call SetPosition() or SyncPositionFromMotors() after.
+
+        \param[in] kinematics KINEMATICS_CARTESIAN or KINEMATICS_COREXY
+        \return false if motion is active or queued, or the X and Y
+                mechanical parameters differ for CoreXY
+    **/
+    bool SetKinematics(CoordKinematics kinematics);
+
+    /**
+        \brief The current kinematics (see SetKinematics()).
+    **/
+    CoordKinematics Kinematics() const {
+        return m_kinematics;
+    }
+
+    /**
+        \brief Set a per-motor speed limit for coordinated moves.
+
+        Each queued segment's path speed is lowered so that neither motor
+        exceeds velMax steps/s anywhere on it. This matters for CoreXY, where
+        a motor can run sqrt(2) times faster than the path; in Cartesian no
+        motor runs faster than the path, so it only takes effect when set
+        below ArcVelMax(). 0 (the default) means no limit. Applies to moves
+        queued after the call.
+
+        \param[in] velMax Maximum motor speed in steps/sec (0 = no limit)
+    **/
+    void MotorVelMax(uint32_t velMax) {
+        m_motorVelMax = velMax;
+    }
+
+    /**
+        \brief The per-motor speed limit (steps/sec, 0 = none).
+    **/
+    uint32_t MotorVelMax() const {
+        return m_motorVelMax;
+    }
+
+    /**
+        \brief Set the X/Y position from the motors' commanded positions.
+
+        Use after moving the motors on their own (homing, jogging), which the
+        controller does not track. Cartesian: X and Y are the two motors'
+        PositionRefCommanded(). CoreXY: X = (A + B) / 2, Y = (A - B) / 2.
+
+        \return false if not initialized or motion is active or queued, or
+                (CoreXY) A + B is odd, so the head is half a step off the X/Y
+                grid; the position is still set, X rounded down. Moves are
+                relative, so motor B then stays one step off X - Y until a
+                single-motor move of one step puts A + B back on even.
+    **/
+    bool SyncPositionFromMotors();
 
     /**
         \brief Issue a single arc move
@@ -484,6 +556,9 @@ public:
 
             v_junction ≤ dVmax / max(|ΔdirX|, |ΔdirY|)
 
+        The limit is per motor, so with KINEMATICS_COREXY the divisor is
+        |ΔdirX| + |ΔdirY| (the larger of the A and B changes).
+
         A smaller value gives smoother corners with more deceleration; a larger value allows
         the machine to carry more speed through sharp turns.  Set to 0 to use only the
         GRBL angle-based junction deviation formula instead.
@@ -614,6 +689,14 @@ private:
     
     MotorDriver* m_motorX;
     MotorDriver* m_motorY;
+    CoordKinematics m_kinematics = KINEMATICS_CARTESIAN;
+    uint32_t m_motorVelMax = 0;  // per-motor speed cap (steps/s); 0 = none
+    bool m_outputThisSample = false;  // UpdateFast: this sample's steps were written
+    // Send one sample's Cartesian steps to the motors through the kinematics.
+    void OutputSteps(int32_t stepsX, int32_t stepsY);
+    // Path speed for a segment, lowered so no motor exceeds m_motorVelMax.
+    uint32_t LinearSpeed(int32_t dx, int32_t dy) const;
+    uint32_t ArcSpeed(double startAngle, double span, bool clockwise) const;
     
     ArcInterpolator m_arcInterpolator;
     LinearInterpolator m_linearInterpolator;

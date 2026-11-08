@@ -192,9 +192,16 @@ bool CoordinatedMotionController::MoveArc(int32_t centerX, int32_t centerY,
     }
 
     // Initialize arc interpolator
+    double spanStart = startAngle;
+    double spanEnd = endAngle;
+    NormalizeAngle0TwoPi(&spanStart);
+    NormalizeAngle0TwoPi(&spanEnd);
     if (!m_arcInterpolator.InitializeArc(centerX, centerY, radius,
                                          startAngle, endAngle, clockwise,
-                                         m_velocityMax, m_accelMax, SampleRateHz,
+                                         ArcSpeed(spanStart,
+                                                  PlannerArcSpanRadians(spanStart, spanEnd, clockwise),
+                                                  clockwise),
+                                         m_accelMax, SampleRateHz,
                                          0, 0)) {
         return false;
     }
@@ -360,7 +367,16 @@ void CoordinatedMotionController::UpdateFast() {
     }
     m_lastUpdateCycles = now;
     m_updateStartedMotion = false;
+    m_outputThisSample = false;
     UpdateFastBody();
+    // Every sample must write the motors' step count. The step timer repeats the last count it
+    // was given, so a sample that writes nothing sends the previous sample's steps again,
+    // uncounted (an extra pulse at a move hand-over; found with the drives' own position
+    // registers on the CoreXY bench). The paths that hand over to the next move, or finish,
+    // without stepping write nothing themselves: their step count for this sample is 0.
+    if (!m_outputThisSample) {
+        OutputSteps(0, 0);
+    }
     const uint32_t took = DWT->CYCCNT - now;
     if (took > m_maxUpdateCycles) {
         m_maxUpdateCycles = took;
@@ -376,12 +392,7 @@ void CoordinatedMotionController::UpdateFastBody() {
     
     // If stop counter is active, continue sending zero steps to clear hardware buffer
     if (m_stopCounter > 0) {
-        if (m_motorX) {
-            m_motorX->SetCoordinatedSteps(0);
-        }
-        if (m_motorY) {
-            m_motorY->SetCoordinatedSteps(0);
-        }
+        OutputSteps(0, 0);
         m_stopCounter--;
         return;
     }
@@ -427,7 +438,7 @@ void CoordinatedMotionController::UpdateFastBody() {
     }
     
     if (motionComplete) {
-        // No more moves, stop motion
+        // No more moves, stop motion (UpdateFast writes this sample's zero steps).
         m_active = false;
         m_motionType = MOTION_TYPE_NONE;
         m_stopCounter = m_stopAtQueueEnd ? 10 : 0;
@@ -461,12 +472,7 @@ void CoordinatedMotionController::UpdateFastBody() {
             }
 
             if (motionComplete) {
-                if (m_motorX) {
-                    m_motorX->SetCoordinatedSteps(0);
-                }
-                if (m_motorY) {
-                    m_motorY->SetCoordinatedSteps(0);
-                }
+                OutputSteps(0, 0);
                 m_active = false;
                 m_motionType = MOTION_TYPE_NONE;
                 m_stopCounter = m_stopAtQueueEnd ? 10 : 0;
@@ -478,9 +484,8 @@ void CoordinatedMotionController::UpdateFastBody() {
             stepsY < -BURST_THRESHOLD) {
             RecordBurst(stepsX, stepsY);
         }
-        // Apply steps to motors
-        m_motorX->SetCoordinatedSteps(stepsX);
-        m_motorY->SetCoordinatedSteps(stepsY);
+        // Apply steps to motors (through the kinematics: CoreXY sends X+Y and X-Y)
+        OutputSteps(stepsX, stepsY);
         
         // Update current position from interpolator (not by adding steps)
         // This ensures position matches interpolator's internal state
@@ -524,12 +529,7 @@ void CoordinatedMotionController::UpdateFastBody() {
         }
 
         if (motionComplete) {
-            if (m_motorX) {
-                m_motorX->SetCoordinatedSteps(0);
-            }
-            if (m_motorY) {
-                m_motorY->SetCoordinatedSteps(0);
-            }
+            OutputSteps(0, 0);
             m_active = false;
             m_motionType = MOTION_TYPE_NONE;
             m_stopCounter = m_stopAtQueueEnd ? 10 : 0;
@@ -586,10 +586,13 @@ bool CoordinatedMotionController::ProcessNextArc() {
     // Calculate start angle (tangent to current position)
     double startAngle = CalculateStartAngle(arc.centerX, arc.centerY);
     
-    // Initialize interpolator with new arc
+    // Initialize interpolator with new arc. This runs in the interrupt, so the motor speed cap
+    // takes the worst case for any arc rather than working out this arc's sweep.
     if (!m_arcInterpolator.InitializeArc(arc.centerX, arc.centerY, arc.radius,
                                          startAngle, arc.endAngle, arc.clockwise,
-                                         m_velocityMax, m_accelMax, SampleRateHz,
+                                         Kinematics::CapPathSpeed(m_velocityMax, m_motorVelMax,
+                                             Kinematics::MaxMotorSpeedFactor(m_kinematics)),
+                                         m_accelMax, SampleRateHz,
                                          0, 0)) {
         // Failed to initialize, remove from queue
         arc.valid = false;
@@ -674,7 +677,8 @@ bool CoordinatedMotionController::MoveLinear(int32_t endX, int32_t endY) {
     // Initialize linear interpolator
     if (!m_linearInterpolator.InitializeLinear(m_currentX, m_currentY,
                                               endX, endY,
-                                              m_velocityMax, m_accelMax, SampleRateHz,
+                                              LinearSpeed(endX - m_currentX, endY - m_currentY),
+                                              m_accelMax, SampleRateHz,
                                               0, 0)) {
         return false;
     }
@@ -712,7 +716,8 @@ bool CoordinatedMotionController::MoveLinearAbsolute(int32_t startX, int32_t sta
     // Initialize linear interpolator
     if (!m_linearInterpolator.InitializeLinear(startX, startY,
                                               endX, endY,
-                                              m_velocityMax, m_accelMax, SampleRateHz,
+                                              LinearSpeed(endX - startX, endY - startY),
+                                              m_accelMax, SampleRateHz,
                                               0, 0)) {
         return false;
     }
@@ -785,7 +790,8 @@ bool CoordinatedMotionController::ProcessNextLinear() {
     int32_t currentY = m_currentY;
     if (!m_linearInterpolator.InitializeLinear(currentX, currentY,
                                                linear.endX, linear.endY,
-                                               m_velocityMax, m_accelMax, SampleRateHz,
+                                               LinearSpeed(linear.endX - currentX, linear.endY - currentY),
+                                               m_accelMax, SampleRateHz,
                                                0, 0)) {
         // Failed to initialize, remove from queue
         linear.valid = false;
@@ -978,7 +984,7 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
     uint8_t tail = m_motionQueueTail;
     QueuedMotion& motion = m_motionQueue[tail];
     motion.type = QUEUED_MOTION_ARC;
-    motion.nominalSpeed = m_velocityMax;
+    motion.nominalSpeed = ArcSpeed(sn, angleSpan, clockwise);
     motion.entrySpeed = 0;
     motion.exitSpeed = 0;
     motion.lengthSteps = lengthSteps;
@@ -1080,7 +1086,7 @@ bool CoordinatedMotionController::QueueLinear(int32_t endX, int32_t endY) {
     uint8_t tail = m_motionQueueTail;
     QueuedMotion& motion = m_motionQueue[tail];
     motion.type = QUEUED_MOTION_LINEAR;
-    motion.nominalSpeed = m_velocityMax;
+    motion.nominalSpeed = LinearSpeed(dx, dy);
     motion.entrySpeed = 0;
     motion.exitSpeed = 0;
     motion.lengthSteps = lengthSteps;
@@ -1202,11 +1208,13 @@ void CoordinatedMotionController::RecalculatePlanner() {
                 // |Δv_axis| = v_junction × |dDir_axis|
                 // Constraint: v_junction × max(|dDirX|, |dDirY|) ≤ dVmax
                 // → v_junction ≤ dVmax / max(|dDirX|, |dDirY|)
+                // The cap is per motor: in CoreXY the motors see dDirX ± dDirY, so the
+                // divisor is |dDirX| + |dDirY| (see Kinematics::JunctionMotorDelta).
                 //
                 // Corner cases:
                 //   |dDir| ≈ 0  → no direction change, full speed allowed
                 //   |dDir| ≈ 2  → 180° reversal, must stop
-                double maxDeltaDir = fmax(fabs(dDirX), fabs(dDirY));
+                double maxDeltaDir = Kinematics::JunctionMotorDelta(m_kinematics, dDirX, dDirY);
                 double vJunction;
                 if (maxDeltaDir < 1e-6) {
                     // Straight-through or negligible turn — full nominal speed
@@ -1617,6 +1625,67 @@ void CoordinatedMotionController::SetPosition(int32_t x, int32_t y) {
     m_currentX = x;
     m_currentY = y;
     __enable_irq();
+}
+
+// ========== Kinematics (Cartesian / CoreXY) ==========
+
+bool CoordinatedMotionController::SetKinematics(CoordKinematics kinematics) {
+    if (kinematics != KINEMATICS_CARTESIAN && kinematics != KINEMATICS_COREXY) {
+        return false;
+    }
+    if (m_active || m_motionQueueCount > 0 || m_arcQueueCount > 0 || m_linearQueueCount > 0) {
+        return false;
+    }
+    if (kinematics == KINEMATICS_COREXY && m_unitsConfiguredX && m_unitsConfiguredY) {
+        // A = X + Y adds X and Y steps, so a step must be the same distance on both.
+        const double mmX = UnitConverter::StepsToDistance(1000000, UNIT_MM, m_mechanicalConfigX);
+        const double mmY = UnitConverter::StepsToDistance(1000000, UNIT_MM, m_mechanicalConfigY);
+        if (fabs(mmX - mmY) > 1e-6 * fmax(fabs(mmX), fabs(mmY))) {
+            return false;
+        }
+    }
+    m_kinematics = kinematics;
+    return true;
+}
+
+bool CoordinatedMotionController::SyncPositionFromMotors() {
+    if (!m_initialized || m_active || m_motionQueueCount > 0) {
+        return false;
+    }
+    const int32_t a = m_motorX->PositionRefCommanded();
+    const int32_t b = m_motorY->PositionRefCommanded();
+    int32_t x, y;
+    const bool onGrid = Kinematics::ToCartesian(m_kinematics, a, b, x, y);
+    SetPosition(x, y);
+    return onGrid;
+}
+
+void CoordinatedMotionController::OutputSteps(int32_t stepsX, int32_t stepsY) {
+    m_outputThisSample = true;
+    int32_t a, b;
+    Kinematics::ToMotor(m_kinematics, stepsX, stepsY, a, b);
+    m_motorX->SetCoordinatedSteps(a);
+    m_motorY->SetCoordinatedSteps(b);
+}
+
+uint32_t CoordinatedMotionController::LinearSpeed(int32_t dx, int32_t dy) const {
+    if (m_motorVelMax == 0 || (dx == 0 && dy == 0)) {
+        return m_velocityMax;
+    }
+    double ux = (double)dx;
+    double uy = (double)dy;
+    NormalizeVec(ux, uy);
+    return Kinematics::CapPathSpeed(m_velocityMax, m_motorVelMax,
+                                    Kinematics::MotorSpeedFactor(m_kinematics, ux, uy));
+}
+
+uint32_t CoordinatedMotionController::ArcSpeed(double startAngle, double span, bool clockwise) const {
+    if (m_motorVelMax == 0) {
+        return m_velocityMax;
+    }
+    return Kinematics::CapPathSpeed(m_velocityMax, m_motorVelMax,
+                                    Kinematics::ArcMotorSpeedFactor(m_kinematics, startAngle, span,
+                                                                    clockwise));
 }
 
 void CoordinatedMotionController::FeedRateInchesPerMin(double feedRate) {

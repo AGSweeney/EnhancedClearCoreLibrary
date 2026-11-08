@@ -64,6 +64,12 @@ This document lists all files that were created for the coordinated motion featu
    - Fixed-point Q15 mathematics interface
    - **Path**: `libClearCore/inc/LinearInterpolator.h`
 
+6. **CoordinatedKinematics.h**
+   - Machine kinematics for `CoordinatedMotionController`: `KINEMATICS_CARTESIAN` / `KINEMATICS_COREXY`
+   - CoreXY transforms (A = X+Y, B = X−Y and back), motor speed factors for lines, arcs and junctions, path speed cap for a motor limit
+   - Header-only, no hardware dependencies (host-tested by `libClearCore/tests/host/corexy_kinematics_test.cpp`)
+   - **Path**: `libClearCore/inc/CoordinatedKinematics.h`
+
 ## Implementation Files
 
 ### libClearCore/src/
