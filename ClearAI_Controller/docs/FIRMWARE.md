@@ -157,7 +157,7 @@ HLFB is configured for **measured torque** (`HLFB_MODE_HAS_BIPOLAR_PWM`). `get_s
 
 ### Move queue introspection & flush
 
-Coordinated XY moves queue in the planner (`MotionQueueCount`). `queue_status` returns `{queue, active}` (pending segment count and whether a move is executing); allowed during `wait_idle`. `queue_clear` decelerates the active coordinated segment to a stop and drops all pending segments (it zeroes the planner queue counts), then stops independent Z/A with `MoveStopDecel`. Motors stay enabled. Accepted during `wait_idle`/`dwell` (treated as a safety method, it interrupts the wait).
+Coordinated XY moves queue in the planner (`MotionQueueCount`). `queue_status` returns `{queue, active}` (pending segment count and whether a move is executing); allowed during `wait_idle`. `queue_clear` decelerates the active coordinated segment to a stop along its path at `decel` and drops all pending segments (`CoordinatedMotionController::StopRamped()`, taken in the next 200 µs sample), and stops independent Z/A with `MoveStopDecel`. The same stop serves `stop`, `jog_stop`, a hardware limit, the host watchdog and `home`. Motors stay enabled. Accepted during `wait_idle`/`dwell` (treated as a safety method, it interrupts the wait).
 
 ### Jog-continuous velocity (`jog_velocity` / `jog_stop`)
 
