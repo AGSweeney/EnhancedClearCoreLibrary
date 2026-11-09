@@ -109,13 +109,13 @@ src/MotorDriver.d src/MotorDriver.o: ../src/MotorDriver.cpp \
  ../inc/StatusManager.h ../inc/StepGenerator.h ../inc/SysUtils.h \
  ../inc/SysManager.h ../inc/UnitConverter.h \
  ../inc/CoordinatedMotionController.h ../inc/ArcInterpolator.h \
- ../inc/LinearInterpolator.h ../inc/UnitConverter.h ../inc/atomic_utils.h \
- ../inc/CcioBoardManager.h ../inc/CcioPin.h ../inc/SerialDriver.h \
- ../inc/SerialBase.h ../inc/DmaManager.h ../inc/ISerial.h \
- ../inc/SysTiming.h ../inc/Connector.h ../inc/InputManager.h \
- ../inc/MotorManager.h ../inc/HardwareMapping.h ../inc/MotorDriver.h \
- ../inc/StatusManager.h ../inc/SysManager.h ../inc/SysTiming.h \
- ../inc/SysUtils.h
+ ../inc/CoordinatedKinematics.h ../inc/LinearInterpolator.h \
+ ../inc/UnitConverter.h ../inc/atomic_utils.h ../inc/CcioBoardManager.h \
+ ../inc/CcioPin.h ../inc/SerialDriver.h ../inc/SerialBase.h \
+ ../inc/DmaManager.h ../inc/ISerial.h ../inc/SysTiming.h \
+ ../inc/Connector.h ../inc/InputManager.h ../inc/MotorManager.h \
+ ../inc/HardwareMapping.h ../inc/MotorDriver.h ../inc/StatusManager.h \
+ ../inc/SysManager.h ../inc/SysTiming.h ../inc/SysUtils.h
 
 ../inc/MotorDriver.h:
 
@@ -356,6 +356,8 @@ C:\Program\ Files\ (x86)\Atmel\Studio\7.0\Packs\atmel\SAME53_DFP\1.1.118\include
 ../inc/CoordinatedMotionController.h:
 
 ../inc/ArcInterpolator.h:
+
+../inc/CoordinatedKinematics.h:
 
 ../inc/LinearInterpolator.h:
 

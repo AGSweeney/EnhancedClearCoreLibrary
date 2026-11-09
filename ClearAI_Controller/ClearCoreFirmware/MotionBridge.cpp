@@ -1108,6 +1108,20 @@ static void ApplyLimits() {
     g_xy.ArcAccelMax(g_accel);
 }
 
+/* Decelerate everything to a stop at g_decel. Coordinated XY: CoordinatedMotionController::
+ * StopRamped(), a straight decel along the present direction that also drops the queue (its
+ * StopDecel() is abrupt in coordinated mode: the StepGenerators are not driving the motors then).
+ * Single-axis moves (jog, seek, independent moves): each motor's own decel. */
+static void StopAllDecel() {
+    g_xy.StopRamped(g_decel);
+    for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
+        MotorDriver *m = MotorForAxis(a);
+        if (m) {
+            m->MoveStopDecel(g_decel);
+        }
+    }
+}
+
 static const char *GateMotion() {
     if (g_watchdogTripped) {
         return "watchdog tripped; call keepalive";
@@ -1168,13 +1182,7 @@ void MotionPollEstop() {
             }
             const bool posDir = (m->StatusReg().bit.MoveDirection != 0);
             if ((posDir && HwLimitActive(a, true)) || (!posDir && HwLimitActive(a, false))) {
-                g_xy.StopDecel();
-                for (uint8_t b = 0; b < CLEARAI_AXIS_COUNT; b++) {
-                    MotorDriver *mb = MotorForAxis(b);
-                    if (mb) {
-                        mb->MoveStopDecel(g_decel);
-                    }
-                }
+                StopAllDecel();
                 /* Latch a limit-tripped fault for host diagnostics. Cleared by
                  * clear_alerts. */
                 g_limitTrippedAxis = a;
@@ -1206,13 +1214,7 @@ void MotionPollWatchdog() {
     }
     if ((Milliseconds() - g_lastKeepaliveMs) >= g_watchdogMs) {
         /* Host went silent mid-session: decelerate to a stop and latch. */
-        g_xy.StopDecel();
-        for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
-            MotorDriver *m = MotorForAxis(a);
-            if (m) {
-                m->MoveStopDecel(g_decel);
-            }
-        }
+        StopAllDecel();
         g_watchdogTripped = true;
     }
 }
@@ -1339,13 +1341,7 @@ const char *MotionClearAlerts() {
 }
 
 const char *MotionStop() {
-    g_xy.StopDecel();
-    for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
-        MotorDriver *m = MotorForAxis(a);
-        if (m) {
-            m->MoveStopDecel(g_decel);
-        }
-    }
+    StopAllDecel();
     return nullptr;
 }
 
@@ -2064,13 +2060,7 @@ const char *MotionJogVelocity(const RpcParams *p) {
 }
 
 void MotionJogStop() {
-    g_xy.StopDecel();
-    for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
-        MotorDriver *m = MotorForAxis(a);
-        if (m) {
-            m->MoveStopDecel(g_decel);
-        }
-    }
+    StopAllDecel();
 }
 
 void MotionLog(const char *method, const char *reason, uint8_t kind) {
@@ -2651,15 +2641,9 @@ void MotionRestart() {
 }
 
 const char *MotionQueueClear() {
-    /* StopDecel() decelerates the active coordinated segment to a stop and
-     * drops all pending queued segments (it zeros the planner queue counts). */
-    g_xy.StopDecel();
-    for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
-        MotorDriver *m = MotorForAxis(a);
-        if (m) {
-            m->MoveStopDecel(g_decel);
-        }
-    }
+    /* The ramped stop decelerates the active coordinated segment to a stop and
+     * drops all pending queued segments (in the next sample). */
+    StopAllDecel();
     return nullptr;
 }
 
@@ -2721,13 +2705,7 @@ static int SeekUntilTrigger(uint8_t axis, bool positive, const SeekTrigger *trig
         if (SeekTriggered(trig, axis, positive)) {
             /* Trip: decelerate everything to a stop. For hw limits MotionPollEstop
              * may have already started the stop; this is idempotent. */
-            g_xy.StopDecel();
-            for (uint8_t a = 0; a < CLEARAI_AXIS_COUNT; a++) {
-                MotorDriver *m = MotorForAxis(a);
-                if (m) {
-                    m->MoveStopDecel(g_decel);
-                }
-            }
+            StopAllDecel();
             while (!MotorsIdle()) {
                 MotionPollEstop();
                 if (g_interrupted) {
