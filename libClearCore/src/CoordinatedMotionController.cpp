@@ -304,6 +304,8 @@ void CoordinatedMotionController::ResetPlannerStateWithoutMotorStop() {
 }
 
 void CoordinatedMotionController::Stop() {
+    m_queueEpoch++;       // ClearHPGL: a block being queued now is not committed
+    m_rampStopDecel = 0;
     ResetPlannerStateWithoutMotorStop();
 
     if (m_motorX) {
@@ -315,6 +317,8 @@ void CoordinatedMotionController::Stop() {
 }
 
 void CoordinatedMotionController::StopDecel() {
+    m_queueEpoch++;       // ClearHPGL: a block being queued now is not committed
+    m_rampStopDecel = 0;
     m_active = false;
     m_motionType = MOTION_TYPE_NONE;
     m_arcInterpolator.Reset();
@@ -345,6 +349,58 @@ void CoordinatedMotionController::StopDecel() {
     if (m_motorY) {
         m_motorY->MoveStopDecel();
     }
+}
+
+void CoordinatedMotionController::StopRamped(uint32_t decelStepsPerSec2) {
+    if (decelStepsPerSec2 == 0) {
+        Stop();
+        return;
+    }
+    if (!m_active && m_motionQueueCount == 0) {
+        return;
+    }
+    m_rampStopDecel = decelStepsPerSec2;
+}
+
+// Sample interrupt: the ramped stop asked for by StopRamped().
+void CoordinatedMotionController::RampStop() {
+    const uint32_t decel = m_rampStopDecel;
+    m_rampStopDecel = 0;
+    m_queueEpoch++;
+    for (uint8_t i = 0; i < ARC_QUEUE_SIZE; i++) {
+        m_motionQueue[i].valid = false;
+    }
+    m_motionQueueHead = 0;
+    m_motionQueueTail = 0;
+    m_motionQueueCount = 0;
+    m_motionQueuePlanned = 0;
+    m_deferQueueStart = false;
+    // At rest (or not started): nothing to ramp. The window can hold an older move's samples then.
+    const double vx = m_active ? (double)m_winSumX * (double)SampleRateHz / (double)RAMP_WINDOW : 0.0;
+    const double vy = m_active ? (double)m_winSumY * (double)SampleRateHz / (double)RAMP_WINDOW : 0.0;
+    const double v = sqrt(vx * vx + vy * vy);  // steps/s along the path
+    const double d = v * v / (2.0 * (double)decel);
+    int32_t endX = m_currentX, endY = m_currentY;
+    if (v >= 1.0) {
+        endX += (int32_t)llround(vx / v * d);
+        endY += (int32_t)llround(vy / v * d);
+    }
+    if ((endX == m_currentX && endY == m_currentY) ||
+        !m_linearInterpolator.InitializeLinear(m_currentX, m_currentY, endX, endY, (uint32_t)v, decel,
+                                               SampleRateHz, (uint32_t)v, 0)) {
+        // Too slow to need a ramp: stop here.
+        m_arcInterpolator.Reset();
+        m_linearInterpolator.Reset();
+        m_active = false;
+        m_motionType = MOTION_TYPE_NONE;
+        m_stopCounter = m_stopAtQueueEnd ? 10 : 0;
+        return;
+    }
+    m_arcInterpolator.Reset();
+    m_motionType = MOTION_TYPE_LINEAR;
+    m_activeTargetX = endX;
+    m_activeTargetY = endY;
+    m_active = true;
 }
 
 void CoordinatedMotionController::UpdateFast() {
@@ -389,6 +445,9 @@ void CoordinatedMotionController::UpdateFast() {
 }
 
 void CoordinatedMotionController::UpdateFastBody() {
+    if (m_rampStopDecel != 0) {
+        RampStop();  // also drops a queue that has not started yet
+    }
     
     // If stop counter is active, continue sending zero steps to clear hardware buffer
     if (m_stopCounter > 0) {
@@ -853,19 +912,28 @@ bool CoordinatedMotionController::QueueStartPoint(int32_t *startX, int32_t *star
         *startX = m_activeTargetX;
         *startY = m_activeTargetY;
     }
+    m_startEpoch = m_queueEpoch;
     NoteIrqOff(irqOffStart);
     __enable_irq();
     return true;
 }
 
-void CoordinatedMotionController::CommitQueuedMotion() {
-    m_motionQueue[m_motionQueueTail].valid = true;
+bool CoordinatedMotionController::CommitQueuedMotion() {
     __disable_irq();
     const uint32_t irqOffStart = DWT->CYCCNT;  // ClearHPGL timing probe
+    if (m_queueEpoch != m_startEpoch || m_rampStopDecel != 0) {
+        // A stop cleared the queue (or is about to) since the start point was read: this block
+        // would start from a point the tool is no longer heading for.
+        NoteIrqOff(irqOffStart);
+        __enable_irq();
+        return false;
+    }
+    m_motionQueue[m_motionQueueTail].valid = true;
     m_motionQueueTail = (m_motionQueueTail + 1) % ARC_QUEUE_SIZE;
     m_motionQueueCount++;
     NoteIrqOff(irqOffStart);
     __enable_irq();
+    return true;
 }
 
 void CoordinatedMotionController::NoteIrqOff(uint32_t irqOffStart) {
@@ -1002,7 +1070,9 @@ bool CoordinatedMotionController::QueueArc(int32_t centerX, int32_t centerY,
     motion.arc.startAngle = sn;
     motion.arc.endAngle = en;
     motion.arc.clockwise = clockwise;
-    CommitQueuedMotion();
+    if (!CommitQueuedMotion()) {
+        return false;
+    }
     if (kUseGrblPlanner) {
         PlanQueue();  // interrupts enabled; see PlanQueue()
     }
@@ -1100,7 +1170,9 @@ bool CoordinatedMotionController::QueueLinear(int32_t endX, int32_t endY) {
     motion.endY = endY;
     motion.linear.endX = endX;
     motion.linear.endY = endY;
-    CommitQueuedMotion();
+    if (!CommitQueuedMotion()) {
+        return false;
+    }
     if (kUseGrblPlanner) {
         PlanQueue();  // interrupts enabled; see PlanQueue()
     }
@@ -1662,6 +1734,12 @@ bool CoordinatedMotionController::SyncPositionFromMotors() {
 
 void CoordinatedMotionController::OutputSteps(int32_t stepsX, int32_t stepsY) {
     m_outputThisSample = true;
+    // ClearHPGL ramped stop: the path's speed and direction over the last 16 samples.
+    m_winSumX += stepsX - m_winX[m_winIdx];
+    m_winSumY += stepsY - m_winY[m_winIdx];
+    m_winX[m_winIdx] = stepsX;
+    m_winY[m_winIdx] = stepsY;
+    m_winIdx = (uint8_t)((m_winIdx + 1) % RAMP_WINDOW);
     int32_t a, b;
     Kinematics::ToMotor(m_kinematics, stepsX, stepsY, a, b);
     m_motorX->SetCoordinatedSteps(a);

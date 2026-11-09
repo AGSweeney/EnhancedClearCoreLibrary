@@ -41,6 +41,7 @@ This document lists all files that were created for the coordinated motion featu
    - High-level controller for coordinated motion
    - Manages arc queue and motor coordination
    - Public API for arc commands
+   - `StopRamped()`: a controlled stop along the path, requestable from the sample interrupt (MODIFICATIONS.md section 13)
    - Integration with MotorDriver system
    - **Path**: `libClearCore/inc/CoordinatedMotionController.h`
 
