@@ -6,6 +6,8 @@ The [Teknic ClearCore](https://teknic.com/products/io-motion-controller/) is an 
 
 It also holds the applications built on top of it: a CNC controller, an LLM-driven gantry controller and a GRBL desktop app. Two larger projects that started here now have their own repositories (see [Projects](#projects)).
 
+**Videos:** see the library and the projects built on it at work in the [YouTube playlist](https://www.youtube.com/watch?v=EWpQybInKNM&list=PLRxe8AWf5tZQ&index=1).
+
 > [!WARNING]
 > The additions and the controller projects are **experimental**. They are not certified for production or safety-critical use. Always keep a physical E-stop in the motor power circuit.
 
@@ -92,6 +94,7 @@ The ClearCNC desktop app builds with `build.ps1` (Visual Studio 2022, CMake and 
 | [Teknic API reference](https://teknic-inc.github.io/ClearCore-library/) | The stock ClearCore library |
 | [docs/CoordinatedArcMotion](docs/CoordinatedArcMotion/README.md) | Coordinated motion: theory, usage, API, examples |
 | [NEW_FILES.md](NEW_FILES.md), [MODIFICATIONS.md](MODIFICATIONS.md) | What this fork adds and changes, and why |
+| [YouTube playlist](https://www.youtube.com/watch?v=EWpQybInKNM&list=PLRxe8AWf5tZQ&index=1) | Videos of the library and the projects built on it |
 | [LibraryDocs](LibraryDocs/README.md) | Knowledge base for the coordinated motion code and the controller apps |
 | Project READMEs | [ClearCNC](ClearCNC_Controller/README.md), [ClearAI](ClearAI_Controller/README.md) (also its `PROTOCOL.md` and `docs/`), [NewGControl](NewGControl/README.md) |
 
