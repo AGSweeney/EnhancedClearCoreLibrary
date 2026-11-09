@@ -216,6 +216,18 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 
 **Why**: an application can then read `lwip_stats.mem` and `lwip_stats.memp[]` (use, high water, allocation failures) to see that the 4 KB heap and the pools are not running out under load, as the ECam firmware's `diag` does in a 30-minute EtherNet/IP + telemetry test. It costs a few hundred bytes of RAM and a counter update per allocation; nothing changes in how the stack behaves.
 
+### 13. Ramped stop for coordinated motion (from ClearHPGL limit switches, 2026-11-08)
+
+**Files** (new-file changes, see NEW_FILES.md): `libClearCore/inc/CoordinatedMotionController.h`, `libClearCore/src/CoordinatedMotionController.cpp` — new `StopRamped(uint32_t decelStepsPerSec2)` and `StopRampedPending()`; `QueueStartPoint()` / `CommitQueuedMotion()` carry a queue epoch.
+
+**What**:
+- `StopRamped(decel)` stores a request (safe from the sample interrupt, e.g. a `SysMgr.SampleCallbackSet()` callback that reads a limit switch). At the top of the next `UpdateFast()` the controller drops the queue and replaces the running move with one straight move along the present direction, from the present speed (the mean of the last 16 samples' steps) down to rest at `decel`. On a line the tool stays on the line; on an arc it leaves along the tangent by v² / (2 × decel) at most. `IsActive()` turns false at rest. With nothing moving or queued it does nothing; `StopRamped(0)` is `Stop()`.
+- A stop (`Stop()`, `StopDecel()` or a ramped stop) bumps a queue epoch. A block built across it (`QueueLinear()` / `QueueArc()` between reading the start point and publishing the block, with interrupts enabled since section 7) is refused (returns false) instead of being committed after the stop with a start point the tool is no longer heading for.
+
+**Why**:
+- **Limit switches.** ClearHPGL stops an axis on a limit switch read in the sample callback; the stop has to start in that same 200 µs sample, from the interrupt, and be a controlled deceleration. `StopDecel()` cannot do that: in coordinated mode the StepGenerator's velocity is 0, so it ends the coordinated motion as abruptly as `Stop()`. ClearHPGL also uses `StopRamped()` for abort and jog release. Measured on a ClearPath CoreXY plotter: a 10 mm/s jog stops at a switch edge within the 3-sample filter; a 200 mm/s move at 3 × 5000 mm/s² stops about 2 mm past it; longest `UpdateFast()` 86 µs.
+- **Behaviour for existing users** (ClearAI's `MotionBridge` calls `StopDecel()`): unchanged, except that a `QueueLinear()` / `QueueArc()` racing a stop now returns false rather than queueing motion after it. Callers already handle false (zero-length or full queue).
+
 ## Summary
 
 **Modification Types** (sections above):
@@ -226,6 +238,7 @@ All modifications are by **Adam G. Sweeney <agsweeney@gmail.com>** (2026).
 5. **lwIP configuration** (10): room for an EtherNet/IP adapter's UDP sockets.
 6. **Motor enable fix** (11): a disable during the enable delay no longer leaves the motor marked enabled.
 7. **lwIP statistics** (12): heap and pool counters compiled in.
+8. **Ramped stop** (13): `CoordinatedMotionController::StopRamped()` for limit switches, abort and jog release, safe from the sample interrupt.
 
 **All Modifications Preserve**:
 - Original Teknic copyright and license

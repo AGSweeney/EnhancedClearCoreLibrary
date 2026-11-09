@@ -319,6 +319,29 @@ public:
     void StopDecel();
 
     /**
+        \brief Stop along the path with a controlled ramp (a feed hold that ends the motion).
+
+        On the next sample the running move is replaced by one straight move in the direction the
+        tool is going, from its present speed (the mean of the last 16 samples) down to rest at
+        decelStepsPerSec2, and everything queued is dropped. On a line the tool stays on it; on an
+        arc it leaves along the tangent, by v^2 / (2 x decel) at most (under 1 mm at 100 mm/s and
+        6000 mm/s^2). Safe to call from the sample interrupt (only a request is stored), so a limit
+        switch read there can stop the axes in the same sample. A move being queued when the stop
+        happens is refused (QueueLinear / QueueArc return false), so nothing runs on after it.
+        IsActive() turns false when the tool is at rest. Nothing to do when nothing is moving.
+
+        \param[in] decelStepsPerSec2 Deceleration along the path in steps/sec^2 (0 = Stop())
+    **/
+    void StopRamped(uint32_t decelStepsPerSec2);
+
+    /**
+        \brief A StopRamped() request not yet taken by the sample interrupt.
+    **/
+    bool StopRampedPending() const {
+        return m_rampStopDecel != 0;
+    }
+
+    /**
         \brief Check if coordinated motion is active
         
         \return true if motion is active
@@ -692,6 +715,16 @@ private:
     CoordKinematics m_kinematics = KINEMATICS_CARTESIAN;
     uint32_t m_motorVelMax = 0;  // per-motor speed cap (steps/s); 0 = none
     bool m_outputThisSample = false;  // UpdateFast: this sample's steps were written
+    // ClearHPGL ramped stop: the request, and the last 16 samples' Cartesian steps for the speed.
+    volatile uint32_t m_rampStopDecel = 0;
+    static const uint8_t RAMP_WINDOW = 16;
+    int32_t m_winX[RAMP_WINDOW] = {0}, m_winY[RAMP_WINDOW] = {0};
+    int32_t m_winSumX = 0, m_winSumY = 0;
+    uint8_t m_winIdx = 0;
+    // Bumped whenever the queue is cleared: a block built before it is not committed.
+    volatile uint32_t m_queueEpoch = 0;
+    uint32_t m_startEpoch = 0;
+    void RampStop();
     // Send one sample's Cartesian steps to the motors through the kinematics.
     void OutputSteps(int32_t stepsX, int32_t stepsY);
     // Path speed for a segment, lowered so no motor exceeds m_motorVelMax.
@@ -702,7 +735,7 @@ private:
     LinearInterpolator m_linearInterpolator;
     // ClearHPGL: build queue blocks with interrupts enabled (see QueueStartPoint in the .cpp).
     bool QueueStartPoint(int32_t *startX, int32_t *startY);
-    void CommitQueuedMotion();
+    bool CommitQueuedMotion();  // false: the queue was cleared since QueueStartPoint (a stop)
     void NoteIrqOff(uint32_t irqOffStart);
     // QueueArcTo hands its exact end point to QueueArc through these.
     bool m_exactEndPending = false;
